@@ -1,6 +1,6 @@
 ---
 title: "What I learnt adding AI to a system that assumed its components were reliable"
-description: "The model call was the easy part. The system around it had opinions about correctness that no longer held."
+description: "Notes on the assumptions the surrounding system was making, and which of them I had to change."
 published: 2026-02-09
 updated:
 featured: false
@@ -29,8 +29,8 @@ constrained outputs, a person at a well-chosen point, and a cheap way to detect 
 drifted.
 
 <Callout type="hypothesis">
-  The question that turned out to be worth asking early wasn’t "where do we add the model", but
-  "what does this system do when the model is confidently wrong, and who finds out".
+  The question I’d ask earlier next time: what does this system do when the model is confidently
+  wrong, and who finds out?
 </Callout>
 
 I’ve since assumed this generalises further than I’ve actually tested. It’s one system, and the

@@ -5,8 +5,7 @@
 export const SITE = {
   title: 'Ryan Nel',
   /** Used as the default meta description and in the RSS feed. */
-  description:
-    'Notes on AI engineering, agents and software architecture, from things I build and learn.',
+  description: 'Notes on building software, experimenting with AI, and what I learn along the way.',
   /** Must match `site` in astro.config.mjs. */
   url: 'https://ryannel.dev',
   author: 'Ryan Nel',
@@ -14,9 +13,7 @@ export const SITE = {
 } as const;
 
 export const INTRO = {
-  role: 'Senior Staff Software Engineer',
-  line: 'Senior Staff Software Engineer exploring how to build AI systems that can reason effectively over complex, real-world context.',
-  sub: 'I write about AI engineering, agents, software architecture, and things I learn while building them.',
+  line: 'Senior Staff Software Engineer. I build large software systems, experiment extensively with AI, and write down what I learn along the way.',
 } as const;
 
 /** Shown in the footer and on the about page. Order is preserved. */
@@ -36,7 +33,7 @@ export const NAV = [
  * the dates do that work, and a disclaimer on every piece reads as an apology.
  */
 export const NOTES_PREAMBLE =
-  "Things I’m learning while building and experimenting. Each note is dated, and left as it was written.";
+  "Things I’m learning while building and experimenting. They’re dated snapshots — if my thinking changes, I’ll usually write another one.";
 
 /** How many pieces the home page shows. */
 export const HOME_NOTE_COUNT = 5;

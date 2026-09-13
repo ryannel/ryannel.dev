@@ -1,6 +1,6 @@
 ---
 title: "What I learnt trying to give coding agents context across a large software system"
-description: "Repository access answered what the code was. It didn’t answer what the system was."
+description: "Notes on what an agent still didn’t know after I gave it access to the whole repository."
 published: 2026-07-22
 updated:
 featured: true
@@ -16,9 +16,9 @@ related:
 *Placeholder — this is sample content to show the reading experience.*
 
 In the system I was working on, repository-level context stopped being enough once tasks crossed
-service boundaries. An agent could read every file and still not know what the system was — the
-repo described structure, but not intent, ownership, invariants, or the reasons the last three
-people hadn’t done the obvious thing.
+service boundaries. It could read every file and still miss the things
+nobody had written down: intent, ownership, which invariants were actually enforced rather than
+just assumed, and why the last three people hadn’t done the obvious thing.
 
 <Figure
   src="/diagrams/repo-vs-system-model.svg"
