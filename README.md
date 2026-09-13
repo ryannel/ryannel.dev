@@ -47,8 +47,8 @@ and type errors — the same check CI runs.
 ## Writing a new note
 
 Everything dated is a Note, whether it is 300 words or 3,000. "Note" describes the stance, not the
-length or the ambition — there is no separate essay or article type, and adding one would be a
-mistake. `featured: true` is the only lever for giving a piece more prominence.
+length — there is no separate essay or article type. `featured: true` is the only lever for giving
+a piece more prominence.
 
 Create one file in `src/content/writing/`. The filename becomes the URL:
 `messy-real-world-context.mdx` → `/writing/messy-real-world-context/`. Pick it carefully, because
@@ -109,13 +109,12 @@ Available in any `.mdx` note without importing anything:
 <Callout type="update" label="Update — March 2027">What changed my mind.</Callout>
 ```
 
-### Changing your mind later
+### Revising a note
 
-Old notes stay as they were written. A note dated September 2026 means "this is what I was
-building, seeing and thinking in September 2026" — not "this is my current position". There is no
-obligation to keep old writing in line with what you believe now.
+Notes are dated snapshots, not living documentation. A note dated September 2026 records what was
+built, observed and understood in September 2026. It is not kept in line with a later view.
 
-When your thinking moves materially, in order of preference:
+When the thinking moves materially, in order of preference:
 
 1. write a new note;
 2. link it to the earlier one via `related:`;
@@ -128,9 +127,9 @@ When your thinking moves materially, in order of preference:
 </Callout>
 ```
 
-Set `updated:` in the frontmatter when you do that. Do not rewrite the original argument so that
-past-you agrees with present-you. Factual corrections, typos, broken links and formatting fixes
-are fine and need no update block.
+Set `updated:` in the frontmatter when adding one. The original argument stays as written — it is
+the record of what was thought at the time. Factual corrections, typos, broken links and
+formatting fixes need no update block.
 
 ### Images and diagrams
 
@@ -235,7 +234,7 @@ Recorded so these stay decisions rather than oversights, and so the site doesn't
   `image:` in a note's frontmatter to override it with a committed file.
 - **No theme framework.** The toggle is three states and about fifteen lines — see below.
 
-Before adding anything: does it help you publish useful writing, or help a reader understand your
+Before adding anything: does it help publish useful writing, or help a reader understand the
 work? If not, leave it out.
 
 ## How the theme toggle works

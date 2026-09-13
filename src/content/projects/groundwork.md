@@ -15,5 +15,5 @@ The main place I work out how to design systems that use AI as a component rathe
 Context assembly, evaluation, boundaries between deterministic and probabilistic parts, and the
 tooling I need to test any of it.
 
-It exists because I kept rebuilding the same scaffolding from scratch and kept relearning the same
-lessons. Most of the notes on this site come out of it.
+It exists because the same scaffolding kept getting rebuilt from scratch on each new experiment.
+Most of the notes on this site come out of it.
