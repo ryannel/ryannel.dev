@@ -1,6 +1,6 @@
 import { getCollection, type CollectionEntry } from 'astro:content';
 
-export type Note = CollectionEntry<'notes'>;
+export type Note = CollectionEntry<'writing'>;
 export type Project = CollectionEntry<'projects'>;
 
 const isPublished = (entry: { data: { draft: boolean } }) =>
@@ -8,7 +8,7 @@ const isPublished = (entry: { data: { draft: boolean } }) =>
 
 /** Published notes, newest first. Drafts are visible in `astro dev` only. */
 export async function getNotes(): Promise<Note[]> {
-  const notes = await getCollection('notes', isPublished);
+  const notes = await getCollection('writing', isPublished);
   return notes.sort((a, b) => b.data.published.valueOf() - a.data.published.valueOf());
 }
 

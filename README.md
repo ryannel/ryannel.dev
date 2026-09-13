@@ -8,7 +8,7 @@ Hosted on GitHub Pages, so hosting costs nothing.
 
 ```
 src/
-  content/notes/       one .mdx file per note (served at /writing/<slug>/)
+  content/writing/     one .mdx file per note, served at /writing/<slug>/
   content/projects/    one .md file per project
   content.config.ts    frontmatter schemas — the only place fields are defined
   consts.ts            name, links, taglines, how many notes the home page shows
@@ -50,7 +50,7 @@ Everything dated is a Note, whether it is 300 words or 3,000. "Note" describes t
 length or the ambition — there is no separate essay or article type, and adding one would be a
 mistake. `featured: true` is the only lever for giving a piece more prominence.
 
-Create one file in `src/content/notes/`. The filename becomes the URL:
+Create one file in `src/content/writing/`. The filename becomes the URL:
 `messy-real-world-context.mdx` → `/writing/messy-real-world-context/`. Pick it carefully, because
 changing it later breaks any link that is already out there.
 
@@ -277,9 +277,9 @@ manual override, so mobile browser chrome can differ from the page. Not worth sc
 
 ## Placeholder content
 
-The six notes in `src/content/notes/` and the three projects in `src/content/projects/` are
+The six notes in `src/content/writing/` and the three projects in `src/content/projects/` are
 placeholders, each marked with a "sample content" line. They exist to show the reading experience.
-Rewrite or delete them — `rm src/content/notes/*.mdx` is a fine way to start.
+Rewrite or delete them — `rm src/content/writing/*.mdx` is a fine way to start.
 
-One naming note: the content folder is `src/content/notes/` while the URL is `/writing/<slug>/`.
-"Writing" is the nav label, "Notes" is what the pieces are. Same single collection either way.
+The collection is `writing` throughout — folder, URL and schema. "Writing" is the section; a
+"Note" is one piece in it.

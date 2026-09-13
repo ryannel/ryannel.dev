@@ -20,8 +20,8 @@ const links = optional(
     .default([]),
 );
 
-const notes = defineCollection({
-  loader: glob({ base: './src/content/notes', pattern: '**/*.{md,mdx}' }),
+const writing = defineCollection({
+  loader: glob({ base: './src/content/writing', pattern: '**/*.{md,mdx}' }),
   schema: z.object({
     title: z.string(),
     description: z.string(),
@@ -36,7 +36,7 @@ const notes = defineCollection({
     /** "Related code / skill / project / discussion" links, rendered after the article. */
     links,
     /** Filenames of other notes, without the extension. */
-    related: optional(z.array(reference('notes')).default([])),
+    related: optional(z.array(reference('writing')).default([])),
   }),
 });
 
@@ -51,8 +51,8 @@ const projects = defineCollection({
     order: optional(z.number().default(100)),
     draft: optional(z.boolean().default(false)),
     links,
-    related: optional(z.array(reference('notes')).default([])),
+    related: optional(z.array(reference('writing')).default([])),
   }),
 });
 
-export const collections = { notes, projects };
+export const collections = { writing, projects };
