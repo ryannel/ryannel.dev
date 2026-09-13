@@ -1,0 +1,8 @@
+Source Serif 4 (variable, weight axis)
+From @fontsource-variable/source-serif-4 v5.3.0
+Upstream: https://github.com/adobe-fonts/source-serif
+Licence: SIL Open Font License 1.1 - see source-serif-4-LICENSE.txt
+
+Files are the latin and latin-ext weight-axis subsets. The optical-size (opsz)
+builds were rejected: 2.4x the bytes for a refinement that is marginal across
+the 18-34px range this site actually uses.

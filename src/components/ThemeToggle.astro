@@ -36,14 +36,25 @@
     if (!button) return;
 
     const ORDER = ['system', 'light', 'dark'];
+    const PAPER = { light: '#fdfcfa', dark: '#141413' };
+    const dark = matchMedia('(prefers-color-scheme: dark)');
     const describe = (theme) => `Theme: ${theme}. Change theme.`;
 
+    // The static pair in <head> is media-scoped and correct without scripting,
+    // but the spec picks the FIRST matching meta, so a manual override cannot
+    // simply be appended. Replace them with one meta this script owns.
+    document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.remove());
+    const meta = document.createElement('meta');
+    meta.name = 'theme-color';
+    document.head.appendChild(meta);
+
+    const paint = () => {
+      meta.content = PAPER[root.dataset.theme || (dark.matches ? 'dark' : 'light')];
+    };
+
     const apply = (theme) => {
-      if (theme === 'system') {
-        delete root.dataset.theme;
-      } else {
-        root.dataset.theme = theme;
-      }
+      if (theme === 'system') delete root.dataset.theme;
+      else root.dataset.theme = theme;
       try {
         if (theme === 'system') localStorage.removeItem('theme');
         else localStorage.setItem('theme', theme);
@@ -52,9 +63,12 @@
       }
       button.setAttribute('aria-label', describe(theme));
       button.title = describe(theme);
+      paint();
     };
 
     apply(root.dataset.theme || 'system');
+    // Keeps the browser chrome correct when the OS flips while System is selected.
+    dark.addEventListener('change', paint);
     button.addEventListener('click', () => {
       const current = root.dataset.theme || 'system';
       apply(ORDER[(ORDER.indexOf(current) + 1) % ORDER.length]);

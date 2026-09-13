@@ -1,20 +1,83 @@
 ---
+import { Image } from 'astro:assets';
+
 /**
- * An image or committed SVG diagram with a caption.
- * Usage in .mdx: <Figure src="/diagrams/agent-context.svg" alt="..." caption="..." />
+ * An image or committed SVG diagram, with space reserved before it loads.
+ *
+ * Two ways to use it, in order of preference:
+ *
+ *   1. Import the file, and Astro supplies the dimensions, a srcset and a
+ *      build-time optimised, smaller format:
+ *
+ *        import diagram from '../../assets/agent-context.png';
+ *        <Figure src={diagram} alt="..." caption="..." />
+ *
+ *   2. Reference something already in /public, in which case width and height
+ *      are required so the browser can reserve the right box:
+ *
+ *        <Figure src="/diagrams/x.svg" alt="..." width={640} height={280} />
+ *
+ * Images below the fold load lazily. Pass `eager` for one that genuinely
+ * appears in the first viewport; it is not a general-purpose speed-up.
  */
 interface Props {
-  src: string;
+  src: ImageMetadata | string;
   alt: string;
   caption?: string;
+  /** Required when src is a path into /public. */
   width?: number;
   height?: number;
+  /** Only for an image actually visible on load. */
+  eager?: boolean;
+  /** Overrides the default responsive widths for imported images. */
+  widths?: number[];
+  sizes?: string;
 }
 
-const { src, alt, caption, width, height } = Astro.props;
+const { src, alt, caption, width, height, eager = false, widths, sizes } = Astro.props;
+
+if (typeof src === 'string' && (!width || !height)) {
+  throw new Error(
+    `<Figure src="${src}"> needs width and height. Files under /public have no ` +
+      `metadata for Astro to read, so without them the page reflows when the ` +
+      `image arrives. Import the image instead and the dimensions come for free.`,
+  );
+}
+
+// The widest the column ever gets is --measure (39rem) plus a little slack.
+const DISPLAY_SIZES = '(min-width: 40rem) 624px, calc(100vw - 3rem)';
+
+// Never upscale: only offer widths the source can actually supply.
+const responsiveWidths =
+  typeof src === 'string'
+    ? undefined
+    : (widths ?? [...new Set([640, 960, 1280].filter((w) => w < src.width).concat(src.width))]);
 ---
 
 <figure>
-  <img src={src} alt={alt} width={width} height={height} loading="lazy" decoding="async" />
+  {
+    typeof src === 'string' ? (
+      <img
+        src={src}
+        alt={alt}
+        width={width}
+        height={height}
+        loading={eager ? 'eager' : 'lazy'}
+        fetchpriority={eager ? 'high' : 'auto'}
+        decoding={eager ? 'sync' : 'async'}
+      />
+    ) : (
+      <Image
+        src={src}
+        alt={alt}
+        widths={responsiveWidths}
+        sizes={sizes ?? DISPLAY_SIZES}
+        loading={eager ? 'eager' : 'lazy'}
+        fetchpriority={eager ? 'high' : 'auto'}
+        decoding={eager ? 'sync' : 'async'}
+        quality={85}
+      />
+    )
+  }
   {caption && <figcaption>{caption}</figcaption>}
 </figure>

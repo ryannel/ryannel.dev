@@ -29,18 +29,15 @@ import { ELSEWHERE } from '../consts';
       Nothing here reflects or discloses my employer’s work. Where a lesson comes from professional
       experience, it’s generalised.
     </p>
-    <p>
+    <p class="inline-links">
       {
-        ELSEWHERE.map((link, i) => (
-          <>
-            {i > 0 && ' · '}
-            <a href={link.href} rel="me">
-              {link.label}
-            </a>
-          </>
+        ELSEWHERE.map((link) => (
+          <a href={link.href} rel="me">
+            {link.label}
+          </a>
         ))
       }
-      {' · '}<a href="/rss.xml">RSS</a>
+      <a href="/rss.xml">RSS</a>
     </p>
   </div>
 </Base>

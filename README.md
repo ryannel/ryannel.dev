@@ -16,7 +16,7 @@ src/
   components/          head, header, footer, note list, callout, figure, date, theme toggle
   layouts/Base.astro   the page shell
   styles/global.css    the whole design — one file, tokens at the top
-public/                CNAME, robots.txt, favicon, og.png, diagrams/
+public/                CNAME, robots.txt, favicon, og.png, grain.png, fonts/, diagrams/
 ```
 
 ## Local development
@@ -40,6 +40,7 @@ Then open <http://localhost:4321>. Drafts are visible in dev and excluded from b
 | `npm run preview` | Serve `dist/` exactly as it will be deployed |
 | `npm run check` | Type-check and validate all frontmatter against the schemas |
 | `npm run og` | Regenerate `public/og.png` after editing `scripts/generate-og.mjs` |
+| `npm run grain` | Regenerate `public/grain.png`, the dark-mode texture |
 
 Run `npm run check` before pushing. It catches broken frontmatter, bad `related:` references
 and type errors — the same check CI runs.
@@ -133,15 +134,39 @@ formatting fixes need no update block.
 
 ### Images and diagrams
 
-Commit the file to `public/`, then reference it:
+The simplest pattern, and the one to reach for by default: put the file in `src/assets/` and
+import it.
 
 ```mdx
-<Figure src="/diagrams/repo-vs-system-model.svg" alt="Describe the diagram." caption="Optional." />
+import diagram from '../../assets/agent-context.png';
+
+<Figure src={diagram} alt="Describe the diagram." caption="Optional." />
 ```
+
+Importing gets you the dimensions, a `srcset`, and a smaller format, all at build time. There is
+no separate export or resizing step — commit the original and Astro does the rest.
+
+For something already in `public/`, width and height are required, because Astro has no metadata
+to read and without them the page reflows when the image lands:
+
+```mdx
+<Figure src="/diagrams/repo-vs-system-model.svg" alt="..." width={640} height={280} />
+```
+
+Leaving them out fails the build with an explanation rather than shipping the layout shift.
+
+Images load lazily by default. Pass `eager` only for one that is genuinely visible without
+scrolling — it sets high fetch priority, which is wasted if the image is further down.
 
 Diagrams are hand-written SVG rather than a rendering pipeline. Draw them with mid-tone neutral
 strokes (`#8a8781` is what `public/diagrams/repo-vs-system-model.svg` uses) so a single file is
-legible on both the light and dark background.
+legible on both the light and dark background. Nothing inverts images by theme.
+
+### Tables
+
+Write ordinary Markdown tables. They are wrapped in a scroll container automatically, so a wide
+one scrolls inside itself instead of widening the page, and the table keeps its real semantics —
+see `src/components/Table.astro`. This works in `.mdx`, which is what notes should be.
 
 ### Adding a project
 
@@ -236,6 +261,43 @@ Recorded so these stay decisions rather than oversights, and so the site doesn't
 
 Before adding anything: does it help publish useful writing, or help a reader understand the
 work? If not, leave it out.
+
+## Fonts
+
+Source Serif 4, self-hosted from `public/fonts/`, weight axis only. `public/fonts/SOURCE.txt`
+records the exact version and licence.
+
+The reason for a web font at all is consistency: the previous stack led with Charter, which exists
+on macOS and nowhere else, so Windows, Linux and Android each fell back to something different.
+
+Three decisions worth keeping:
+
+- **Weight axis, not optical size.** The `opsz` builds are 2.4x the bytes for a refinement that is
+  marginal across the 18-34px range this site actually uses.
+- **latin and latin-ext, not a subset of the current articles.** Subsetting against today's notes
+  would mean regenerating fonts whenever a piece contains a character the old ones lacked.
+  `unicode-range` means latin-ext is only fetched by a page that needs it, so it costs nothing
+  until it is used. Swedish letters and typographic punctuation are all in `latin`.
+- **Only the normal face is preloaded.** It is referenced from an external stylesheet, so without
+  the preload the browser cannot discover it until that CSS arrives. Measured: it is worth about
+  300ms of FCP. Italic is not on the critical path for most pages.
+
+The stack also declares two metric-matched fallbacks (`size-adjust: 95%` for Charter, `86%` for
+Georgia) so line wrapping barely moves when the real font swaps in.
+
+To drop the web font entirely, remove the `@font-face` blocks and the preload, and put `Charter`
+back at the front of `--font-prose`. Everything else keeps working.
+
+## Dark-mode texture
+
+`public/grain.png` is a 128x128 tile, 7.2 KiB, whose noise lives in its **alpha** channel. That
+means the CSS needs no `opacity`, no blend mode and no filter — it is a repeating background on
+`body`, behind the content, in dark mode only. There is no fixed overlay and so no full-viewport
+compositing layer. It is disabled for printing and for forced-colours mode, and publishing a note
+never requires regenerating it.
+
+It is meant to be imperceptible as a pattern. If it ever reads as dust, lower `MAX_ALPHA` in
+`scripts/generate-grain.mjs` and run `npm run grain`.
 
 ## How the theme toggle works
 

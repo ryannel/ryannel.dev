@@ -4,6 +4,7 @@ import { getEntries, render } from 'astro:content';
 import Base from '../../layouts/Base.astro';
 import Callout from '../../components/Callout.astro';
 import Figure from '../../components/Figure.astro';
+import Table from '../../components/Table.astro';
 import FormattedDate from '../../components/FormattedDate.astro';
 import { getNotes, noteHref, readingTime } from '../../lib/notes';
 
@@ -39,8 +40,8 @@ const links = note.data.links;
     </header>
 
     <div class="prose">
-      {/* Callout and Figure are available in any .mdx note without importing them. */}
-      <Content components={{ Callout, Figure }} />
+      {/* Available in any .mdx note without importing them; `table` wraps Markdown tables. */}
+      <Content components={{ Callout, Figure, table: Table }} />
     </div>
 
     {

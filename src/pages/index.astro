@@ -39,16 +39,13 @@ const projects = (await getProjects()).slice(0, 3);
     <h2 class="label">Elsewhere</h2>
     <p class="inline-links">
       {
-        ELSEWHERE.map((link, i) => (
-          <>
-            {i > 0 && ' · '}
-            <a href={link.href} rel="me">
-              {link.label}
-            </a>
-          </>
+        ELSEWHERE.map((link) => (
+          <a href={link.href} rel="me">
+            {link.label}
+          </a>
         ))
       }
-      {' · '}<a href="/rss.xml">RSS</a>
+      <a href="/rss.xml">RSS</a>
     </p>
   </section>
 </Base>

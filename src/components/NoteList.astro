@@ -19,7 +19,7 @@ const { notes, showReadingTime = true } = Astro.props;
           {note.data.title}
           {note.data.draft && <span class="draft-flag">Draft</span>}
         </a>
-        <p>{note.data.description}</p>
+        <p class="note-description">{note.data.description}</p>
         <p class="meta">
           <FormattedDate date={note.data.published} />
           {note.data.updated && <FormattedDate date={note.data.updated} prefix="updated" />}

@@ -8,7 +8,8 @@
     "build": "astro build",
     "preview": "astro preview",
     "check": "astro check",
-    "og": "node scripts/generate-og.mjs"
+    "og": "node scripts/generate-og.mjs",
+    "grain": "node scripts/generate-grain.mjs"
   },
   "dependencies": {
     "@astrojs/mdx": "^8.0.1",

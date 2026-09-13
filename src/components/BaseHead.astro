@@ -12,10 +12,13 @@ interface Props {
   modifiedTime?: Date;
 }
 
+/** The one committed social card. Regenerate with `npm run og`. */
+const DEFAULT_OG = { src: '/og.png', width: 1200, height: 630, alt: 'Ryan Nel — ryannel.dev' };
+
 const {
   title,
   description = SITE.description,
-  image = '/og.png',
+  image = DEFAULT_OG.src,
   type = 'website',
   publishedTime,
   modifiedTime,
@@ -25,6 +28,9 @@ const {
 const path = Astro.url.pathname.endsWith('/') ? Astro.url.pathname : `${Astro.url.pathname}/`;
 const canonical = new URL(path, SITE.url);
 const socialImage = new URL(image, SITE.url);
+// Dimensions are only asserted for the committed default card; a per-note
+// override is an arbitrary file whose size we do not know here.
+const isDefaultCard = image === DEFAULT_OG.src;
 const fullTitle = title === SITE.title ? title : `${title} — ${SITE.title}`;
 ---
 
@@ -33,6 +39,20 @@ const fullTitle = title === SITE.title ? title : `${title} — ${SITE.title}`;
 <title>{fullTitle}</title>
 <meta name="description" content={description} />
 <link rel="canonical" href={canonical} />
+
+<!--
+  Only the normal latin face is preloaded. It is referenced from an external
+  stylesheet, so without this the browser cannot discover it until that CSS has
+  arrived. Italic is not on the critical path for most pages, and latin-ext only
+  loads when a page actually contains those characters.
+-->
+<link
+  rel="preload"
+  href="/fonts/source-serif-4-latin-wght-normal.woff2"
+  as="font"
+  type="font/woff2"
+  crossorigin
+/>
 
 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 <meta name="color-scheme" content="light dark" />
@@ -44,6 +64,15 @@ const fullTitle = title === SITE.title ? title : `${title} — ${SITE.title}`;
 <meta property="og:description" content={description} />
 <meta property="og:url" content={canonical} />
 <meta property="og:image" content={socialImage} />
+{
+  isDefaultCard && (
+    <>
+      <meta property="og:image:width" content={String(DEFAULT_OG.width)} />
+      <meta property="og:image:height" content={String(DEFAULT_OG.height)} />
+      <meta property="og:image:alt" content={DEFAULT_OG.alt} />
+    </>
+  )
+}
 <meta property="og:site_name" content={SITE.title} />
 <meta property="og:locale" content="en_GB" />
 {publishedTime && <meta property="article:published_time" content={publishedTime.toISOString()} />}
@@ -53,6 +82,7 @@ const fullTitle = title === SITE.title ? title : `${title} — ${SITE.title}`;
 <meta name="twitter:title" content={fullTitle} />
 <meta name="twitter:description" content={description} />
 <meta name="twitter:image" content={socialImage} />
+{isDefaultCard && <meta name="twitter:image:alt" content={DEFAULT_OG.alt} />}
 
 <link
   rel="alternate"
