@@ -7,8 +7,8 @@ links:
   - label: "GitHub"
     href: "https://github.com/ryannel"
 related:
-  - context-is-the-hard-part
-  - coding-agents-need-a-system-model
+  - messy-real-world-context
+  - coding-agents-context-across-a-large-system
 ---
 
 The main place I work out how to design systems that use AI as a component rather than a feature.

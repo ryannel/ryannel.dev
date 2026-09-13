@@ -48,4 +48,4 @@ export function isoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
-export const noteHref = (id: string) => `/notes/${id}/`;
+export const noteHref = (id: string) => `/writing/${id}/`;

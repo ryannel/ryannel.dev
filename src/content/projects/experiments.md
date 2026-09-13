@@ -4,7 +4,7 @@ description: "Selected technical and creative experiments where there’s someth
 status: "Ongoing"
 order: 3
 related:
-  - character-loras-consistency-control
+  - training-character-loras
   - ai-leadership-coach-private-context
 ---
 

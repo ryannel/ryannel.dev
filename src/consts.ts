@@ -26,14 +26,17 @@ export const ELSEWHERE = [
 ] as const;
 
 export const NAV = [
-  { label: 'Notes', href: '/notes/' },
+  { label: 'Writing', href: '/writing/' },
   { label: 'Projects', href: '/projects/' },
   { label: 'About', href: '/about/' },
 ] as const;
 
-/** Shown once at the top of the notes index. Deliberately not repeated on every note. */
+/**
+ * Shown once at the top of the writing index. Deliberately not repeated on every note —
+ * the dates do that work, and a disclaimer on every piece reads as an apology.
+ */
 export const NOTES_PREAMBLE =
-  "These are notes from things I’m building and learning. My thinking will probably change.";
+  "Things I’m learning while building and experimenting. Each note is dated, and left as it was written.";
 
-/** How many notes the home page shows. */
+/** How many pieces the home page shows. */
 export const HOME_NOTE_COUNT = 5;

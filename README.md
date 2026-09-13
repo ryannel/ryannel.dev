@@ -1,6 +1,6 @@
 # ryannel.dev
 
-A small personal site: notes, projects, and a short about page.
+A small personal site: writing, projects, and a short about page.
 
 Astro, static output, Markdown/MDX content, no backend, no database, no CMS, no analytics.
 The only JavaScript is the theme toggle — two small inline scripts, no bundle, no network request.
@@ -8,11 +8,11 @@ Hosted on GitHub Pages, so hosting costs nothing.
 
 ```
 src/
-  content/notes/       one .mdx file per note
+  content/notes/       one .mdx file per note (served at /writing/<slug>/)
   content/projects/    one .md file per project
   content.config.ts    frontmatter schemas — the only place fields are defined
   consts.ts            name, links, taglines, how many notes the home page shows
-  pages/               home, /notes, /notes/<slug>, /projects, /about, /rss.xml, 404
+  pages/               home, /writing, /writing/<slug>, /projects, /about, /rss.xml, 404
   components/          head, header, footer, note list, callout, figure, date, theme toggle
   layouts/Base.astro   the page shell
   styles/global.css    the whole design — one file, tokens at the top
@@ -46,9 +46,13 @@ and type errors — the same check CI runs.
 
 ## Writing a new note
 
+Everything dated is a Note, whether it is 300 words or 3,000. "Note" describes the stance, not the
+length or the ambition — there is no separate essay or article type, and adding one would be a
+mistake. `featured: true` is the only lever for giving a piece more prominence.
+
 Create one file in `src/content/notes/`. The filename becomes the URL:
-`context-is-the-hard-part.mdx` → `/notes/context-is-the-hard-part/`. Pick it carefully, because
-changing it later breaks any link you have circulated.
+`messy-real-world-context.mdx` → `/writing/messy-real-world-context/`. Pick it carefully, because
+changing it later breaks any link that is already out there.
 
 ```mdx
 ---
@@ -71,25 +75,28 @@ omitted.
 | `title` | Used as the page heading, `<title>` and social preview title |
 | `description` | One sentence. Shown under the title, in lists, in RSS and in social previews |
 | `published` | `YYYY-MM-DD`. The note's date, and its sort order |
-| `updated` | Set this only for a substantive revision, not a typo fix |
+| `updated` | Only when you add a dated update block. Not for typos or broken links |
 | `featured` | `true` floats it to the top of the home page |
 | `draft` | `true` keeps it out of the build; still visible in `npm run dev` |
 | `tags` | Optional, descriptive only — there are deliberately no tag pages |
 | `image` | Optional path to a social preview image, e.g. `/og/context.png` |
-| `links` | Related code, skills, projects or a LinkedIn discussion — rendered at the end |
+| `links` | Anything worth pointing at — code, a skill, a project, a discussion elsewhere |
 | `related` | Filenames (without extension) of other notes — rendered at the end |
 
 Example of the optional end matter:
 
 ```yaml
 links:
-  - label: "Related code — groundwork/context"
+  - label: "The code this came from"
     href: "https://github.com/ryannel/groundwork"
-  - label: "Discussion on LinkedIn"
-    href: "https://www.linkedin.com/posts/..."
+  - label: "Discussion"
+    href: "https://example.com/thread"
 related:
-  - coding-agents-need-a-system-model
+  - coding-agents-context-across-a-large-system
 ```
+
+`links` is deliberately generic — no platform is assumed or privileged. Add one when a particular
+piece actually has somewhere worth pointing, and leave it out otherwise.
 
 ### Callouts
 
@@ -102,9 +109,28 @@ Available in any `.mdx` note without importing anything:
 <Callout type="update" label="Update — March 2027">What changed my mind.</Callout>
 ```
 
-Use `update` when you revise a note rather than silently rewriting it — a note should stay
-identifiable as what you believed when you wrote it. Set `updated:` in the frontmatter at the
-same time.
+### Changing your mind later
+
+Old notes stay as they were written. A note dated September 2026 means "this is what I was
+building, seeing and thinking in September 2026" — not "this is my current position". There is no
+obligation to keep old writing in line with what you believe now.
+
+When your thinking moves materially, in order of preference:
+
+1. write a new note;
+2. link it to the earlier one via `related:`;
+3. if it helps a reader, add a short dated update to the old note pointing at the new thinking:
+
+```mdx
+<Callout type="update" label="Update — March 2027">
+  I've changed my mind about part of this. I wrote about what changed
+  [here](/writing/the-newer-note/).
+</Callout>
+```
+
+Set `updated:` in the frontmatter when you do that. Do not rewrite the original argument so that
+past-you agrees with present-you. Factual corrections, typos, broken links and formatting fixes
+are fine and need no update block.
 
 ### Images and diagrams
 
@@ -200,8 +226,11 @@ Recorded so these stay decisions rather than oversights, and so the site doesn't
   it would go. Nothing else needs to change, and no cookie banner is required for those.
 - **No tag or category pages.** `tags` is descriptive metadata, not navigation.
 - **No per-project pages.** Projects are short; they render on one page.
-- **No comments, share buttons, newsletter, or search.** Distribution happens on LinkedIn and
-  elsewhere; the site is the archive.
+- **No comments, share buttons, newsletter, follower counts or engagement metrics.** The site is
+  the canonical archive. Distribution is per-piece and manual: some notes are worth submitting
+  somewhere, most are not, and the site does not depend on any of it. No platform is the default,
+  and none should get an integration.
+- **No separate essay, article or long-form type.** Everything dated is a Note.
 - **No per-note generated social images.** One static `public/og.png` covers every page. Set
   `image:` in a note's frontmatter to override it with a committed file.
 - **No theme framework.** The toggle is three states and about fifteen lines — see below.
@@ -252,5 +281,5 @@ The six notes in `src/content/notes/` and the three projects in `src/content/pro
 placeholders, each marked with a "sample content" line. They exist to show the reading experience.
 Rewrite or delete them — `rm src/content/notes/*.mdx` is a fine way to start.
 
-Things to change before going live, all in `src/consts.ts`: the GitHub and LinkedIn URLs are
-guesses based on the domain name and need checking.
+One naming note: the content folder is `src/content/notes/` while the URL is `/writing/<slug>/`.
+"Writing" is the nav label, "Notes" is what the pieces are. Same single collection either way.

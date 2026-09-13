@@ -1,0 +1,33 @@
+---
+title: "What I learnt training character LoRAs for consistent scenes"
+description: "A detour into image generation that changed how I evaluate anything generative."
+published: 2026-03-18
+updated:
+featured: false
+draft: false
+tags: ["generative", "evaluation"]
+---
+
+*Placeholder — this is sample content to show the reading experience.*
+
+I spent a few weeks training character LoRAs, mostly out of curiosity. It turned into the most
+useful thing I did that quarter, for reasons that had little to do with images.
+
+Getting a consistent character turned out to be an evaluation problem wearing a costume. I couldn’t
+tell whether a run was better by looking at one output. I needed a fixed set of prompts, the same
+seeds, and the discipline to compare like with like — otherwise I was just reacting to whichever
+sample happened to look good.
+
+<Callout type="surprise">
+  Dataset composition mattered far more than training configuration. Twenty well-chosen images beat
+  two hundred mediocre ones, and beat almost any amount of hyperparameter fiddling on the same bad
+  set.
+</Callout>
+
+The part I’ve carried into other work: when the output is subjective, I make no progress until I
+fix what I’m comparing against before I start changing things. That has held for the prompts,
+agents and retrieval strategies I’ve tried it on since, though I came to it from faces.
+
+One more, which cost me a week: pushing likeness hard enough cost me the ability to put the
+character in new situations. I suspect something similar shows up whenever I tune hard on a narrow
+objective, but I’ve only actually watched it happen here.

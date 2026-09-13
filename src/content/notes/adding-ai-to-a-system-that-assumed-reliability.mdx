@@ -1,0 +1,37 @@
+---
+title: "What I learnt adding AI to a system that assumed its components were reliable"
+description: "The model call was the easy part. The system around it had opinions about correctness that no longer held."
+published: 2026-02-09
+updated:
+featured: false
+draft: false
+tags: ["architecture"]
+related:
+  - messy-real-world-context
+---
+
+*Placeholder — this is sample content to show the reading experience.*
+
+My first version was a model call behind an existing interface. It worked, briefly, and then it ran
+into the fact that everything around it had been designed on the assumption that its components are
+deterministic and usually right.
+
+The assumptions that quietly broke:
+
+- errors are exceptional rather than routine;
+- the same input produces the same output;
+- correctness can be checked at the boundary;
+- retries are cheap and safe.
+
+None of those held here. What I ended up doing was treating confident wrongness as a normal
+operating condition and putting something in the architecture to catch it — verification,
+constrained outputs, a person at a well-chosen point, and a cheap way to detect that the answer had
+drifted.
+
+<Callout type="hypothesis">
+  The question that turned out to be worth asking early wasn’t "where do we add the model", but
+  "what does this system do when the model is confidently wrong, and who finds out".
+</Callout>
+
+I’ve since assumed this generalises further than I’ve actually tested. It’s one system, and the
+places it bit me might be specific to how that one was built.

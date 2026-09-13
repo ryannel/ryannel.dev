@@ -7,7 +7,7 @@ links:
   - label: "skills.sh"
     href: "https://skills.sh"
 related:
-  - skills-tools-agents-boundaries
+  - line-between-skills-tools-and-agents
 ---
 
 Where I turn a specific thing I’ve worked out into something reusable, and publish it through

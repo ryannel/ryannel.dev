@@ -16,7 +16,10 @@ const byYear = notes.reduce<Map<number, Note[]>>((acc, note) => {
 const years = [...byYear.entries()].sort((a, b) => b[0] - a[0]);
 ---
 
-<Base title="Notes" description="Working notes on AI engineering, agents and software architecture.">
+<Base
+  title="Notes"
+  description="Things I’m learning while building — AI engineering, agents, software architecture."
+>
   <h1 class="page-title">Notes</h1>
   <p class="page-intro">{NOTES_PREAMBLE}</p>
 

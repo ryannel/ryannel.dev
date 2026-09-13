@@ -1,0 +1,64 @@
+---
+title: "What surprised me while trying to make AI systems work with messy real-world context"
+description: "The failures I hit weren’t reasoning failures. They were context failures, and they were quiet."
+published: 2026-09-04
+updated:
+featured: true
+draft: false
+tags: ["context", "agents"]
+links:
+  - label: "Related project — Groundwork"
+    href: "/projects/#groundwork"
+related:
+  - coding-agents-context-across-a-large-system
+---
+
+*Placeholder — this is sample content to show the reading experience.*
+
+Every time I watched an agent fail on one of these systems, the postmortem landed in the same
+place. The model could reason. It just didn’t have the right things in front of it, and nothing in
+the system knew that.
+
+## The failures didn’t announce themselves
+
+A reasoning failure looks like a reasoning failure. A context failure looked like a confident,
+plausible, wrong answer — which was harder to catch, because the output had the same shape as a
+good one.
+
+<Callout type="surprise">
+  The runs that worried me most weren’t the ones that failed loudly. They were the ones that
+  produced something reasonable from a partial picture and gave no signal that the picture was
+  partial.
+</Callout>
+
+## What happened when I widened the context window
+
+My first reflex was to give it more. That helped up to a point, and then it stopped helping in ways
+I didn’t notice for a while:
+
+- retrieval that was *topically* relevant but structurally irrelevant;
+- three versions of the same fact, one of them stale;
+- everything the system knew, and nothing about what mattered.
+
+What moved the needle for me was treating context assembly as its own component with its own
+contract — something I could test:
+
+```python
+# The unit under test isn't the model. It's what reaches the model.
+def test_migration_context_includes_owning_service():
+    ctx = assemble(task="rename column", entity="orders.customer_ref")
+    assert ctx.includes_schema_owner()
+    assert ctx.excludes_unrelated_services()
+```
+
+Once context assembly was a testable thing, my questions got sharper. Not "is the model good
+enough", but "did the right five facts reach it, and how would I know".
+
+> The interesting work turned out not to be the prompt. It was everything that decided what the
+> prompt got to say.
+
+<Callout type="hypothesis">
+  In the systems I’ve worked on, the limit has been context engineering rather than model
+  capability — and it behaved like a systems problem, not a prompting one. That’s a narrow slice of
+  systems, and I don’t know yet how far it carries.
+</Callout>

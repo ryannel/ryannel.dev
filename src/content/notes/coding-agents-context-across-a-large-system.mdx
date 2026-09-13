@@ -1,0 +1,46 @@
+---
+title: "What I learnt trying to give coding agents context across a large software system"
+description: "Repository access answered what the code was. It didn’t answer what the system was."
+published: 2026-07-22
+updated:
+featured: true
+draft: false
+tags: ["agents", "architecture"]
+links:
+  - label: "Related project — Groundwork"
+    href: "/projects/#groundwork"
+related:
+  - messy-real-world-context
+---
+
+*Placeholder — this is sample content to show the reading experience.*
+
+In the system I was working on, repository-level context stopped being enough once tasks crossed
+service boundaries. An agent could read every file and still not know what the system was — the
+repo described structure, but not intent, ownership, invariants, or the reasons the last three
+people hadn’t done the obvious thing.
+
+<Figure
+  src="/diagrams/repo-vs-system-model.svg"
+  alt="Two stacked layers: a repository layer of files and modules, and a system model layer of boundaries, invariants and ownership."
+  caption="The repo was the bottom layer. In this system, most of what the agent needed to reason correctly lived in the layer above it."
+/>
+
+## What was missing was mostly implicit
+
+The things the engineers around me held in their heads on day 200 and not on day 1:
+
+- which boundaries were real and which were accidental;
+- what was load-bearing versus what was vestigial;
+- which invariants were enforced in code, and which only by convention;
+- what a change here tended to break over there.
+
+<Callout type="failed">
+  I spent a while trying to recover this from the codebase automatically — call graphs, commit
+  archaeology, ownership heuristics. It produced something that looked like a system model and
+  behaved like noise. The signal that mattered was never written down anywhere I could read it.
+</Callout>
+
+So I started writing parts of it down explicitly, as a thin artefact next to the code rather than a
+document that rots in a wiki. That’s early, and I don’t know yet whether it survives contact with a
+system that changes weekly. Ask me in six months.
