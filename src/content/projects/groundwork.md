@@ -3,6 +3,9 @@ name: "Groundwork"
 description: "Patterns and tooling for designing AI-enabled systems."
 status: "Active"
 order: 1
+links:
+  - label: "GitHub"
+    href: "https://github.com/ryannel/GroundWork"
 related:
   - messy-real-world-context
   - coding-agents-context-across-a-large-system
