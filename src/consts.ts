@@ -12,8 +12,14 @@ export const SITE = {
   locale: 'en',
 } as const;
 
+/**
+ * The home page opening. Two parts, deliberately: who is writing, then what the
+ * writing is about. `line` is also the home page's meta description, so it has
+ * to stand on its own out of context.
+ */
 export const INTRO = {
-  line: 'Senior Staff Software Engineer. I build large software systems, experiment extensively with AI, and write down what I learn along the way.',
+  who: 'I’m Ryan, a Senior Staff Software Engineer in Gothenburg. I build large software systems, and explore what changes when AI becomes part of them.',
+  line: 'Notes on architecture, context, and what breaks in practice.',
 } as const;
 
 /** Shown in the footer and on the about page. Order is preserved. */
@@ -35,5 +41,8 @@ export const NAV = [
 export const NOTES_PREAMBLE =
   "Things I’m learning while building and experimenting. They’re dated snapshots — if my thinking changes, I’ll usually write another one.";
 
-/** How many pieces the home page shows. */
-export const HOME_NOTE_COUNT = 5;
+/**
+ * How many pieces the home page shows: one lead and up to two behind it.
+ * A selection, not an archive — /writing/ is the archive.
+ */
+export const HOME_NOTE_COUNT = 3;

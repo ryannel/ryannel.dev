@@ -1,7 +1,7 @@
 ---
 import Base from '../layouts/Base.astro';
 import NoteList from '../components/NoteList.astro';
-import { ELSEWHERE, HOME_NOTE_COUNT, INTRO, SITE } from '../consts';
+import { HOME_NOTE_COUNT, INTRO, SITE } from '../consts';
 import { getHomeNotes, getProjects } from '../lib/notes';
 
 const notes = await getHomeNotes(HOME_NOTE_COUNT);
@@ -11,7 +11,8 @@ const projects = (await getProjects()).slice(0, 3);
 <Base title={SITE.title} description={INTRO.line}>
   <div class="lede">
     <h1>Ryan Nel</h1>
-    <p>{INTRO.line}</p>
+    <p>{INTRO.who}</p>
+    <p class="lede-sub">{INTRO.line}</p>
   </div>
 
   {/* A heading over nothing, above a link to an empty page, reads as a fault
@@ -20,7 +21,7 @@ const projects = (await getProjects()).slice(0, 3);
     notes.length > 0 && (
       <section class="section">
         <h2 class="label">Selected writing</h2>
-        <NoteList notes={notes} showReadingTime={false} />
+        <NoteList notes={notes} showReadingTime={false} lead />
         <p class="section-more">
           <a href="/writing/">All writing</a>
         </p>
@@ -36,7 +37,9 @@ const projects = (await getProjects()).slice(0, 3);
           {projects.map((project) => (
             <li>
               <a href={`/projects/#${project.id}`}>{project.data.name}</a>
-              <p>{project.data.description}</p>
+              {/* The same class the notes above use: one description treatment,
+                  so the two lists read as one page rather than two designs. */}
+              <p class="note-description">{project.data.description}</p>
             </li>
           ))}
         </ul>
@@ -46,18 +49,4 @@ const projects = (await getProjects()).slice(0, 3);
       </section>
     )
   }
-
-  <section class="section">
-    <h2 class="label">Elsewhere</h2>
-    <p class="inline-links">
-      {
-        ELSEWHERE.map((link) => (
-          <a href={link.href} rel="me">
-            {link.label}
-          </a>
-        ))
-      }
-      <a href="/rss.xml">RSS</a>
-    </p>
-  </section>
 </Base>

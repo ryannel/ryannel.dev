@@ -8,6 +8,7 @@
     "build": "astro build",
     "preview": "astro preview",
     "check": "astro check",
+    "test": "node scripts/test-visibility.mjs",
     "og": "node scripts/generate-og.mjs",
     "grain": "node scripts/generate-grain.mjs",
     "verify": "node scripts/verify-build.mjs"

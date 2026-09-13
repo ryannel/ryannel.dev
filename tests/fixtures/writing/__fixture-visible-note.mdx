@@ -1,0 +1,39 @@
+---
+title: "Fixture — a published note that other fixtures point at"
+description: "The reference that has to survive filtering, and the MDX half of the table check."
+published: 2026-01-02
+---
+
+A pipe table written in Markdown, inside an `.mdx` file:
+
+| Column | Second column with a long heading | Third |
+| --- | --- | --- |
+| `PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN` | value | x |
+
+A table written as markup, which reaches the processor as JSX rather than as a
+Markdown node — the case that escaped the wrapper once already:
+
+<table>
+  <thead>
+    <tr>
+      <th>One</th>
+      <th>Two</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>a</td>
+      <td>b</td>
+    </tr>
+  </tbody>
+</table>
+
+A figure from /public, with the dimensions the component requires:
+
+<Figure
+  src="/diagrams/repo-vs-system-model.svg"
+  width={640}
+  height={280}
+  alt="Fixture diagram."
+  caption="A public-path figure with explicit dimensions."
+/>

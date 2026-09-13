@@ -1,0 +1,37 @@
+name: Validate pull request
+
+on:
+  pull_request:
+    branches: [main]
+
+# Read-only. This workflow builds and checks; it never deploys and never writes
+# to the repository, so a pull request from a fork cannot gain any permission.
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run check
+
+      # No analytics token: a pull-request build is not production, and the
+      # beacon's host guard is asserted by verify against a build without one.
+      - run: npm run build
+
+      - run: npm run verify
+
+      - run: npm test

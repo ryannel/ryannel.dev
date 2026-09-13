@@ -22,8 +22,10 @@ So I started writing what I needed down as agent skills instead, where I can kee
 of it comes out of my own workflow and the things I got wrong before they worked; some covers tools
 I haven’t used myself and is research rather than experience.
 
-Everything so far is generative media: one skill per model for the image and video generators worth
-knowing, plus cross-model ones for character LoRA training, production pipelines, and running
-ComfyUI on rented GPUs. An atlas skill sits at the front to route a goal to the right model.
+Everything so far is generative media: one skill per model for the image and video generators
+worth knowing, plus cross-model ones for character LoRA training, production pipelines, and running
+ComfyUI on rented GPUs. An atlas sits at the front and routes a whole goal to the skills it needs,
+settling most model choices on licence before quality.
 
-Install with `npx skills add ryannel/skills`, or pass `--list` to browse first.
+Install with `npx skills add ryannel/skills`, or pass `--list` to read the set before installing
+anything.

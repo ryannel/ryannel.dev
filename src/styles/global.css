@@ -465,6 +465,15 @@ h4 {
   max-width: 34rem;
 }
 
+/*
+ * A page that is all prose and no article furniture — /about. Slightly narrower
+ * than the 39rem article measure because there is no title or metadata above it
+ * to set the width.
+ */
+.page-prose {
+  max-width: 34rem;
+}
+
 /* Small uppercase label used for section headings and metadata. */
 .label {
   font-family: var(--font-ui);
@@ -500,14 +509,34 @@ h4 {
   gap: 2.25rem;
 }
 
+/*
+ * The title carries the list. At 1.125rem it sat under the body size on desktop
+ * and read as a link in a paragraph; a step above the prose is what makes the
+ * list scan as a set of things to choose between.
+ */
 .note-list > li > a {
   display: block;
-  font-size: 1.125rem;
+  font-size: 1.3125rem;
   font-weight: 600;
   color: var(--ink);
   text-decoration: none;
-  line-height: 1.35;
+  line-height: 1.3;
   text-wrap: balance;
+}
+
+/*
+ * The lead. One step up and a little more room beneath it — enough to read as
+ * "start here", not enough to become a banner. Only above 40rem: on a phone the
+ * lead is already first and a larger title just costs it another two lines.
+ */
+@media (min-width: 40rem) {
+  .note-list > li.is-lead > a {
+    font-size: 1.5rem;
+  }
+
+  .note-list > li.is-lead {
+    margin-bottom: 0.75rem;
+  }
 }
 
 .note-list > li > a:hover {
@@ -516,10 +545,14 @@ h4 {
   text-decoration-color: var(--accent);
 }
 
+/*
+ * The reason to read, so it is set at reading size — the muted colour is what
+ * puts it behind the title, not a smaller type size. At 0.95em it was 16px and
+ * read as a caption.
+ */
 .note-list .note-description {
-  margin: 0.35rem 0 0.5rem;
+  margin: 0.4rem 0 0.55rem;
   color: var(--ink-muted);
-  font-size: 0.95em;
 }
 
 /* Metadata is deliberately last in the hierarchy; .meta sets its own size. */
@@ -527,7 +560,8 @@ h4 {
   margin: 0;
 }
 
-.draft-flag {
+/* `astro dev` only: Draft or Sample. A build has no hidden entries to badge. */
+.hidden-flag {
   font-family: var(--font-ui);
   font-size: 0.75rem;
   font-weight: 600;
@@ -857,17 +891,31 @@ pre.astro-code {
   margin: 0 0 3.5rem;
 }
 
+/*
+ * The one place on the site that gets a genuinely large size. Fluid between a
+ * 320px phone and the desktop column so it is never wider than its line: 28px
+ * at the narrow end, 38px once there is room. Below it the type steps down
+ * twice — 18px introduction, then the 21px list titles — so the page opens with
+ * a clear order rather than three things at almost the same size.
+ */
 .lede h1 {
-  font-size: 1.625rem;
-  margin-bottom: 0.75rem;
+  font-size: clamp(1.75rem, 1.1rem + 3.2vw, 2.375rem);
+  letter-spacing: -0.015em;
+  margin-bottom: 0.9rem;
 }
 
 .lede p {
-  margin: 0 0 0.75rem;
+  margin: 0 0 0.6rem;
 }
 
 .lede p:last-child {
   margin-bottom: 0;
+}
+
+/* The second line says what the writing is about; muted, so the first line
+   stays the sentence a reader lands on. */
+.lede-sub {
+  color: var(--ink-muted);
 }
 
 .section {
@@ -882,21 +930,6 @@ pre.astro-code {
   font-family: var(--font-ui);
   font-size: 0.875rem;
   margin-top: 1.75rem;
-}
-
-/*
- * A wrapping row of links, the same treatment as the footer's. It used to put a
- * middot between them with a ::before, which left the separator stranded at the
- * end of a line as soon as the row wrapped — at 320px, or at large text sizes.
- * A gap cannot be orphaned.
- */
-.inline-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem 1.25rem;
-  font-family: var(--font-ui);
-  font-size: 0.875rem;
-  margin: 0;
 }
 
 .project {
@@ -925,6 +958,27 @@ pre.astro-code {
   margin: 0 0 0.75rem;
 }
 
+/* Sits tighter than a section .label: it heads a row, not a page section. */
+.project .project-related-heading {
+  margin: 1.5rem 0 0.5rem;
+}
+
+.project-related {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-family: var(--font-ui);
+  font-size: 0.875rem;
+}
+
+/*
+ * A wrapping row of links. It used to put a middot between them with a ::before,
+ * which left the separator stranded at the end of a line as soon as the row
+ * wrapped — at 320px, or at large text sizes. A gap cannot be orphaned.
+ */
 .project .links {
   display: flex;
   flex-wrap: wrap;

@@ -1,23 +1,30 @@
 ---
 import FormattedDate from './FormattedDate.astro';
-import { noteHref, readingTime, type Note } from '../lib/notes';
+import { hiddenReason, noteHref, readingTime, type Note } from '../lib/notes';
 
 interface Props {
   notes: Note[];
   /** Show the reading time alongside the date. */
   showReadingTime?: boolean;
+  /**
+   * Give the first entry the lead treatment: a larger title and a little more
+   * room. Used on the home page, where the selection is an argument about what
+   * to read first. The archive is a list, so it stays even.
+   */
+  lead?: boolean;
 }
 
-const { notes, showReadingTime = true } = Astro.props;
+const { notes, showReadingTime = true, lead = false } = Astro.props;
 ---
 
 <ul class="note-list">
   {
-    notes.map((note) => (
-      <li>
+    notes.map((note, index) => (
+      <li class={lead && index === 0 ? 'is-lead' : undefined}>
         <a href={noteHref(note.id)}>
           {note.data.title}
-          {note.data.draft && <span class="draft-flag">Draft</span>}
+          {/* Only ever rendered by `astro dev`: a build has no hidden entries. */}
+          {hiddenReason(note) && <span class="hidden-flag">{hiddenReason(note)}</span>}
         </a>
         <p class="note-description">{note.data.description}</p>
         <p class="meta">

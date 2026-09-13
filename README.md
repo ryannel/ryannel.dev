@@ -19,6 +19,8 @@ src/
   layouts/Base.astro   the page shell
   styles/global.css    the whole design — one file, tokens at the top
 public/                CNAME, robots.txt, favicon, og.png, grain.png, fonts/, diagrams/
+scripts/               build assertions, the visibility test, og/grain generators
+tests/fixtures/        content that exists only to break the publication rule on purpose
 ```
 
 ## Local development
@@ -33,7 +35,7 @@ npm install
 npm run dev
 ```
 
-Then open <http://localhost:4321>. Drafts are visible in dev and excluded from builds.
+Then open <http://localhost:4321>. Drafts and samples are visible in dev and excluded from builds.
 
 | Command | What it does |
 | --- | --- |
@@ -41,11 +43,22 @@ Then open <http://localhost:4321>. Drafts are visible in dev and excluded from b
 | `npm run build` | Static build into `dist/` |
 | `npm run preview` | Serve `dist/` exactly as it will be deployed |
 | `npm run check` | Type-check and validate all frontmatter against the schemas |
+| `npm run verify` | Assert things about `dist/` — run it after a build |
+| `npm test` | Build fixture content designed to break the publication rule, and check it doesn't |
 | `npm run og` | Regenerate `public/og.png` after editing `scripts/generate-og.mjs` |
 | `npm run grain` | Regenerate `public/grain.png`, the dark-mode texture |
 
-Run `npm run check` before pushing. It catches broken frontmatter, bad `related:` references
-and type errors — the same check CI runs.
+Writing a note is: create the file, keep `npm run dev` open, push. CI runs the full set of checks
+on every push and fails the deploy rather than publishing something broken, so there is nothing you
+have to remember to run first.
+
+When you do want the whole thing locally — before a change to the layout or the build, say:
+
+```bash
+npm run check && npm run build && npm run verify && npm test
+```
+
+See [Validation](#validation) for what each one catches.
 
 ## Writing a new note
 
@@ -70,8 +83,9 @@ draft: false
 Write here.
 ```
 
-Only `title`, `description` and `published` are required. Everything else can be left blank or
-omitted.
+Only `title`, `description` and `published` are required, and they have to say something: a blank
+or whitespace-only title fails the build, as does a missing or unparseable `published` date, or an
+`updated` date earlier than `published`. Everything else can be left blank or omitted.
 
 | Field | Meaning |
 | --- | --- |
@@ -80,7 +94,8 @@ omitted.
 | `published` | `YYYY-MM-DD`. The note's date, and its sort order |
 | `updated` | Only when you add a dated update block. Not for typos or broken links |
 | `featured` | `true` floats it to the top of the home page |
-| `draft` | `true` keeps it out of the build; still visible in `npm run dev` |
+| `draft` | `true` — unfinished. Kept out of the build; still visible in `npm run dev` |
+| `sample` | `true` — placeholder content. Hidden by the same rule as `draft` |
 | `tags` | Optional, descriptive only — there are deliberately no tag pages |
 | `image` | Optional path to a social preview image, e.g. `/og/context.png` |
 | `links` | Anything worth pointing at — code, a skill, a project, a discussion elsewhere |
@@ -157,8 +172,14 @@ to read and without them the page reflows when the image lands:
 
 Leaving them out fails the build with an explanation rather than shipping the layout shift.
 
-Images load lazily by default. Pass `eager` only for one that is genuinely visible without
-scrolling — it sets high fetch priority, which is wasted if the image is further down.
+Images load lazily by default. Two separate props, because they are two different claims:
+
+- **`eager`** — this image is visible without scrolling, so don't defer it.
+- **`priority`** — this image is the *largest thing* in the first viewport, so fetch it ahead of
+  other subresources. It implies `eager`. If every image claims it, it means nothing.
+
+Widths are capped at 1872px (3x the 624px column), so committing an 8000px original resamples it
+down rather than generating a derivative nothing can display.
 
 Diagrams are hand-written SVG rather than a rendering pipeline. Draw them with mid-tone neutral
 strokes (`#8a8781` is what `public/diagrams/repo-vs-system-model.svg` uses) so a single file is
@@ -172,27 +193,51 @@ the page, while a small one simply fits. The table node itself is untouched, so 
 semantics and anything you wrote on it.
 
 It runs in the shared Sätteri pipeline, so `.md` and `.mdx` behave identically — an MDX component
-override would only have covered `.mdx`. The one edit it makes is to the corner cell of a matrix
-table: Markdown has no way to say an empty header is not a header, so an empty first cell of the
-first header row becomes a `<td>`.
+override would only have covered `.mdx`. It also handles a table written out as markup rather than
+as a pipe table, which reaches the processor as JSX rather than as a Markdown node and escaped an
+earlier version of the plugin. All three cases are covered by fixtures in `tests/fixtures/`.
 
-### Drafts
+The one edit it makes is to the corner cell of a matrix table: Markdown has no way to say an empty
+header is not a header, so an empty first cell of the first header row becomes a `<td>`.
 
-`draft: true` keeps a note out of production entirely: no route, no listing, no RSS entry, no
-sitemap entry, and no mention from another note's `related:`. In `astro dev` drafts are visible, so
-you can read one before publishing.
+A table only scrolls when it has to. The wrapper sizes the table by `min-content`, so a narrow
+table fits a 320px phone and a wide one scrolls inside itself — there is no fixed minimum width
+making small tables scroll for no reason.
+
+### Drafts and samples
+
+Two ways for a file to exist here without being published, and one rule that hides both:
+
+- **`draft: true`** — unfinished. Waiting to be written.
+- **`sample: true`** — placeholder content, there to show the reading experience. Waiting to be
+  deleted.
+
+They mean opposite things about what happens next, which is why they are separate fields; nothing
+else distinguishes them. Either one keeps a note or a project out of production entirely: no route,
+no listing, no RSS entry, no sitemap entry, and no mention from another page's `related:`. In
+`astro dev` both are visible and badged, so you can read one before publishing.
+
+The rule is `isPublished` in `src/lib/notes.ts`, and it is the only one. Everything that selects or
+resolves content goes through it — the archive, the home page, the feed, the routes the sitemap is
+built from, and the related lists on notes and on projects. `scripts/test-visibility.mjs` builds
+fixture content designed to slip past it and fails if anything does.
 
 One thing this is not: a public Git repository is not confidential storage. A draft is unpublished,
 not private.
 
 A `related:` reference that matches nothing is still a build error — a typo and an unpublished
-note are different problems, and only one of them should be silent.
+note are different problems, and only one of them should be silent. A reference to something that
+exists but is hidden is neither: it is simply dropped from the rendered list, and if that empties
+the list the whole section goes with it rather than leaving a heading over nothing.
 
 ### Adding a project
 
 Same idea, in `src/content/projects/`, with `name`, `description`, `status`, and optional
-`order`, `links` and `related`. Projects render inline on `/projects` — there are no separate
-project pages, and adding them would make the site bigger without helping a reader.
+`order`, `links`, `related`, `draft` and `sample`. Projects render inline on `/projects` — there
+are no separate project pages, and adding them would make the site bigger without helping a reader.
+
+`description` is what the home page shows, so make it say what the project *is*. The body says why
+it exists, what a visitor can look at, and how finished it is.
 
 ## Publishing
 
@@ -202,11 +247,34 @@ git add . && git commit -m "note: context is the hard part" && git push
 
 Pushing to `main` builds and deploys. Nothing else to do.
 
+## Validation
+
+Four commands, in the order CI runs them:
+
+| Command | What it can catch that the others cannot |
+| --- | --- |
+| `npm run check` | Types, and frontmatter against the schemas: blank titles, unparseable dates, an `updated` before its `published`, a `href` with no scheme and no leading `/` or `#` |
+| `npm run build` | Anything that only fails while rendering: a `related:` reference matching no file, or a `<Figure>` from `/public` with no dimensions. Note that `astro check` *prints* a broken reference but still exits 0 — the build is what fails, which is why both run |
+| `npm run verify` | Assertions about `dist/` itself: nothing hidden was built, linked or listed; every table is inside its scroll container; the analytics beacon is host-guarded; canonical URLs match their paths; every internal link *and fragment* resolves; the 404 has no canonical and is not in the sitemap; no empty list or heading was left behind |
+| `npm test` | The same assertions against `tests/fixtures/`, which is content written specifically to break them |
+
+The fixtures live outside `src/content/`, so no build can publish them by accident.
+`scripts/test-visibility.mjs` copies the project into a temporary directory, drops them in there,
+and checks that build.
+
+External links are not checked. A link-rot crawl is a network dependency that fails for reasons
+that have nothing to do with the change being tested.
+
 ## Deployment
 
-`.github/workflows/deploy.yml` runs on every push to `main`: install, `npm run check`,
-`npm run build`, then publish `dist/` to GitHub Pages. A failing type-check or invalid frontmatter
+`.github/workflows/deploy.yml` runs on every push to `main`: install, then the four commands above,
+then publish `dist/` to GitHub Pages. A failing type-check, invalid frontmatter or failed assertion
 fails the build rather than deploying a broken site.
+
+`.github/workflows/pr.yml` runs the same four on every pull request and nothing else. It is
+read-only: `contents: read` and no deploy step, so a pull request cannot gain write access.
+`pages: write` and `id-token: write` are granted only to the deploy job in the other workflow, not
+at the top of either file.
 
 ### One-time repository setup
 
@@ -424,14 +492,19 @@ instead, and updates it when the OS flips while "system" is selected.
 
 ## Placeholder content
 
-The six notes in `src/content/writing/` and the three projects in `src/content/projects/` are
-placeholders. Each note carries a visible "sample content" line. They exist to show the reading
-experience. Rewrite or delete them — `rm src/content/writing/*.mdx` is a fine way to start.
+The six notes in `src/content/writing/` are placeholders. Each carries a visible "sample content"
+line and `sample: true`, so **they are not published** — the deployed site has no notes yet. They
+are still there to read in `npm run dev`, which is what they are for: they show what a note looks
+like before there is a real one. Rewrite or delete them; `rm src/content/writing/*.mdx` is a fine
+way to start. Removing `sample: true` publishes one.
 
-If you delete the notes, clear the `related:` lists in the sample projects too: a reference to a
-note that no longer exists is a build error, deliberately. With no notes at all the site still
-builds and reads as intentional — the home page drops its writing section rather than showing a
-heading over nothing, and `/writing/` is its title and preamble with nothing under them yet.
+The three projects in `src/content/projects/` are **not** placeholders and are published. Two point
+at real repositories; `Experiments` describes real practice but has nothing linkable yet.
+
+If you delete the notes, clear the `related:` lists in the projects too: a reference to a note that
+no longer exists is a build error, deliberately. With no published notes the site still reads as
+intentional — the home page drops its writing section rather than showing a heading over nothing,
+and `/writing/` says so in a sentence and points at the projects and the feed.
 
 The collection is `writing` throughout — folder, URL and schema. "Writing" is the section; a
 "Note" is one piece in it.

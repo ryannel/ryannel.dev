@@ -39,12 +39,23 @@ const rendered = await Promise.all(
             ))}
           </p>
         )}
+        {/*
+          Labelled, because an unannounced second row of links below "GitHub"
+          reads as more of the same thing. These are note titles, not places to
+          inspect the project. The row is absent entirely when every reference
+          resolves to something this build does not publish.
+        */}
         {related.length > 0 && (
-          <p class="links">
-            {related.map((note) => (
-              <a href={noteHref(note.id)}>{note.data.title}</a>
-            ))}
-          </p>
+          <>
+            <h3 class="label project-related-heading">Related notes</h3>
+            <ul class="project-related">
+              {related.map((note) => (
+                <li>
+                  <a href={noteHref(note.id)}>{note.data.title}</a>
+                </li>
+              ))}
+            </ul>
+          </>
         )}
       </section>
     ))

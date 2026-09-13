@@ -3,16 +3,41 @@ import { getCollection, getEntries, type CollectionEntry, type ReferenceDataEntr
 export type Note = CollectionEntry<'writing'>;
 export type Project = CollectionEntry<'projects'>;
 
-const isPublished = (entry: { data: { draft: boolean } }) =>
-  import.meta.env.DEV || !entry.data.draft;
+/**
+ * The one visibility rule on this site. Everything that selects or references
+ * content goes through it: the archive, the home page, the feed, the sitemap
+ * (via the routes that exist) and the related lists on notes and projects.
+ *
+ * Two ways to be unpublished, one rule. `draft` is unfinished writing; `sample`
+ * is placeholder content showing what the reading experience looks like. Both
+ * stay in the repository and out of the build.
+ *
+ * `astro dev` shows everything, so a draft can be read and a sample still
+ * demonstrates the design. `astro build` shows neither, and CI asserts it —
+ * see scripts/verify-build.mjs.
+ */
+export type Hideable = { data: { draft: boolean; sample: boolean } };
 
-/** Published notes, newest first. Drafts are visible in `astro dev` only. */
+export const isPublished = (entry: Hideable) =>
+  import.meta.env.DEV || !(entry.data.draft || entry.data.sample);
+
+/** Why an entry is hidden, for the dev-only badge. Null when it is published. */
+export const hiddenReason = (entry: Hideable): 'Draft' | 'Sample' | null =>
+  entry.data.draft ? 'Draft' : entry.data.sample ? 'Sample' : null;
+
+/** Published notes, newest first. Hidden ones are visible in `astro dev` only. */
 export async function getNotes(): Promise<Note[]> {
   const notes = await getCollection('writing', isPublished);
   return notes.sort((a, b) => b.data.published.valueOf() - a.data.published.valueOf());
 }
 
-/** Featured notes first, then the most recent. */
+/**
+ * The home page selection: featured first, then the most recent, capped.
+ *
+ * Deterministic — a build is the same twice — and it degrades honestly. With
+ * one published note the home page shows one; with none it shows the section
+ * not at all. Nothing is padded to fill the slot.
+ */
 export async function getHomeNotes(limit: number): Promise<Note[]> {
   const notes = await getNotes();
   const featured = notes.filter((note) => note.data.featured);
@@ -51,9 +76,11 @@ export function isoDate(date: Date): string {
 /**
  * Resolve `related:` references to the notes that this build actually publishes.
  *
- * Without the visibility filter a published note can advertise a draft's title and
- * link to a route that was never built. A reference that resolves to nothing is a
- * different problem — a typo in frontmatter — so it still throws.
+ * Without the visibility filter a published note can advertise a hidden note's
+ * title and link to a route that was never built. A reference that resolves to
+ * nothing is a different problem — a typo in frontmatter — so it still throws.
+ * An existing-but-hidden reference is not an error: it is the normal state of a
+ * note whose companion piece is still a draft.
  */
 export async function resolveNotes(refs: ReferenceDataEntry<'writing'>[]): Promise<Note[]> {
   if (refs.length === 0) return [];

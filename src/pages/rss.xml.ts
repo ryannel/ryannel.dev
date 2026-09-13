@@ -10,14 +10,14 @@ export const GET: APIRoute = async (context) => {
     title: `${SITE.title} — Notes`,
     description: SITE.description,
     site: context.site ?? SITE.url,
-    items: notes
-      .filter((note) => !note.data.draft)
-      .map((note) => ({
-        title: note.data.title,
-        description: note.data.description,
-        pubDate: note.data.published,
-        link: noteHref(note.id),
-      })),
+    // getNotes() has already applied the site's one visibility rule; filtering
+    // again here is how the feed and the archive drift apart.
+    items: notes.map((note) => ({
+      title: note.data.title,
+      description: note.data.description,
+      pubDate: note.data.published,
+      link: noteHref(note.id),
+    })),
     customData: `<language>en-gb</language>`,
   });
 };

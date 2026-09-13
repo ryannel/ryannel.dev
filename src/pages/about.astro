@@ -1,17 +1,20 @@
 ---
 import Base from '../layouts/Base.astro';
 import { ELSEWHERE } from '../consts';
+
+// One contact route rather than a second copy of the footer's link list.
+const linkedin = ELSEWHERE.find((link) => link.label === 'LinkedIn');
 ---
 
 <Base
   title="About"
-  description="Ryan Nel — Senior Staff Software Engineer, based in Sweden, working on large software systems and AI engineering."
+  description="Ryan Nel — Senior Staff Software Engineer in Gothenburg, working on large software systems and AI engineering."
 >
   <h1 class="page-title">About</h1>
 
-  <div class="prose" style="max-width:34rem">
+  <div class="prose page-prose">
     <p>
-      I’m Ryan Nel, a Senior Staff Software Engineer based in Sweden. I work on large-scale software
+      I’m Ryan Nel, a Senior Staff Software Engineer in Gothenburg. I work on large-scale software
       systems, and increasingly on the systems we build <em>with</em> AI rather than around it.
     </p>
     <p>
@@ -29,15 +32,10 @@ import { ELSEWHERE } from '../consts';
       Nothing here reflects or discloses my employer’s work. Where a lesson comes from professional
       experience, it’s generalised.
     </p>
-    <p class="inline-links">
-      {
-        ELSEWHERE.map((link) => (
-          <a href={link.href} rel="me">
-            {link.label}
-          </a>
-        ))
-      }
-      <a href="/rss.xml">RSS</a>
+    <p>
+      If any of it is useful, or wrong, I’d like to hear about it —
+      {linkedin ? <a href={linkedin.href} rel="me">LinkedIn</a> : 'get in touch'} is the surest way
+      to reach me.
     </p>
   </div>
 </Base>

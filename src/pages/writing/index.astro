@@ -21,7 +21,22 @@ const years = [...byYear.entries()].sort((a, b) => b[0] - a[0]);
   description="Things I’m learning while building — AI engineering, agents, software architecture."
 >
   <h1 class="page-title">Notes</h1>
-  <p class="page-intro">{NOTES_PREAMBLE}</p>
+
+  {
+    /*
+     * The preamble describes a body of writing, so it only makes sense once
+     * there is one. Before that it would be introducing an empty page.
+     */
+    notes.length > 0 ? (
+      <p class="page-intro">{NOTES_PREAMBLE}</p>
+    ) : (
+      <p class="page-intro">
+        Nothing published here yet — the first notes are being written. The{' '}
+        <a href="/projects/">projects</a> page has the work they will be about, and the{' '}
+        <a href="/rss.xml">feed</a> will carry them when they arrive.
+      </p>
+    )
+  }
 
   {
     years.map(([year, yearNotes]) => (

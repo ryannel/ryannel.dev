@@ -35,10 +35,14 @@ jobs:
           # public by design. Unset simply means no beacon in the output.
           PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN: ${{ vars.PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN }}
 
-      # Assertions about dist/ that a type-check cannot make: no draft leaked into
-      # a published page, every table is in its scroll container, the analytics
-      # beacon is host-guarded, links resolve. See scripts/verify-build.mjs.
+      # Assertions about dist/ that a type-check cannot make: nothing hidden
+      # leaked into a published page, every table is in its scroll container,
+      # the analytics beacon is host-guarded, links and fragments resolve.
       - run: npm run verify
+
+      # The same assertions against content built to break them, plus the dev
+      # half of the rule. See scripts/test-visibility.mjs.
+      - run: npm test
 
       - uses: actions/upload-pages-artifact@v5
         with:

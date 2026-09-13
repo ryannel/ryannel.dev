@@ -1,6 +1,6 @@
 ---
 name: "Experiments"
-description: "Selected technical and creative experiments where there’s something worth showing."
+description: "Smaller builds run to find out where a technology actually breaks."
 status: "Ongoing"
 order: 3
 related:
@@ -8,8 +8,10 @@ related:
   - ai-leadership-coach-private-context
 ---
 
-Smaller things built to find out where a technology works and where it breaks — image and video
-generation workflows, character LoRAs, agent evaluation harnesses, and whatever else I’m curious
-about.
+Smaller things built to find out where a technology works and where it stops — image and video
+generation workflows, character LoRAs, agent evaluation harnesses, and whatever else I am curious
+about that week.
 
-Most of these don’t become projects. The point is the thing I learn on the way to abandoning them.
+Most of them do not become projects, which is the point: the useful part is what I learn on the
+way to abandoning one. When something here is worth showing, it turns up as a note rather than a
+repository.
