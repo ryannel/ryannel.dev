@@ -17,8 +17,10 @@ import { Image } from 'astro:assets';
  *
  *        <Figure src="/diagrams/x.svg" alt="..." width={640} height={280} />
  *
- * Images below the fold load lazily. Pass `eager` for one that genuinely
- * appears in the first viewport; it is not a general-purpose speed-up.
+ * Images below the fold load lazily. Pass `eager` for one that genuinely appears
+ * in the first viewport, and `priority` only for one that is the largest thing
+ * in it — priority is a claim about this image relative to everything else on
+ * the page, so it stops meaning anything if every image makes it.
  */
 interface Props {
   src: ImageMetadata | string;
@@ -27,14 +29,26 @@ interface Props {
   /** Required when src is a path into /public. */
   width?: number;
   height?: number;
-  /** Only for an image actually visible on load. */
+  /** Skip lazy loading: the image is actually visible before any scrolling. */
   eager?: boolean;
-  /** Overrides the default responsive widths for imported images. */
+  /** Also ask the browser to fetch it ahead of other subresources. Implies eager. */
+  priority?: boolean;
+  /** Overrides the bounded default widths — for genuinely exceptional media. */
   widths?: number[];
   sizes?: string;
 }
 
-const { src, alt, caption, width, height, eager = false, widths, sizes } = Astro.props;
+const {
+  src,
+  alt,
+  caption,
+  width,
+  height,
+  eager = false,
+  priority = false,
+  widths,
+  sizes,
+} = Astro.props;
 
 if (typeof src === 'string' && (!width || !height)) {
   throw new Error(
@@ -44,14 +58,41 @@ if (typeof src === 'string' && (!width || !height)) {
   );
 }
 
-// The widest the column ever gets is --measure (39rem) plus a little slack.
-const DISPLAY_SIZES = '(min-width: 40rem) 624px, calc(100vw - 3rem)';
+/*
+ * The column is 624px at its widest (--measure 39rem + the two 1.5rem gutters),
+ * so 1248px covers a 2x display at full width and 1872px covers 3x. Nothing
+ * above that is ever displayed, and a 3x phone is showing the image at roughly
+ * a third of that width anyway — so a 8000px original is resampled down to
+ * 1872px rather than re-encoded at its original size.
+ */
+const MAX_WIDTH = 1872;
+const CANDIDATES = [624, 936, 1248, MAX_WIDTH];
 
-// Never upscale: only offer widths the source can actually supply.
+// Never upscale: cap at the source's own width, and drop anything wider.
 const responsiveWidths =
   typeof src === 'string'
     ? undefined
-    : (widths ?? [...new Set([640, 960, 1280].filter((w) => w < src.width).concat(src.width))]);
+    : (widths ?? [...new Set(CANDIDATES.map((w) => Math.min(w, src.width)))].sort((a, b) => a - b));
+
+/*
+ * The base `src` needs capping as well as the srcset. Left alone, Astro points
+ * it at a derivative the size of the original — so a 3200px screenshot shipped a
+ * 145kB fallback that nothing displays. Height follows from the width, so the
+ * intrinsic aspect ratio, and the space reserved before the image loads, are
+ * unchanged.
+ */
+const baseWidth =
+  typeof src === 'string' ? undefined : Math.min(src.width, widths ? Math.max(...widths) : MAX_WIDTH);
+
+/*
+ * Below 42rem (the wrap's own max-width) the image fills the viewport minus the
+ * gutters; above it the column stops growing at 624px. Using the desktop width
+ * for everything above 40rem overstated it by up to 32px in the 640-672px band.
+ */
+const DISPLAY_SIZES = '(min-width: 42rem) 624px, calc(100vw - 3rem)';
+
+const loading = eager || priority ? 'eager' : 'lazy';
+const fetchpriority = priority ? 'high' : 'auto';
 ---
 
 <figure>
@@ -62,19 +103,20 @@ const responsiveWidths =
         alt={alt}
         width={width}
         height={height}
-        loading={eager ? 'eager' : 'lazy'}
-        fetchpriority={eager ? 'high' : 'auto'}
-        decoding={eager ? 'sync' : 'async'}
+        loading={loading}
+        fetchpriority={fetchpriority}
+        decoding="async"
       />
     ) : (
       <Image
         src={src}
         alt={alt}
+        width={baseWidth}
         widths={responsiveWidths}
         sizes={sizes ?? DISPLAY_SIZES}
-        loading={eager ? 'eager' : 'lazy'}
-        fetchpriority={eager ? 'high' : 'auto'}
-        decoding={eager ? 'sync' : 'async'}
+        loading={loading}
+        fetchpriority={fetchpriority}
+        decoding="async"
         quality={85}
       />
     )

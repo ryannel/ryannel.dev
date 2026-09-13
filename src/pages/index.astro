@@ -14,26 +14,38 @@ const projects = (await getProjects()).slice(0, 3);
     <p>{INTRO.line}</p>
   </div>
 
-  <section class="section">
-    <h2 class="label">Selected writing</h2>
-    <NoteList notes={notes} showReadingTime={false} />
-    <p class="section-more"><a href="/writing/">All writing</a></p>
-  </section>
+  {/* A heading over nothing, above a link to an empty page, reads as a fault
+      rather than as a site with nothing published yet. */}
+  {
+    notes.length > 0 && (
+      <section class="section">
+        <h2 class="label">Selected writing</h2>
+        <NoteList notes={notes} showReadingTime={false} />
+        <p class="section-more">
+          <a href="/writing/">All writing</a>
+        </p>
+      </section>
+    )
+  }
 
-  <section class="section">
-    <h2 class="label">Projects</h2>
-    <ul class="note-list">
-      {
-        projects.map((project) => (
-          <li>
-            <a href={`/projects/#${project.id}`}>{project.data.name}</a>
-            <p>{project.data.description}</p>
-          </li>
-        ))
-      }
-    </ul>
-    <p class="section-more"><a href="/projects/">All projects</a></p>
-  </section>
+  {
+    projects.length > 0 && (
+      <section class="section">
+        <h2 class="label">Projects</h2>
+        <ul class="note-list">
+          {projects.map((project) => (
+            <li>
+              <a href={`/projects/#${project.id}`}>{project.data.name}</a>
+              <p>{project.data.description}</p>
+            </li>
+          ))}
+        </ul>
+        <p class="section-more">
+          <a href="/projects/">All projects</a>
+        </p>
+      </section>
+    )
+  }
 
   <section class="section">
     <h2 class="label">Elsewhere</h2>

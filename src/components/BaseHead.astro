@@ -10,6 +10,8 @@ interface Props {
   type?: 'website' | 'article';
   publishedTime?: Date;
   modifiedTime?: Date;
+  /** For a page that is not a document at a URL of its own — the 404. */
+  noindex?: boolean;
 }
 
 /** The one committed social card. Regenerate with `npm run og`. */
@@ -22,6 +24,7 @@ const {
   type = 'website',
   publishedTime,
   modifiedTime,
+  noindex = false,
 } = Astro.props;
 
 // Canonical URLs on this site always end in "/", matching build.format: 'directory'.
@@ -38,7 +41,16 @@ const fullTitle = title === SITE.title ? title : `${title} — ${SITE.title}`;
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>{fullTitle}</title>
 <meta name="description" content={description} />
-<link rel="canonical" href={canonical} />
+{
+  /*
+   * A 404 has no canonical URL: it is whatever address the reader mistyped, not
+   * a document of its own, so claiming one would point crawlers at a page that
+   * also 404s. GitHub Pages already serves it with a 404 status, which is the
+   * signal that actually matters; noindex is there for anywhere it is served
+   * with a 200, such as a local preview.
+   */
+}
+{noindex ? <meta name="robots" content="noindex" /> : <link rel="canonical" href={canonical} />}
 
 <!--
   Only the normal latin face is preloaded. It is referenced from an external
@@ -62,7 +74,7 @@ const fullTitle = title === SITE.title ? title : `${title} — ${SITE.title}`;
 <meta property="og:type" content={type} />
 <meta property="og:title" content={fullTitle} />
 <meta property="og:description" content={description} />
-<meta property="og:url" content={canonical} />
+{!noindex && <meta property="og:url" content={canonical} />}
 <meta property="og:image" content={socialImage} />
 {
   isDefaultCard && (

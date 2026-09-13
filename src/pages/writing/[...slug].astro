@@ -1,12 +1,11 @@
 ---
 import type { GetStaticPaths } from 'astro';
-import { getEntries, render } from 'astro:content';
+import { render } from 'astro:content';
 import Base from '../../layouts/Base.astro';
 import Callout from '../../components/Callout.astro';
 import Figure from '../../components/Figure.astro';
-import Table from '../../components/Table.astro';
 import FormattedDate from '../../components/FormattedDate.astro';
-import { getNotes, noteHref, readingTime } from '../../lib/notes';
+import { getNotes, noteHref, readingTime, resolveNotes } from '../../lib/notes';
 
 export const getStaticPaths = (async () => {
   const notes = await getNotes();
@@ -15,7 +14,7 @@ export const getStaticPaths = (async () => {
 
 const { note } = Astro.props;
 const { Content } = await render(note);
-const related = note.data.related.length ? await getEntries(note.data.related) : [];
+const related = await resolveNotes(note.data.related);
 const links = note.data.links;
 ---
 
@@ -40,8 +39,8 @@ const links = note.data.links;
     </header>
 
     <div class="prose">
-      {/* Available in any .mdx note without importing them; `table` wraps Markdown tables. */}
-      <Content components={{ Callout, Figure, table: Table }} />
+      {/* Available in any .mdx note without importing them. */}
+      <Content components={{ Callout, Figure }} />
     </div>
 
     {

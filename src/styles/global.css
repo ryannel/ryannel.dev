@@ -39,18 +39,95 @@
   unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
 }
 
+/*
+ * Metric-matched fallbacks, so the page does not reflow when Source Serif 4
+ * finally arrives. Three things were measured rather than assumed:
+ *
+ *   - local() matches a font's PostScript or full name, not its family name, so
+ *     local('Charter') never resolved on macOS. Both spellings are listed now.
+ *   - size-adjust has to come from advance width, not x-height. Source Serif 4
+ *     sets 834 characters of this site's own prose in 39680 units where Georgia
+ *     takes 36930, so the correction is 107.4% — slightly wider. The old 86%
+ *     was squashing Georgia to 21.8% narrower than the real font, which is a
+ *     worse mismatch than leaving it alone. Tuning on a short specimen was not
+ *     enough: it gave 104.7% and the fallback still set the paragraph a line
+ *     short, so these are measured against real body copy.
+ *   - the last family in the stack is plain `serif`, which on Android and Linux
+ *     is Noto/Liberation/DejaVu and had no adjustment at all. It has one now.
+ *
+ * font-weight covers the whole range so bold text stays in the same fallback
+ * family instead of dropping to the next one mid-paragraph.
+ */
 @font-face {
   font-family: 'Source Serif Fallback Charter';
-  src: local('Charter'), local('Bitstream Charter');
-  size-adjust: 95%;
-  ascent-override: 100%;
+  font-style: normal;
+  font-weight: 100 900;
+  src: local('Charter-Roman'), local('Charter'), local('CharterBT-Roman'),
+    local('Bitstream Charter'), local('BitstreamCharter-Roman');
+  size-adjust: 108%;
+  ascent-override: 96.3%;
+  descent-override: 31.5%;
 }
 
 @font-face {
   font-family: 'Source Serif Fallback Georgia';
+  font-style: normal;
+  font-weight: 100 900;
   src: local('Georgia');
-  size-adjust: 86%;
-  ascent-override: 100%;
+  size-adjust: 107.4%;
+  ascent-override: 96.8%;
+  descent-override: 31.7%;
+}
+
+/* Windows' and Linux'/Android's default serifs, which the bare `serif` keyword
+   resolves to. Metrically these are all Times-like. */
+@font-face {
+  font-family: 'Source Serif Fallback Times';
+  font-style: normal;
+  font-weight: 100 900;
+  src: local('TimesNewRomanPSMT'), local('Times New Roman'), local('LiberationSerif'),
+    local('Liberation Serif'), local('Tinos-Regular'), local('Tinos'), local('NotoSerif'),
+    local('Noto Serif'), local('DejaVuSerif'), local('DejaVu Serif');
+  size-adjust: 117.6%;
+  ascent-override: 88.4%;
+  descent-override: 28.9%;
+}
+
+/*
+ * Italic gets its own faces. Without them the browser slants the upright, which
+ * came out 8.4% wide; these bring it to the same measure as Source Serif 4's
+ * real italic. Same method as above, measured on the same body copy.
+ */
+@font-face {
+  font-family: 'Source Serif Fallback Charter';
+  font-style: italic;
+  font-weight: 100 900;
+  src: local('Charter-Italic'), local('Charter Italic'), local('BitstreamCharter-Italic');
+  size-adjust: 103.1%;
+  ascent-override: 100.9%;
+  descent-override: 33%;
+}
+
+@font-face {
+  font-family: 'Source Serif Fallback Georgia';
+  font-style: italic;
+  font-weight: 100 900;
+  src: local('Georgia-Italic'), local('Georgia Italic');
+  size-adjust: 96.4%;
+  ascent-override: 107.9%;
+  descent-override: 35.3%;
+}
+
+@font-face {
+  font-family: 'Source Serif Fallback Times';
+  font-style: italic;
+  font-weight: 100 900;
+  src: local('TimesNewRomanPS-ItalicMT'), local('Times New Roman Italic'),
+    local('LiberationSerif-Italic'), local('Tinos-Italic'), local('NotoSerif-Italic'),
+    local('DejaVuSerif-Italic');
+  size-adjust: 108%;
+  ascent-override: 96.3%;
+  descent-override: 31.5%;
 }
 
 /* ---------------------------------------------------------------------------
@@ -73,8 +150,8 @@
   --selection: light-dark(#dbe6ee, #24333d);
 
   --font-prose: 'Source Serif 4', 'Source Serif Fallback Charter',
-    'Source Serif Fallback Georgia', Charter, 'Iowan Old Style', 'Sitka Text', Cambria, Georgia,
-    serif;
+    'Source Serif Fallback Georgia', 'Source Serif Fallback Times', Charter, 'Iowan Old Style',
+    'Sitka Text', Cambria, Georgia, serif;
   --font-ui: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
     sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
@@ -82,6 +159,18 @@
   /* ~65 characters in Source Serif 4 at the desktop size. */
   --measure: 39rem;
   --gutter: 1.5rem;
+}
+
+/*
+ * Four pixels back on each side of a narrow phone. Measured on the writing
+ * index at 320px: it takes two of the eight titles from four lines to three,
+ * and going narrower still gains nothing. In rem, so a reader who has enlarged
+ * their text gets the roomier column sooner, which is when they need it.
+ */
+@media (max-width: 25rem) {
+  :root {
+    --gutter: 1.25rem;
+  }
 }
 
 /*
@@ -248,15 +337,21 @@ main {
 .site-nav a[aria-current] {
   text-decoration: underline;
   text-underline-offset: 0.25em;
-  text-decoration-color: var(--rule);
+  /* --rule is the colour of a hairline divider: too faint to read as a marker.
+     A step below the text itself stays quiet but is actually visible. */
+  text-decoration-color: var(--ink-muted);
+  text-decoration-thickness: 1px;
 }
 
 .header-end {
   display: flex;
   align-items: center;
   /* Must be able to reflow: at large text sizes the nav and the control no
-     longer fit one row, and without this the page scrolls sideways. */
+     longer fit one row, and without this the page scrolls sideways. When it
+     does reflow, every row still ends at the right edge, so the result reads as
+     a two-row header rather than as something that fell over. */
   flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 0.5rem 1.25rem;
 }
 
@@ -320,7 +415,10 @@ main {
 
 .site-footer ul {
   display: flex;
-  gap: 1.25rem;
+  /* At large text sizes these no longer fit one row; without this the last
+     link is pushed off the edge of the page. */
+  flex-wrap: wrap;
+  gap: 0.4rem 1.25rem;
   list-style: none;
   margin: 0;
   padding: 0;
@@ -349,6 +447,10 @@ h4 {
   line-height: 1.25;
   letter-spacing: -0.005em;
   text-wrap: balance;
+  /* At twice the default text size a single long word in a title is wider than
+     the column and spills into the gutter. `break-word` only breaks a word that
+     cannot fit a line of its own, so ordinary titles are untouched. */
+  overflow-wrap: break-word;
   margin: 0;
 }
 
@@ -427,7 +529,7 @@ h4 {
 
 .draft-flag {
   font-family: var(--font-ui);
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -569,25 +671,30 @@ h4 {
 }
 
 /*
- * Wide blocks scroll inside themselves, never the page. Markdown tables are
- * wrapped in .table-scroll automatically by Table.astro, so the table keeps its
- * real semantics and authors never wrap one by hand.
+ * Every Markdown table is wrapped in .table-wrap by the wrap-tables plugin in
+ * astro.config.mjs, so a wide one scrolls inside itself rather than widening
+ * the page — and the table itself keeps its real semantics and attributes.
  */
-.table-scroll {
+.table-wrap {
   overflow-x: auto;
   overscroll-behavior-x: contain;
   max-width: 100%;
   margin: 1.8rem 0;
 }
 
-/* Let the table keep a readable natural width and scroll the container,
-   rather than compressing columns until words break. */
-.table-scroll > table {
+/*
+ * Sized by its content, not by a fixed floor. min-content is the narrowest the
+ * columns can get without breaking words mid-syllable: below that the wrapper
+ * scrolls, above it `width: 100%` fills the column. So a three-column table
+ * fits a 320px phone and a wide technical one scrolls — no blanket minimum
+ * that made small tables scroll for no reason.
+ */
+.table-wrap > table {
   margin: 0;
-  min-width: max(100%, 34rem);
+  min-width: min-content;
 }
 
-.table-scroll:focus-visible {
+.table-wrap:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
@@ -595,10 +702,10 @@ h4 {
 /*
  * Long identifiers and URLs must not widen the page. `break-word` only breaks a
  * word that cannot fit a line on its own, so ordinary prose is left alone —
- * `anywhere` would hyphenate "non-commercial" mid-syllable inside a table cell.
+ * `anywhere` would hyphenate "non-commercial" mid-syllable, and would also drag
+ * the min-content width above down with it.
  */
-.prose,
-.table-scroll {
+.prose {
   overflow-wrap: break-word;
 }
 
@@ -623,7 +730,21 @@ samp {
   background: var(--surface);
   border-radius: 2px;
   padding: 0.12em 0.32em;
+  /* In flowing text there is nowhere for a long token to go, so it has to break
+     rather than widen the page. Inside a table there is somewhere: see below. */
   word-break: break-word;
+}
+
+/*
+ * A table has a scroll container, so a long identifier should stay whole and
+ * push the table wider instead of hyphenating into "PUBLIC_CLOU / DFLARE_WEB_".
+ * This is also what makes the table's own min-content width honest: break-word
+ * above behaves like `anywhere`, which would otherwise let every column
+ * collapse to a few characters and the wrapper never scroll at all.
+ */
+.table-wrap :is(code, kbd, samp) {
+  word-break: normal;
+  overflow-wrap: normal;
 }
 
 pre {
@@ -673,9 +794,11 @@ pre.astro-code {
   border-left: 2px solid var(--rule);
 }
 
+/* Same size as .label: 11px uppercase with tracking was cramped, and three
+   different sizes of small caps across the site was two too many. */
 .callout > .callout-label {
   font-family: var(--font-ui);
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -761,18 +884,19 @@ pre.astro-code {
   margin-top: 1.75rem;
 }
 
+/*
+ * A wrapping row of links, the same treatment as the footer's. It used to put a
+ * middot between them with a ::before, which left the separator stranded at the
+ * end of a line as soon as the row wrapped — at 320px, or at large text sizes.
+ * A gap cannot be orphaned.
+ */
 .inline-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.25rem;
   font-family: var(--font-ui);
   font-size: 0.875rem;
   margin: 0;
-}
-
-.inline-links a + a::before {
-  content: '\00b7';
-  color: var(--ink-muted);
-  margin: 0 0.55em;
-  display: inline-block;
-  text-decoration: none;
 }
 
 .project {
@@ -802,17 +926,12 @@ pre.astro-code {
 }
 
 .project .links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.25rem;
   font-family: var(--font-ui);
   font-size: 0.875rem;
   margin-top: 1rem;
-}
-
-.project .links a + a::before {
-  content: '·';
-  color: var(--ink-muted);
-  margin: 0 0.55em;
-  display: inline-block;
-  text-decoration: none;
 }
 
 /* ---------------------------------------------------------------------------
@@ -847,9 +966,14 @@ pre.astro-code {
   background-image: url('/grain.png');
 }
 
+/*
+ * The dark-mode rules above are more specific than a bare `body`, so this needs
+ * !important to win. Scoped to the one declaration: system colours, focus rings
+ * and forced-color-adjust are all left to the platform.
+ */
 @media (forced-colors: active) {
   body {
-    background-image: none;
+    background-image: none !important;
   }
 }
 
@@ -858,7 +982,17 @@ pre.astro-code {
    --------------------------------------------------------------------------- */
 
 @media print {
-  :root {
+  /*
+   * Paper is light. `:root[data-theme='dark']` earlier in this file is more
+   * specific than a bare `:root`, so matching its specificity here — later in
+   * the source — is what actually flips the scheme. Because color-scheme is
+   * inherited and every token is a light-dark() pair, this alone gives the
+   * whole document its light values: muted metadata, captions and inline-code
+   * surfaces included. The reader's saved preference is untouched.
+   */
+  :root,
+  :root[data-theme='light'],
+  :root[data-theme='dark'] {
     color-scheme: light;
   }
 
@@ -907,11 +1041,12 @@ pre.astro-code {
     widows: 3;
   }
 
-  pre,
-  .table-scroll,
-  figure,
-  .callout,
-  blockquote {
+  /*
+   * Only figures. A long code block or table is legitimately taller than a page,
+   * and asking the engine not to break it there costs a page of white space or
+   * clipped lines. Orphan/widow control above does the rest.
+   */
+  figure {
     break-inside: avoid;
     page-break-inside: avoid;
   }
@@ -923,7 +1058,7 @@ pre.astro-code {
     border-color: #999;
   }
 
-  .table-scroll {
+  .table-wrap {
     overflow: visible;
   }
 

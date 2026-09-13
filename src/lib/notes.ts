@@ -1,4 +1,4 @@
-import { getCollection, type CollectionEntry } from 'astro:content';
+import { getCollection, getEntries, type CollectionEntry, type ReferenceDataEntry } from 'astro:content';
 
 export type Note = CollectionEntry<'writing'>;
 export type Project = CollectionEntry<'projects'>;
@@ -46,6 +46,27 @@ export function formatDate(date: Date): string {
 
 export function isoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
+}
+
+/**
+ * Resolve `related:` references to the notes that this build actually publishes.
+ *
+ * Without the visibility filter a published note can advertise a draft's title and
+ * link to a route that was never built. A reference that resolves to nothing is a
+ * different problem — a typo in frontmatter — so it still throws.
+ */
+export async function resolveNotes(refs: ReferenceDataEntry<'writing'>[]): Promise<Note[]> {
+  if (refs.length === 0) return [];
+  const entries = await getEntries(refs);
+  entries.forEach((entry, i) => {
+    if (!entry) {
+      throw new Error(
+        `related: "${refs[i].id}" does not match any note in src/content/writing/. ` +
+          `References are filenames without the extension.`,
+      );
+    }
+  });
+  return entries.filter(isPublished);
 }
 
 export const noteHref = (id: string) => `/writing/${id}/`;

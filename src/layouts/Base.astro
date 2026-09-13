@@ -6,14 +6,29 @@ import { SITE } from '../consts';
 import '../styles/global.css';
 
 /*
- * Cloudflare Web Analytics. Production builds only, and only when the token is
- * set — a missing token simply omits the beacon rather than failing the build.
- * `astro dev` never includes it, because import.meta.env.PROD is false there.
+ * Cloudflare Web Analytics.
+ *
+ * Three conditions, and all of them have to hold before a single byte is
+ * requested from Cloudflare:
+ *
+ *   1. a production build   — `astro dev` never emits this at all
+ *   2. a token is set       — unset simply omits the beacon, it is not an error
+ *   3. the page is being served from the canonical host
+ *
+ * The third is the one PROD cannot answer: it describes how the site was built,
+ * not where the artifact ended up. The same dist/ served from localhost, a
+ * branch preview or someone's fork would otherwise report as production traffic.
+ * So the host is compared at runtime against SITE.url, and the beacon is only
+ * created when it matches.
+ *
  * Set PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN as a GitHub Actions repository
  * variable; see the Analytics section of the README.
  */
 const analyticsToken = import.meta.env.PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN;
-const showAnalytics = import.meta.env.PROD && Boolean(analyticsToken);
+const analytics =
+  import.meta.env.PROD && analyticsToken
+    ? { token: String(analyticsToken), host: new URL(SITE.url).hostname }
+    : null;
 
 interface Props {
   title: string;
@@ -22,6 +37,7 @@ interface Props {
   type?: 'website' | 'article';
   publishedTime?: Date;
   modifiedTime?: Date;
+  noindex?: boolean;
 }
 ---
 
@@ -55,13 +71,23 @@ interface Props {
     </main>
     <Footer />
     {
-      showAnalytics && (
-        <script
-          is:inline
-          type="module"
-          src="https://static.cloudflareinsights.com/beacon.min.js"
-          data-cf-beacon={JSON.stringify({ token: analyticsToken })}
-        />
+      analytics && (
+        <script is:inline define:vars={analytics}>
+          // type="module" is Cloudflare's own recommendation for the manual beacon:
+          // it keeps the script out of browsers too old to run it. Both it and
+          // data-cf-beacon are set before the element is inserted, so the beacon
+          // never runs without its configuration, and the flag means a second
+          // copy of this snippet could not add a second one.
+          if (location.hostname === host && !window.__cfBeaconAdded) {
+            window.__cfBeaconAdded = true;
+            const beacon = document.createElement('script');
+            beacon.type = 'module';
+            beacon.defer = true;
+            beacon.setAttribute('data-cf-beacon', JSON.stringify({ token: token }));
+            beacon.src = 'https://static.cloudflareinsights.com/beacon.min.js';
+            document.head.appendChild(beacon);
+          }
+        </script>
       )
     }
   </body>

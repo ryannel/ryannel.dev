@@ -2,8 +2,10 @@
 
 A small personal site: writing, projects, and a short about page.
 
-Astro, static output, Markdown/MDX content, no backend, no database, no CMS, no analytics.
-The only JavaScript is the theme toggle — two small inline scripts, no bundle, no network request.
+Astro, static output, Markdown/MDX content, no backend, no database, no CMS.
+The site's own JavaScript is two small inline scripts for the theme toggle — no bundle, nothing
+fetched. Production builds also carry Cloudflare Web Analytics, which is one external script and
+the only third-party request on the page; see Analytics below.
 Hosted on GitHub Pages, so hosting costs nothing.
 
 ```
@@ -164,9 +166,27 @@ legible on both the light and dark background. Nothing inverts images by theme.
 
 ### Tables
 
-Write ordinary Markdown tables. They are wrapped in a scroll container automatically, so a wide
-one scrolls inside itself instead of widening the page, and the table keeps its real semantics —
-see `src/components/Table.astro`. This works in `.mdx`, which is what notes should be.
+Write ordinary Markdown tables. The `wrap-tables` plugin in `astro.config.mjs` puts each one in a
+`.table-wrap` container, so a table wider than the column scrolls inside itself instead of widening
+the page, while a small one simply fits. The table node itself is untouched, so it keeps its real
+semantics and anything you wrote on it.
+
+It runs in the shared Sätteri pipeline, so `.md` and `.mdx` behave identically — an MDX component
+override would only have covered `.mdx`. The one edit it makes is to the corner cell of a matrix
+table: Markdown has no way to say an empty header is not a header, so an empty first cell of the
+first header row becomes a `<td>`.
+
+### Drafts
+
+`draft: true` keeps a note out of production entirely: no route, no listing, no RSS entry, no
+sitemap entry, and no mention from another note's `related:`. In `astro dev` drafts are visible, so
+you can read one before publishing.
+
+One thing this is not: a public Git repository is not confidential storage. A draft is unpublished,
+not private.
+
+A `related:` reference that matches nothing is still a build error — a typo and an unpublished
+note are different problems, and only one of them should be silent.
 
 ### Adding a project
 
@@ -238,16 +258,18 @@ dig +short ryannel.dev A
 2. Once the check passes, tick **Enforce HTTPS**. The certificate is issued automatically and
    free. If the tickbox is greyed out, DNS hasn't fully propagated yet — wait and revisit.
 
-If you ever change the domain, update it in three places: `public/CNAME`, `site` in
-`astro.config.mjs`, and the sitemap URL in `public/robots.txt`.
+If you ever change the domain, update it in four places: `public/CNAME`, `site` in
+`astro.config.mjs`, `SITE.url` in `src/consts.ts` (canonical URLs, and the host the analytics
+beacon checks before it loads), and the sitemap URL in `public/robots.txt`.
 
 ## What this site deliberately does not have
 
 Recorded so these stay decisions rather than oversights, and so the site doesn't quietly grow:
 
 - **No cookies, no local storage for analytics, no custom events.** Cloudflare Web Analytics is
-  cookieless and stores nothing on the reader's device — see Analytics below. Outbound clicks and
-  custom events are deliberately not tracked.
+  cookieless and sets nothing on the reader's device — see Analytics below. Outbound clicks and
+  custom events are deliberately not tracked. (`localStorage` is used for one thing only: the
+  theme you picked.)
 - **No tag or category pages.** `tags` is descriptive metadata, not navigation.
 - **No per-project pages.** Projects are short; they render on one page.
 - **No comments, share buttons, newsletter, follower counts or engagement metrics.** The site is
@@ -264,20 +286,32 @@ work? If not, leave it out.
 
 ## Analytics
 
-Cloudflare Web Analytics, via Cloudflare's manual beacon. It is cookieless, stores nothing on the
-reader's device, and needs no consent banner. GitHub Pages remains the host — **DNS does not move
-to Cloudflare**, and there is no Worker, proxy or Cloudflare Pages involved. **No npm dependency.**
+Cloudflare Web Analytics, via Cloudflare's manual beacon. It is cookieless and sets nothing on the
+reader's device. GitHub Pages remains the host — **DNS does not move to Cloudflare**, and there is
+no Worker, proxy or Cloudflare Pages involved. **No npm dependency.**
 
-The beacon lives once in `src/layouts/Base.astro` and is emitted only when both are true:
+Whether a consent banner is required is a question about your jurisdiction and your readers, not
+about this repository; nobody has reviewed that here. What the code does is described above and
+below, and it is the thing to check a requirement against.
+
+The beacon lives once in `src/layouts/Base.astro`. Three conditions all have to hold before a
+single byte is requested from Cloudflare:
 
 ```
-import.meta.env.PROD          production build, so never `astro dev`
-PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN   set at build time
+import.meta.env.PROD                     a production build, so never `astro dev`
+PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN    set at build time
+location.hostname === ryannel.dev        checked in the browser, against SITE.url
 ```
 
-A missing token omits the beacon and the build still succeeds. Because the token is read at build
-time, `npm run preview` shows whatever the last build baked in — so simply don't set the variable
-locally and local builds stay clean.
+The first two are build-time and decide whether the guard script is emitted at all. The third is
+the one a build flag cannot answer — `PROD` describes how the artifact was built, not where it is
+being served — so the host is compared at runtime and the beacon element is only created on a
+match. A production build previewed on localhost therefore reports nothing, and a missing token
+omits the guard entirely while the build still succeeds.
+
+The element is configured before it is inserted (`type="module"`, as Cloudflare's FAQ recommends
+for the manual beacon, plus `data-cf-beacon`), and a flag on `window` means it can only ever be
+added once. If the request is blocked or fails, nothing else on the page is affected.
 
 ### One-time setup
 
@@ -317,8 +351,23 @@ Three decisions worth keeping:
   the preload the browser cannot discover it until that CSS arrives. Measured: it is worth about
   300ms of FCP. Italic is not on the critical path for most pages.
 
-The stack also declares two metric-matched fallbacks (`size-adjust: 95%` for Charter, `86%` for
-Georgia) so line wrapping barely moves when the real font swaps in.
+The stack also declares metric-matched fallbacks so line wrapping does not move when the real font
+swaps in — six faces: upright and italic for Charter, Georgia, and the Times-like default that
+`serif` resolves to on Windows, Linux and Android.
+
+Three things there are easy to get wrong, and were:
+
+- **`local()` matches a font's PostScript or full name, not its family name.** `local('Charter')`
+  never resolved on macOS; `local('Charter-Roman')` does. Both spellings are listed.
+- **`size-adjust` has to come from advance width, and be measured on real body copy.** Tuning on a
+  short specimen left the fallback setting a paragraph a line short. The current values come from
+  834 characters of this site's own prose.
+- **Declare the italic faces.** Without them the browser slants the upright, which measured 8.4%
+  too wide.
+
+Measured across 324 elements on six pages at 320/390/768/1440: 2.5% of them change height when the
+web font replaces the fallback, against 39.3% before. Bold italic is the remaining gap at about
+4%, because it is synthesised bold over a real italic.
 
 To drop the web font entirely, remove the `@font-face` blocks and the preload, and put `Charter`
 back at the front of `--font-prose`. Everything else keeps working.
@@ -368,14 +417,21 @@ Syntax highlighting follows along: Shiki is configured with `defaultColor: false
 both palettes as `--shiki-light` / `--shiki-dark` custom properties and the CSS picks between them
 with `light-dark()` like everything else.
 
-One known gap: the `<meta name="theme-color">` tags still follow the OS setting rather than a
-manual override, so mobile browser chrome can differ from the page. Not worth scripting.
+`<meta name="theme-color">` follows the toggle too. The static pair in `<head>` is media-scoped and
+correct without JavaScript, but the HTML spec picks the *first* matching `theme-color`, so an
+override cannot simply be appended — `ThemeToggle.astro` removes both and owns a single tag
+instead, and updates it when the OS flips while "system" is selected.
 
 ## Placeholder content
 
 The six notes in `src/content/writing/` and the three projects in `src/content/projects/` are
-placeholders, each marked with a "sample content" line. They exist to show the reading experience.
-Rewrite or delete them — `rm src/content/writing/*.mdx` is a fine way to start.
+placeholders. Each note carries a visible "sample content" line. They exist to show the reading
+experience. Rewrite or delete them — `rm src/content/writing/*.mdx` is a fine way to start.
+
+If you delete the notes, clear the `related:` lists in the sample projects too: a reference to a
+note that no longer exists is a build error, deliberately. With no notes at all the site still
+builds and reads as intentional — the home page drops its writing section rather than showing a
+heading over nothing, and `/writing/` is its title and preamble with nothing under them yet.
 
 The collection is `writing` throughout — folder, URL and schema. "Writing" is the section; a
 "Note" is one piece in it.

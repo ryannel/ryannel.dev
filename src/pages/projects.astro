@@ -1,8 +1,7 @@
 ---
-import { getEntries, render } from 'astro:content';
+import { render } from 'astro:content';
 import Base from '../layouts/Base.astro';
-import Table from '../components/Table.astro';
-import { getProjects, noteHref } from '../lib/notes';
+import { getProjects, noteHref, resolveNotes } from '../lib/notes';
 
 const projects = await getProjects();
 
@@ -10,7 +9,7 @@ const rendered = await Promise.all(
   projects.map(async (project) => ({
     project,
     Content: (await render(project)).Content,
-    related: project.data.related.length ? await getEntries(project.data.related) : [],
+    related: await resolveNotes(project.data.related),
   })),
 );
 ---
@@ -31,7 +30,7 @@ const rendered = await Promise.all(
         <h2>{project.data.name}</h2>
         <p class="status">{project.data.status}</p>
         <div class="prose">
-          <Content components={{ table: Table }} />
+          <Content />
         </div>
         {project.data.links && project.data.links.length > 0 && (
           <p class="links">

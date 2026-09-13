@@ -24,7 +24,12 @@ const LABELS: Record<CalloutType, string> = {
 const { type = 'note', label } = Astro.props;
 ---
 
-<aside class={`callout callout-${type}`}>
+<!--
+  role="note" rather than <aside>'s implicit "complementary": this is an aside
+  within an article, not a landmark alongside it, and a complementary landmark
+  nested inside <main> is reported as a fault by every auditing tool.
+-->
+<aside role="note" class={`callout callout-${type}`}>
   <p class="callout-label">{label ?? LABELS[type]}</p>
   <slot />
 </aside>
