@@ -1,20 +1,21 @@
 /* ---------------------------------------------------------------------------
    Tokens
    One palette, one accent, two type families. Dark mode is the same design
-   with different values — there is no theme toggle and no JavaScript.
+   with different values, selected by light-dark() from the active color-scheme.
    --------------------------------------------------------------------------- */
 
 :root {
   color-scheme: light dark;
 
-  --paper: #fdfcfa;
-  --ink: #1c1b19;
-  --ink-muted: #5c5a55;
-  --rule: #e4e2dc;
-  --surface: #f4f2ed;
-  --accent: #2d5f80;
-  --accent-strong: #1f4460;
-  --selection: #dbe6ee;
+  /* light value, dark value — both live here, so a colour is only ever edited once. */
+  --paper: light-dark(#fdfcfa, #141413);
+  --ink: light-dark(#1c1b19, #e7e5df);
+  --ink-muted: light-dark(#5c5a55, #a5a29a);
+  --rule: light-dark(#e4e2dc, #2e2d2a);
+  --surface: light-dark(#f4f2ed, #1d1d1b);
+  --accent: light-dark(#2d5f80, #8fb8d4);
+  --accent-strong: light-dark(#1f4460, #b0cfe4);
+  --selection: light-dark(#dbe6ee, #24333d);
 
   --font-prose: Charter, 'Bitstream Charter', 'Iowan Old Style', 'Sitka Text', Cambria, Georgia,
     serif;
@@ -27,17 +28,16 @@
   --gutter: 1.5rem;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --paper: #141413;
-    --ink: #e7e5df;
-    --ink-muted: #a5a29a;
-    --rule: #2e2d2a;
-    --surface: #1d1d1b;
-    --accent: #8fb8d4;
-    --accent-strong: #b0cfe4;
-    --selection: #24333d;
-  }
+/*
+ * With no data-theme the OS preference wins, which is the default for every reader.
+ * The toggle sets data-theme to pin one; every colour above follows color-scheme.
+ */
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
 }
 
 /* ---------------------------------------------------------------------------
@@ -192,6 +192,52 @@ main {
   text-decoration: underline;
   text-underline-offset: 0.25em;
   text-decoration-color: var(--rule);
+}
+
+.header-end {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+/* ---------------------------------------------------------------------------
+   Theme toggle
+   Hidden unless the inline script in Base.astro ran, so it is never a dead
+   control. Which icon shows is decided here, not in the script.
+   --------------------------------------------------------------------------- */
+
+.theme-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  margin-right: -0.35rem;
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: 2px;
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+
+.has-js .theme-toggle {
+  display: inline-flex;
+}
+
+.theme-toggle:hover {
+  color: var(--ink);
+}
+
+/* Deliberately class-based: an id here would outrank the rules below. */
+.theme-toggle svg {
+  display: none;
+}
+
+:root:not([data-theme]) .icon-system,
+:root[data-theme='light'] .icon-light,
+:root[data-theme='dark'] .icon-dark {
+  display: block;
 }
 
 .site-footer {
@@ -480,18 +526,15 @@ pre {
   margin: 1.7em 0;
 }
 
-/* Override Shiki's own background so code sits in the site palette. */
-pre.astro-code {
-  background-color: var(--surface) !important;
+/* Shiki emits both themes as custom properties; take whichever matches the scheme. */
+.astro-code,
+.astro-code span {
+  color: light-dark(var(--shiki-light), var(--shiki-dark));
 }
 
-@media (prefers-color-scheme: dark) {
-  .astro-code span {
-    color: var(--shiki-dark) !important;
-    font-style: var(--shiki-dark-font-style) !important;
-    font-weight: var(--shiki-dark-font-weight) !important;
-    text-decoration: var(--shiki-dark-text-decoration) !important;
-  }
+/* Code sits on the site's own surface rather than the highlighting theme's background. */
+pre.astro-code {
+  background-color: var(--surface);
 }
 
 /* ---------------------------------------------------------------------------

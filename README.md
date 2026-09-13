@@ -2,8 +2,9 @@
 
 A small personal site: notes, projects, and a short about page.
 
-Astro, static output, Markdown/MDX content, no JavaScript shipped to the browser, no backend,
-no database, no CMS, no analytics. Hosted on GitHub Pages, so hosting costs nothing.
+Astro, static output, Markdown/MDX content, no backend, no database, no CMS, no analytics.
+The only JavaScript is the theme toggle — two small inline scripts, no bundle, no network request.
+Hosted on GitHub Pages, so hosting costs nothing.
 
 ```
 src/
@@ -12,7 +13,7 @@ src/
   content.config.ts    frontmatter schemas — the only place fields are defined
   consts.ts            name, links, taglines, how many notes the home page shows
   pages/               home, /notes, /notes/<slug>, /projects, /about, /rss.xml, 404
-  components/          head, header, footer, note list, callout, figure, date
+  components/          head, header, footer, note list, callout, figure, date, theme toggle
   layouts/Base.astro   the page shell
   styles/global.css    the whole design — one file, tokens at the top
 public/                CNAME, robots.txt, favicon, og.png, diagrams/
@@ -203,11 +204,47 @@ Recorded so these stay decisions rather than oversights, and so the site doesn't
   elsewhere; the site is the archive.
 - **No per-note generated social images.** One static `public/og.png` covers every page. Set
   `image:` in a note's frontmatter to override it with a committed file.
-- **No dark mode toggle.** Dark mode follows the OS setting via `prefers-color-scheme`, which
-  needs no JavaScript and no stored preference.
+- **No theme framework.** The toggle is three states and about fifteen lines — see below.
 
 Before adding anything: does it help you publish useful writing, or help a reader understand your
 work? If not, leave it out.
+
+## How the theme toggle works
+
+Three states: **system** (the default, stores nothing), **light**, **dark**. The button cycles
+through them and shows an icon for the current one.
+
+Colours are defined once each, carrying both values:
+
+```css
+--paper: light-dark(#fdfcfa, #141413);
+```
+
+`light-dark()` resolves against the active `color-scheme`, so there is no duplicated dark palette
+and no `prefers-color-scheme` media query. The toggle only sets `color-scheme` on `:root`:
+
+```css
+:root[data-theme='light'] { color-scheme: light; }
+:root[data-theme='dark']  { color-scheme: dark; }
+```
+
+To change a colour, edit the one `light-dark()` line in `src/styles/global.css`.
+
+Two scripts, both inline:
+
+- **`src/layouts/Base.astro`** — reads `localStorage` and sets `data-theme` before first paint.
+  It must stay in `<head>` and stay blocking; moving or deferring it reintroduces a flash of the
+  wrong theme on every page load. It also adds a `has-js` class, which is what reveals the button —
+  so with JavaScript off there is no dead control, just the OS preference.
+- **`src/components/ThemeToggle.astro`** — the click handler. Which icon is visible is decided in
+  CSS from `data-theme`, so the script only ever sets one attribute.
+
+Syntax highlighting follows along: Shiki is configured with `defaultColor: false`, so it emits
+both palettes as `--shiki-light` / `--shiki-dark` custom properties and the CSS picks between them
+with `light-dark()` like everything else.
+
+One known gap: the `<meta name="theme-color">` tags still follow the OS setting rather than a
+manual override, so mobile browser chrome can differ from the page. Not worth scripting.
 
 ## Placeholder content
 

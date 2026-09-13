@@ -10,7 +10,8 @@ export default defineConfig({
   markdown: {
     shikiConfig: {
       themes: { light: 'github-light', dark: 'github-dark' },
-      defaultColor: 'light',
+      // Emits --shiki-light / --shiki-dark custom properties; CSS picks between them.
+      defaultColor: false,
       wrap: false,
     },
   },

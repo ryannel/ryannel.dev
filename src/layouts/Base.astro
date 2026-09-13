@@ -19,6 +19,21 @@ interface Props {
 <html lang={SITE.locale}>
   <head>
     <BaseHead {...Astro.props} />
+    <script is:inline>
+      // Applies the saved theme before first paint, so there is no flash of the
+      // other one. Also marks that scripting is available, which reveals the toggle.
+      (() => {
+        document.documentElement.classList.add('has-js');
+        try {
+          const saved = localStorage.getItem('theme');
+          if (saved === 'light' || saved === 'dark') {
+            document.documentElement.dataset.theme = saved;
+          }
+        } catch {
+          // Storage unavailable: fall back to the OS preference.
+        }
+      })();
+    </script>
   </head>
   <body>
     <a class="skip-link" href="#content">Skip to content</a>
