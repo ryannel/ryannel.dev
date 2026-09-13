@@ -1,0 +1,63 @@
+---
+import { SITE } from '../consts';
+
+interface Props {
+  title: string;
+  description?: string;
+  /** Absolute path to a social preview image, e.g. "/og.png". */
+  image?: string;
+  /** Set for note pages so crawlers see an article rather than a website. */
+  type?: 'website' | 'article';
+  publishedTime?: Date;
+  modifiedTime?: Date;
+}
+
+const {
+  title,
+  description = SITE.description,
+  image = '/og.png',
+  type = 'website',
+  publishedTime,
+  modifiedTime,
+} = Astro.props;
+
+// Canonical URLs on this site always end in "/", matching build.format: 'directory'.
+const path = Astro.url.pathname.endsWith('/') ? Astro.url.pathname : `${Astro.url.pathname}/`;
+const canonical = new URL(path, SITE.url);
+const socialImage = new URL(image, SITE.url);
+const fullTitle = title === SITE.title ? title : `${title} — ${SITE.title}`;
+---
+
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>{fullTitle}</title>
+<meta name="description" content={description} />
+<link rel="canonical" href={canonical} />
+
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<meta name="color-scheme" content="light dark" />
+<meta name="theme-color" content="#fdfcfa" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#141413" media="(prefers-color-scheme: dark)" />
+
+<meta property="og:type" content={type} />
+<meta property="og:title" content={fullTitle} />
+<meta property="og:description" content={description} />
+<meta property="og:url" content={canonical} />
+<meta property="og:image" content={socialImage} />
+<meta property="og:site_name" content={SITE.title} />
+<meta property="og:locale" content="en_GB" />
+{publishedTime && <meta property="article:published_time" content={publishedTime.toISOString()} />}
+{modifiedTime && <meta property="article:modified_time" content={modifiedTime.toISOString()} />}
+
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content={fullTitle} />
+<meta name="twitter:description" content={description} />
+<meta name="twitter:image" content={socialImage} />
+
+<link
+  rel="alternate"
+  type="application/rss+xml"
+  title={`${SITE.title} — Notes`}
+  href={new URL('/rss.xml', SITE.url)}
+/>
+<link rel="sitemap" href="/sitemap-index.xml" />

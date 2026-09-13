@@ -1,0 +1,45 @@
+---
+title: "Why coding agents need a system model, not just repository access"
+description: "Giving an agent the whole repo answers ‘what is the code’. It doesn’t answer ‘what is this system’."
+published: 2026-07-22
+updated:
+featured: true
+draft: false
+tags: ["agents", "architecture"]
+links:
+  - label: "Related project — Groundwork"
+    href: "/projects/#groundwork"
+related:
+  - context-is-the-hard-part
+---
+
+*Placeholder — this is sample content to show the reading experience.*
+
+An agent with repository access can read every file and still not know what the system *is*. The
+repo describes structure. It doesn’t describe intent, ownership, invariants, or the reasons the
+last three people didn’t do the obvious thing.
+
+<Figure
+  src="/diagrams/repo-vs-system-model.svg"
+  alt="Two stacked layers: a repository layer of files and modules, and a system model layer of boundaries, invariants and ownership."
+  caption="The repo is the bottom layer. Most of what an agent needs to reason correctly lives in the layer above it."
+/>
+
+## What’s missing is mostly implicit
+
+The things a competent engineer holds in their head on day 200 and not on day 1:
+
+- which boundaries are real and which are accidental;
+- what’s load-bearing versus what’s vestigial;
+- which invariants are enforced in code, and which only by convention;
+- what a change here tends to break over there.
+
+<Callout type="failed">
+  I spent a while trying to recover this from the codebase automatically — call graphs, commit
+  archaeology, ownership heuristics. It produced something that looked like a system model and
+  behaved like noise. The signal that mattered was never written down anywhere I could read it.
+</Callout>
+
+So I’ve started writing parts of it down explicitly, as a thin artefact next to the code rather
+than a document that rots in a wiki. Early, and I don’t know yet whether it survives contact with
+a system that changes weekly.

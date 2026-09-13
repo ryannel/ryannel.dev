@@ -1,0 +1,13 @@
+---
+import { formatDate, isoDate } from '../lib/notes';
+
+interface Props {
+  date: Date;
+  /** Prefix such as "Updated". */
+  prefix?: string;
+}
+
+const { date, prefix } = Astro.props;
+---
+
+<time datetime={isoDate(date)}>{prefix ? `${prefix} ` : ''}{formatDate(date)}</time>

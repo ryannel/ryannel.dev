@@ -1,0 +1,13 @@
+---
+import { ELSEWHERE, SITE } from '../consts';
+---
+
+<footer class="site-footer">
+  <div class="wrap">
+    <span>&copy; {new Date().getFullYear()} {SITE.author}</span>
+    <ul>
+      {ELSEWHERE.map((link) => <li><a href={link.href} rel="me">{link.label}</a></li>)}
+      <li><a href="/rss.xml">RSS</a></li>
+    </ul>
+  </div>
+</footer>

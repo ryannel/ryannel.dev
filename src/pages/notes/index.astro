@@ -1,0 +1,31 @@
+---
+import Base from '../../layouts/Base.astro';
+import NoteList from '../../components/NoteList.astro';
+import { NOTES_PREAMBLE } from '../../consts';
+import { getNotes, type Note } from '../../lib/notes';
+
+const notes = await getNotes();
+
+// Group by year so the archive reads as a timeline rather than an undated pile.
+const byYear = notes.reduce<Map<number, Note[]>>((acc, note) => {
+  const year = note.data.published.getUTCFullYear();
+  acc.set(year, [...(acc.get(year) ?? []), note]);
+  return acc;
+}, new Map());
+
+const years = [...byYear.entries()].sort((a, b) => b[0] - a[0]);
+---
+
+<Base title="Notes" description="Working notes on AI engineering, agents and software architecture.">
+  <h1 class="page-title">Notes</h1>
+  <p class="page-intro">{NOTES_PREAMBLE}</p>
+
+  {
+    years.map(([year, yearNotes]) => (
+      <section class="year-group">
+        <h2 class="label year-heading">{year}</h2>
+        <NoteList notes={yearNotes} />
+      </section>
+    ))
+  }
+</Base>

@@ -1,0 +1,23 @@
+---
+import { NAV, SITE } from '../consts';
+
+const path = Astro.url.pathname;
+
+// "page" only for the page you are actually on; "true" marks the section a note sits in.
+const current = (href: string) => (path === href ? 'page' : path.startsWith(href) ? 'true' : undefined);
+---
+
+<header class="site-header">
+  <div class="wrap">
+    <a class="site-name" href="/">{SITE.title}</a>
+    <nav class="site-nav" aria-label="Primary">
+      {
+        NAV.map((item) => (
+          <a href={item.href} aria-current={current(item.href)}>
+            {item.label}
+          </a>
+        ))
+      }
+    </nav>
+  </div>
+</header>

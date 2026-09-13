@@ -1,0 +1,30 @@
+---
+/**
+ * A restrained aside for the recurring shapes these notes take.
+ * Usage in .mdx (no import needed — see src/pages/notes/[...slug].astro):
+ *   <Callout type="surprise">Text.</Callout>
+ *   <Callout label="Caveat">Text.</Callout>
+ */
+type CalloutType = 'hypothesis' | 'surprise' | 'failed' | 'update' | 'note';
+
+interface Props {
+  type?: CalloutType;
+  /** Overrides the default label for the type. */
+  label?: string;
+}
+
+const LABELS: Record<CalloutType, string> = {
+  hypothesis: 'Current hypothesis',
+  surprise: 'What surprised me',
+  failed: "What didn’t work",
+  update: 'Update',
+  note: 'Note',
+};
+
+const { type = 'note', label } = Astro.props;
+---
+
+<aside class={`callout callout-${type}`}>
+  <p class="callout-label">{label ?? LABELS[type]}</p>
+  <slot />
+</aside>

@@ -1,0 +1,663 @@
+/* ---------------------------------------------------------------------------
+   Tokens
+   One palette, one accent, two type families. Dark mode is the same design
+   with different values — there is no theme toggle and no JavaScript.
+   --------------------------------------------------------------------------- */
+
+:root {
+  color-scheme: light dark;
+
+  --paper: #fdfcfa;
+  --ink: #1c1b19;
+  --ink-muted: #5c5a55;
+  --rule: #e4e2dc;
+  --surface: #f4f2ed;
+  --accent: #2d5f80;
+  --accent-strong: #1f4460;
+  --selection: #dbe6ee;
+
+  --font-prose: Charter, 'Bitstream Charter', 'Iowan Old Style', 'Sitka Text', Cambria, Georgia,
+    serif;
+  --font-ui: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+
+  /* Comfortable line length for 500–2000 word pieces. */
+  --measure: 37rem;
+  --gutter: 1.5rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #141413;
+    --ink: #e7e5df;
+    --ink-muted: #a5a29a;
+    --rule: #2e2d2a;
+    --surface: #1d1d1b;
+    --accent: #8fb8d4;
+    --accent-strong: #b0cfe4;
+    --selection: #24333d;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Base
+   --------------------------------------------------------------------------- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-prose);
+  font-size: 1.0625rem;
+  line-height: 1.65;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+@media (min-width: 40rem) {
+  body {
+    font-size: 1.125rem;
+  }
+}
+
+::selection {
+  background: var(--selection);
+}
+
+a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+  text-decoration-thickness: 0.06em;
+  text-decoration-color: color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+a:hover {
+  color: var(--accent-strong);
+  text-decoration-color: currentColor;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 1px;
+}
+
+img,
+svg,
+video {
+  max-width: 100%;
+  height: auto;
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--rule);
+  margin: 3rem 0;
+}
+
+/* ---------------------------------------------------------------------------
+   Layout
+   --------------------------------------------------------------------------- */
+
+.wrap {
+  width: 100%;
+  max-width: calc(var(--measure) + var(--gutter) * 2);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+main {
+  flex: 1 0 auto;
+  padding-block: 3rem 5rem;
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  background: var(--paper);
+  color: var(--ink);
+  padding: 0.6rem 1rem;
+  z-index: 10;
+}
+
+.skip-link:focus {
+  left: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   Header / footer
+   --------------------------------------------------------------------------- */
+
+.site-header {
+  border-bottom: 1px solid var(--rule);
+  font-family: var(--font-ui);
+}
+
+.site-header .wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem 1.5rem;
+  padding-block: 1.4rem;
+}
+
+.site-name {
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.site-name:hover {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.site-nav {
+  display: flex;
+  gap: 1.25rem;
+  font-size: 0.9375rem;
+}
+
+.site-nav a {
+  color: var(--ink-muted);
+  text-decoration: none;
+}
+
+.site-nav a:hover,
+.site-nav a[aria-current] {
+  color: var(--ink);
+}
+
+.site-nav a[aria-current] {
+  text-decoration: underline;
+  text-underline-offset: 0.25em;
+  text-decoration-color: var(--rule);
+}
+
+.site-footer {
+  border-top: 1px solid var(--rule);
+  font-family: var(--font-ui);
+  font-size: 0.875rem;
+  color: var(--ink-muted);
+}
+
+.site-footer .wrap {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem 1.5rem;
+  padding-block: 1.75rem;
+}
+
+.site-footer ul {
+  display: flex;
+  gap: 1.25rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.site-footer a {
+  color: var(--ink-muted);
+  text-decoration: none;
+}
+
+.site-footer a:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+/* ---------------------------------------------------------------------------
+   Headings and shared page furniture
+   --------------------------------------------------------------------------- */
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-prose);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.005em;
+  text-wrap: balance;
+  margin: 0;
+}
+
+.page-title {
+  font-size: 1.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.page-intro {
+  color: var(--ink-muted);
+  margin: 0 0 3rem;
+  max-width: 34rem;
+}
+
+/* Small uppercase label used for section headings and metadata. */
+.label {
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  margin: 0 0 1.25rem;
+}
+
+.meta {
+  font-family: var(--font-ui);
+  font-size: 0.8125rem;
+  color: var(--ink-muted);
+}
+
+.meta > * + *::before {
+  content: '·';
+  margin: 0 0.5em;
+}
+
+/* ---------------------------------------------------------------------------
+   Note lists
+   --------------------------------------------------------------------------- */
+
+.note-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2.25rem;
+}
+
+.note-list > li > a {
+  display: block;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: none;
+  line-height: 1.35;
+  text-wrap: balance;
+}
+
+.note-list > li > a:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+  text-decoration-color: var(--accent);
+}
+
+.note-list p {
+  margin: 0.4rem 0 0.35rem;
+  color: var(--ink-muted);
+  font-size: 0.96em;
+}
+
+.draft-flag {
+  font-family: var(--font-ui);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  padding: 0.05rem 0.35rem;
+  margin-left: 0.5rem;
+  vertical-align: 0.12em;
+}
+
+/* Year groups in the notes archive. */
+.year-group + .year-group {
+  margin-top: 3.25rem;
+}
+
+.year-group + .year-group .year-heading {
+  padding-top: 2.25rem;
+  border-top: 1px solid var(--rule);
+}
+
+/* ---------------------------------------------------------------------------
+   Article
+   --------------------------------------------------------------------------- */
+
+.note-header {
+  margin-bottom: 2.5rem;
+}
+
+.note-header h1 {
+  font-size: 1.875rem;
+  margin-bottom: 0.6rem;
+}
+
+@media (min-width: 40rem) {
+  .note-header h1 {
+    font-size: 2.125rem;
+  }
+}
+
+.note-header .description {
+  color: var(--ink-muted);
+  margin: 0 0 0.85rem;
+}
+
+.prose > * + * {
+  margin-top: 1.15em;
+}
+
+.prose h2 {
+  font-size: 1.3125rem;
+  margin-top: 2.5em;
+  margin-bottom: 0.2em;
+}
+
+.prose h3 {
+  font-size: 1.0625rem;
+  margin-top: 1.9em;
+  margin-bottom: 0.2em;
+}
+
+.prose h2 + *,
+.prose h3 + * {
+  margin-top: 0.5em;
+}
+
+.prose ul,
+.prose ol {
+  padding-left: 1.35em;
+}
+
+.prose li + li {
+  margin-top: 0.35em;
+}
+
+.prose blockquote {
+  margin: 1.6em 0;
+  padding-left: 1.15em;
+  border-left: 2px solid var(--rule);
+  color: var(--ink-muted);
+  font-style: italic;
+}
+
+.prose blockquote p {
+  margin: 0;
+}
+
+.prose blockquote p + p {
+  margin-top: 0.8em;
+}
+
+.prose figure {
+  margin: 2em 0;
+}
+
+.prose figcaption {
+  font-family: var(--font-ui);
+  font-size: 0.8125rem;
+  color: var(--ink-muted);
+  margin-top: 0.6rem;
+  text-align: left;
+}
+
+.prose img {
+  display: block;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+}
+
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-ui);
+  font-size: 0.875rem;
+  margin: 1.8em 0;
+}
+
+.prose th,
+.prose td {
+  text-align: left;
+  padding: 0.5rem 0.75rem 0.5rem 0;
+  border-bottom: 1px solid var(--rule);
+  vertical-align: top;
+}
+
+.prose th {
+  font-weight: 600;
+}
+
+/* Tables and other wide blocks scroll inside themselves, never the page. */
+.scroll-x {
+  overflow-x: auto;
+}
+
+/* ---------------------------------------------------------------------------
+   Code
+   --------------------------------------------------------------------------- */
+
+code,
+kbd,
+samp {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+}
+
+:not(pre) > code {
+  background: var(--surface);
+  border-radius: 2px;
+  padding: 0.12em 0.32em;
+  word-break: break-word;
+}
+
+pre {
+  overflow-x: auto;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  line-height: 1.55;
+  font-size: 0.8125rem;
+  tab-size: 2;
+}
+
+.prose pre {
+  margin: 1.7em 0;
+}
+
+/* Override Shiki's own background so code sits in the site palette. */
+pre.astro-code {
+  background-color: var(--surface) !important;
+}
+
+@media (prefers-color-scheme: dark) {
+  .astro-code span {
+    color: var(--shiki-dark) !important;
+    font-style: var(--shiki-dark-font-style) !important;
+    font-weight: var(--shiki-dark-font-weight) !important;
+    text-decoration: var(--shiki-dark-text-decoration) !important;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Callouts
+   Restrained by design: a rule, a label, and the text.
+   --------------------------------------------------------------------------- */
+
+.callout {
+  margin: 1.8em 0;
+  padding: 0.9rem 0 0.9rem 1.1rem;
+  border-left: 2px solid var(--rule);
+}
+
+.callout > .callout-label {
+  font-family: var(--font-ui);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  margin: 0 0 0.4rem;
+}
+
+.callout > :last-child {
+  margin-bottom: 0;
+}
+
+.callout p {
+  margin: 0;
+}
+
+.callout p + p {
+  margin-top: 0.7em;
+}
+
+.callout-update {
+  border-left-color: var(--accent);
+}
+
+/* ---------------------------------------------------------------------------
+   End matter: related links, related notes
+   --------------------------------------------------------------------------- */
+
+.endmatter {
+  margin-top: 3.5rem;
+  padding-top: 1.75rem;
+  border-top: 1px solid var(--rule);
+  font-family: var(--font-ui);
+  font-size: 0.9375rem;
+}
+
+.endmatter + .endmatter {
+  margin-top: 2rem;
+  padding-top: 1.75rem;
+}
+
+.endmatter ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* ---------------------------------------------------------------------------
+   Home and projects
+   --------------------------------------------------------------------------- */
+
+.lede {
+  max-width: 34rem;
+  margin: 0 0 3.5rem;
+}
+
+.lede h1 {
+  font-size: 1.625rem;
+  margin-bottom: 0.75rem;
+}
+
+.lede p {
+  margin: 0 0 0.75rem;
+}
+
+.lede p:last-child {
+  margin-bottom: 0;
+}
+
+.section {
+  margin-top: 3.5rem;
+}
+
+.section:first-of-type {
+  margin-top: 0;
+}
+
+.section-more {
+  font-family: var(--font-ui);
+  font-size: 0.875rem;
+  margin-top: 1.75rem;
+}
+
+.inline-links {
+  font-family: var(--font-ui);
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.inline-links a + a::before {
+  content: '\00b7';
+  color: var(--ink-muted);
+  margin: 0 0.55em;
+  display: inline-block;
+  text-decoration: none;
+}
+
+.project {
+  padding-top: 2.25rem;
+  margin-top: 2.25rem;
+  border-top: 1px solid var(--rule);
+}
+
+.project:first-of-type {
+  padding-top: 0;
+  margin-top: 0;
+  border-top: 0;
+}
+
+.project h2 {
+  font-size: 1.1875rem;
+  margin-bottom: 0.3rem;
+}
+
+.project .status {
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  margin: 0 0 0.75rem;
+}
+
+.project .links {
+  font-family: var(--font-ui);
+  font-size: 0.875rem;
+  margin-top: 1rem;
+}
+
+.project .links a + a::before {
+  content: '·';
+  color: var(--ink-muted);
+  margin: 0 0.55em;
+  display: inline-block;
+  text-decoration: none;
+}
+
+/* ---------------------------------------------------------------------------
+   Motion
+   --------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

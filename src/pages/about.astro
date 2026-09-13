@@ -1,0 +1,46 @@
+---
+import Base from '../layouts/Base.astro';
+import { ELSEWHERE } from '../consts';
+---
+
+<Base
+  title="About"
+  description="Ryan Nel — Senior Staff Software Engineer, based in Sweden, working on large software systems and AI engineering."
+>
+  <h1 class="page-title">About</h1>
+
+  <div class="prose" style="max-width:34rem">
+    <p>
+      I’m Ryan Nel, a Senior Staff Software Engineer based in Sweden. I work on large-scale software
+      systems, and increasingly on the systems we build <em>with</em> AI rather than around it.
+    </p>
+    <p>
+      Most of what interests me sits at the boundary between the two: how you give a system enough
+      of the right context to reason well, where agents stop understanding a codebase, how to
+      evaluate any of it honestly, and what architecture looks like when a component can be
+      confidently wrong.
+    </p>
+    <p>
+      I learn by building. The notes here are the residue of that — what I tried, what surprised me,
+      what didn’t work, and what I currently think. I’d rather write something specific and
+      provisional than something general and confident.
+    </p>
+    <p>
+      Nothing here reflects or discloses my employer’s work. Where a lesson comes from professional
+      experience, it’s generalised.
+    </p>
+    <p>
+      {
+        ELSEWHERE.map((link, i) => (
+          <>
+            {i > 0 && ' · '}
+            <a href={link.href} rel="me">
+              {link.label}
+            </a>
+          </>
+        ))
+      }
+      {' · '}<a href="/rss.xml">RSS</a>
+    </p>
+  </div>
+</Base>
