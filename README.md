@@ -245,9 +245,9 @@ If you ever change the domain, update it in three places: `public/CNAME`, `site`
 
 Recorded so these stay decisions rather than oversights, and so the site doesn't quietly grow:
 
-- **No analytics.** If you ever want them, add a privacy-respecting script (Plausible, Fathom,
-  GoatCounter) as a single `<script>` in `src/components/BaseHead.astro`. That is the only place
-  it would go. Nothing else needs to change, and no cookie banner is required for those.
+- **No cookies, no local storage for analytics, no custom events.** Cloudflare Web Analytics is
+  cookieless and stores nothing on the reader's device — see Analytics below. Outbound clicks and
+  custom events are deliberately not tracked.
 - **No tag or category pages.** `tags` is descriptive metadata, not navigation.
 - **No per-project pages.** Projects are short; they render on one page.
 - **No comments, share buttons, newsletter, follower counts or engagement metrics.** The site is
@@ -261,6 +261,41 @@ Recorded so these stay decisions rather than oversights, and so the site doesn't
 
 Before adding anything: does it help publish useful writing, or help a reader understand the
 work? If not, leave it out.
+
+## Analytics
+
+Cloudflare Web Analytics, via Cloudflare's manual beacon. It is cookieless, stores nothing on the
+reader's device, and needs no consent banner. GitHub Pages remains the host — **DNS does not move
+to Cloudflare**, and there is no Worker, proxy or Cloudflare Pages involved. **No npm dependency.**
+
+The beacon lives once in `src/layouts/Base.astro` and is emitted only when both are true:
+
+```
+import.meta.env.PROD          production build, so never `astro dev`
+PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN   set at build time
+```
+
+A missing token omits the beacon and the build still succeeds. Because the token is read at build
+time, `npm run preview` shows whatever the last build baked in — so simply don't set the variable
+locally and local builds stay clean.
+
+### One-time setup
+
+1. Sign in to Cloudflare and open **Web Analytics**.
+2. **Add a site**, and enter `ryannel.dev`.
+3. Open **Manage site** and copy the site token from the snippet.
+4. In GitHub: **Settings → Secrets and variables → Actions → Variables → New repository variable**
+
+   ```
+   PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN = <site token>
+   ```
+
+   A variable, not a secret: the token is public by design, and a variable keeps it readable in the
+   workflow. Do not commit a `.env` containing the real value.
+5. Re-run the latest **Deploy to GitHub Pages** workflow, or push anything.
+6. Visit <https://ryannel.dev> and confirm data appears in Cloudflare after a few minutes.
+
+The workflow already passes the variable through to `npm run build`; nothing else needs changing.
 
 ## Fonts
 

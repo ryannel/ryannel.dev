@@ -31,6 +31,10 @@ jobs:
       - run: npm run check
 
       - run: npm run build
+        env:
+          # Repository variable, not a secret: the Cloudflare site token is
+          # public by design. Unset simply means no beacon in the output.
+          PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN: ${{ vars.PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN }}
 
       - uses: actions/upload-pages-artifact@v5
         with:

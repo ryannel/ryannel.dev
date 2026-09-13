@@ -5,6 +5,16 @@ import Footer from '../components/Footer.astro';
 import { SITE } from '../consts';
 import '../styles/global.css';
 
+/*
+ * Cloudflare Web Analytics. Production builds only, and only when the token is
+ * set — a missing token simply omits the beacon rather than failing the build.
+ * `astro dev` never includes it, because import.meta.env.PROD is false there.
+ * Set PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN as a GitHub Actions repository
+ * variable; see the Analytics section of the README.
+ */
+const analyticsToken = import.meta.env.PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN;
+const showAnalytics = import.meta.env.PROD && Boolean(analyticsToken);
+
 interface Props {
   title: string;
   description?: string;
@@ -44,5 +54,15 @@ interface Props {
       </div>
     </main>
     <Footer />
+    {
+      showAnalytics && (
+        <script
+          is:inline
+          type="module"
+          src="https://static.cloudflareinsights.com/beacon.min.js"
+          data-cf-beacon={JSON.stringify({ token: analyticsToken })}
+        />
+      )
+    }
   </body>
 </html>
