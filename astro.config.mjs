@@ -3,6 +3,8 @@ import { defineConfig } from 'astro/config';
 import { satteri } from '@astrojs/markdown-satteri';
 import mdx from '@astrojs/mdx';
 import sitemap from '@astrojs/sitemap';
+import noteEditor from './scripts/editor/integration.mjs';
+import { stampSource } from './scripts/editor/stamp.mjs';
 
 const isTable = (node) =>
   (node.type === 'element' && node.tagName === 'table') ||
@@ -130,10 +132,11 @@ const raiseCommentContrast = {
 // https://astro.build/config
 export default defineConfig({
   site: 'https://ryannel.dev',
-  integrations: [mdx(), sitemap()],
+  // noteEditor and stampSource are inert outside `astro dev`; see scripts/editor/.
+  integrations: [mdx(), sitemap(), noteEditor()],
   markdown: {
     // @astrojs/mdx extends this config by default, so .mdx gets the same pipeline.
-    processor: satteri({ hastPlugins: [wrapTables] }),
+    processor: satteri({ hastPlugins: [wrapTables, stampSource] }),
     shikiConfig: {
       themes: { light: 'github-light', dark: 'github-dark' },
       // Emits --shiki-light / --shiki-dark custom properties; CSS picks between them.

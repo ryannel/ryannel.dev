@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/editor/prompt-context.mjs",
+            "timeout": 5,
+            "statusMessage": "Reading editor cursor"
+          }
+        ]
+      }
+    ]
+  }
+}

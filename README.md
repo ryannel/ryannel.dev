@@ -149,6 +149,50 @@ Set `updated:` in the frontmatter when adding one. The original argument stays a
 the record of what was thought at the time. Factual corrections, typos, broken links and
 formatting fixes need no update block.
 
+### Editing in the browser
+
+Under `npm run dev` only, a note can be edited on the page itself, the way a post is edited in
+Ghost. Open the note, click the pencil (**Edit note**) in Astro's dev toolbar at the bottom of
+the window, and click into any paragraph, heading, list item, quote, callout, caption, the title
+or the description. Text is written back into the MDX file when you pause, leave the block or
+press ⌘S. The page updates in place, without a reload, and the caret stays where it was. A pill
+in the top-right shows the save state and the word count.
+
+**Markdown as you type.** `**bold**`, `*italic*`, `` `code` ``, `~~struck~~` and `[text](url)`
+convert the moment you close them. At the start of a block, `## ` and `### ` make a heading,
+`- ` a list, `1. ` a numbered list, `> ` a quote, and `---` on its own line a divider. Backspace
+at the start of a heading, item or quote turns it back into a paragraph.
+
+**Selecting text** shows a formatting bar: bold, italic, code, strikethrough, link, and the
+block's kind (heading, subheading, quote). Inside a callout the bar also has the callout's type
+and a way to remove it. ⌘B, ⌘I and ⌘K work too; ⌘K with nothing selected inserts the URL as a
+link. Put the caret in a link to see, edit or remove it.
+
+**Blocks.** Enter at the end of a block opens a new one below it (a new item after an item,
+a new line after a quote line); Enter in the middle splits it; Enter on an empty item or quote
+line leaves the list or quote. ⌘Enter opens a paragraph after whatever the block sits in, which
+is how you get out of a callout. Backspace at the start of a paragraph joins it to the one
+above. Arrow keys move between blocks, including onto figures and dividers.
+
+**Cards.** A figure or divider is selected with a click, or by arrowing onto it. Its bar sets
+alt text, caption and the wide layout, or removes it; Backspace removes it too, and Enter opens
+a paragraph after it.
+
+**Adding things.** In an empty block, type `/` (or click the `+` in the margin) for a menu:
+heading, subheading, bullet list, numbered list, quote, divider, image and callout. *Image*
+lists everything under `src/assets/`; dropping or pasting an image file onto the page uploads
+it to `src/assets/<note>/` and adds a figure, with the import written for you. Pasted text
+keeps its markdown and its links, and a pasted passage lands as separate paragraphs.
+
+The editor also records which block the cursor is in (`.astro/editor-context.json`), and the
+Claude Code hook in `.claude/settings.json` (and the Codex one in `.codex/hooks.json`) passes
+that along with every prompt. So with the caret in a paragraph, "tighten this" or "add a callout
+after this" needs no further pointing. Claude's edits land in the file and the page reloads.
+
+All of it lives in `scripts/editor/` and is inert outside `astro dev`: production HTML carries
+no `data-src` stamps and no editor code, and `npm run verify` checks that. Removing a figure
+leaves its `import` line behind; tidy those by hand when a note is done.
+
 ### Images and diagrams
 
 The simplest pattern, and the one to reach for by default: put the file in `src/assets/` and

@@ -11,6 +11,8 @@ interface Props {
   type?: CalloutType;
   /** Overrides the default label for the type. */
   label?: string;
+  /** Set only by the dev-only editor (scripts/editor/stamp.mjs); never in a build. */
+  'data-src'?: string;
 }
 
 const LABELS: Record<CalloutType, string> = {
@@ -29,7 +31,7 @@ const { type = 'note', label } = Astro.props;
   within an article, not a landmark alongside it, and a complementary landmark
   nested inside <main> is reported as a fault by every auditing tool.
 -->
-<aside role="note" class={`callout callout-${type}`}>
+<aside role="note" class={`callout callout-${type}`} data-src={Astro.props['data-src']}>
   <p class="callout-label">{label ?? LABELS[type]}</p>
   <slot />
 </aside>

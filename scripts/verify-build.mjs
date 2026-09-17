@@ -148,6 +148,14 @@ for (const { path, html } of pages) {
   check(!/<(ul|ol)(\s[^>]*)?>\s*<\/\1>/.test(html), `${path}: an empty list was rendered`);
 }
 
+// --- 8. the dev-only editor left nothing behind ------------------------------
+// scripts/editor/ stamps blocks with data-src and adds a toolbar app under
+// `astro dev` only. Neither may reach a build.
+for (const { path, html } of pages) {
+  check(!html.includes('data-src='), `${path}: carries editor source stamps`);
+  check(!html.includes('note-editor'), `${path}: references the dev-only editor`);
+}
+
 if (failures.length) {
   console.error(
     `verify-build: ${failures.length} failure(s)\n` + failures.map((f) => '  - ' + f).join('\n'),

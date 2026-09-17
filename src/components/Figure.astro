@@ -36,6 +36,9 @@ interface Props {
   /** Overrides the bounded default widths — for genuinely exceptional media. */
   widths?: number[];
   sizes?: string;
+  /** Let a large illustration extend beyond the reading column. */
+  wide?: boolean;
+  'data-src'?: string;
 }
 
 const {
@@ -48,6 +51,9 @@ const {
   priority = false,
   widths,
   sizes,
+  wide = false,
+  // Set only by the dev-only editor (scripts/editor/stamp.mjs); never in a build.
+  'data-src': dataSrc,
 } = Astro.props;
 
 if (typeof src === 'string' && (!width || !height)) {
@@ -95,7 +101,7 @@ const loading = eager || priority ? 'eager' : 'lazy';
 const fetchpriority = priority ? 'high' : 'auto';
 ---
 
-<figure>
+<figure class:list={{ 'figure-wide': wide }} data-src={dataSrc}>
   {
     typeof src === 'string' ? (
       <img
@@ -113,7 +119,7 @@ const fetchpriority = priority ? 'high' : 'auto';
         alt={alt}
         width={baseWidth}
         widths={responsiveWidths}
-        sizes={sizes ?? DISPLAY_SIZES}
+        sizes={sizes ?? (wide ? '(min-width: 75rem) 1152px, calc(100vw - 3rem)' : DISPLAY_SIZES)}
         loading={loading}
         fetchpriority={fetchpriority}
         decoding="async"
@@ -123,3 +129,24 @@ const fetchpriority = priority ? 'high' : 'auto';
   }
   {caption && <figcaption>{caption}</figcaption>}
 </figure>
+
+<style>
+  .figure-wide {
+    width: min(72rem, calc(100vw - 3rem));
+    max-width: none;
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+  .figure-wide figcaption {
+    max-width: 39rem;
+    margin-inline: auto;
+  }
+  @media print {
+    .figure-wide {
+      width: 100%;
+      left: auto;
+      transform: none;
+    }
+  }
+</style>
