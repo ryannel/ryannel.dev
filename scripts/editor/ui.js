@@ -282,7 +282,9 @@ export const createUi = () => {
       plusRun = run;
       plus.hidden = false;
       const r = pageRect(rect);
-      plus.style.left = `${Math.max(4, r.left - 36)}px`;
+      // In the left margin when there is one; on a narrow window, at the
+      // block's right end, well away from the caret.
+      plus.style.left = `${rect.left >= 44 ? r.left - 36 : r.right - 30}px`;
       plus.style.top = `${r.top + Math.max(0, (rect.height - 26) / 2)}px`;
     },
     hide() {

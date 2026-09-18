@@ -921,6 +921,9 @@ export default {
     const onInput = (e) => {
       const block = e.target.closest?.('[contenteditable="true"]');
       if (!block) return;
+      // Deleting the last character leaves a <br> behind, which hides the
+      // placeholder and can sit under the caret; an empty block stays empty.
+      if (!block.textContent && block.childNodes.length) block.replaceChildren();
       // Markdown as you type: inline shortcuts close on their last character,
       // block shortcuts on the space after their marker.
       if (e.inputType === 'insertText' && isText(block)) {
