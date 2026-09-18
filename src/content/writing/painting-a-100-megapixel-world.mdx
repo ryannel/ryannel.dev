@@ -6,13 +6,14 @@ featured: false
 draft: true
 tags: ["experiments", "generative", "world-building"]
 links:
-  - label: "Skills repository on GitHub"
-    href: "https://github.com/ryannel/skills"
+  - label: "The map-making kit on GitHub"
+    href: "https://github.com/ryannel/experiments/tree/main/map_creation"
   - label: "Related project — Experiments"
     href: "/projects/#experiments"
 ---
 
-import world from '../../assets/atlas-experiment/world-complete.jpg';
+import world from '../../assets/atlas-experiment/world-and-detail.jpg';
+import asterfall from '../../assets/atlas-experiment/asterfall.jpg';
 import styleSearch from '../../assets/atlas-experiment/style-search.jpg';
 import firstMap from '../../assets/atlas-experiment/first-map.jpg';
 import firstMapCrop from '../../assets/atlas-experiment/first-map-crownmere-100pct.png';
@@ -30,26 +31,105 @@ import AtlasHandoff from '../../components/AtlasHandoff.astro';
 
 <Figure
   src={world}
-  alt="The completed, labelled Lantern Sea world map, with snowy mountains, wooded river valleys, dry uplands, a blue crater lake, tropical rainforest and coastal settlements."
-  caption="The Lantern Sea: 81 overlapping paintings on a 12,276 × 8,184-pixel canvas, a little over 100 megapixels. The place names live on a separate layer."
+  alt="The complete Lantern Sea world map, with a small gold rectangle on the royal capital and an inset in the lower right showing that rectangle at full size: a castle with blue roofs above a walled town, a river and fields."
+  caption="The whole map, with the marked piece of it at its own pixels. Everything on the map is painted at that level of detail."
   priority
   wide
 />
 
-I’ve always been drawn to maps. Old ones with compass stars and sea monsters. The hand-drawn
-ones in the front of fantasy novels. The big paper road maps my parents would unfold on family
-holidays. Over the years I’ve doodled my own now and then, in tools like Inkarnate and
-Dungeondraft, imagining the stories and far-off worlds behind them. I always put them aside
-in the end, disappointed by the result and by the limits of what I could draw.
+I’ve always been drawn to maps. Old hand-painted ones with compass stars and sea monsters in
+the corners. The hand-drawn ones in the front of fantasy novels, pored over before the first
+chapter. The road atlases my parents would unfold across the whole front of the car on family
+holidays. A good map makes you want to go there. You trace a road with your finger and wonder
+what is at the end of it. Now and then I’ve doodled my own, in tools like Inkarnate and
+Dungeondraft, chasing that feeling. There was always a world in my head, and what ended up on
+the page was never it.
 
-When ChatGPT 6 Astra came out with its new image model, I wanted to have another go, this
-time with an LLM and an image generator doing the drawing.
+When GPT-6 Astra came out with its new image model, I wanted another go. This time I wanted
+the whole map in my head: zoom out and there are continents, zoom in and there is a single
+painted hamlet on a dusty road.
 
-Ten days and a lot of trial and error later, I have a process I’m happy with. The result is
-the map at the top of this page: a 100-megapixel fantasy world, painted one tile at a time.
-Here is how it went, and how you can make your own.
+Ten days, 433 turns with the agent and 300 million tokens later, I have one. 12,000 by 8,000
+pixels, painted in 81 overlapping pieces, and every one of them is worth leaning into.
 
-## Finding a look
+I like it. It isn’t perfect: the cities are a little warped in places, and some of the tiles
+still don’t quite line up. But it is closer to the map in my head than anything I have ever
+managed to get down. Better still, you could have one of your own by the weekend.
+
+Here’s how.
+
+<Figure
+  src={asterfall}
+  alt="The observatory on the northern rim of Asterfall’s crater lake: a domed telescope house and bell tower among cypresses, walled terraces dropping to cliffs, a compass rose faintly drawn in the deep blue water below, and open sea behind."
+  caption="The observatory at Asterfall. On the map it is smaller than a fingernail."
+  wide
+/>
+
+## Getting set up
+
+Clone the `map_creation` folder of my experiments repository:
+
+```sh
+git clone --filter=blob:none --sparse https://github.com/ryannel/experiments.git experiments
+cd experiments
+git sparse-checkout set map_creation
+```
+
+Open it in Codex as its own project. The folder’s settings pick GPT-6 Astra on High, which is
+what everything was built with; check the task shows it. Astra directs and reviews, and does
+the painting through Codex’s built-in image generation, so there is nothing else to connect.
+
+Paste the starting prompt from the README and the agent takes it from there. There is nothing
+to install by hand, and you should never be handed a JSON file to fill in or a shell command to
+run. If that happens the skills have not loaded; ask it to read
+`.agents/skills/map-director/SKILL.md`.
+
+Agree a generation budget before the first batch. Most of the cost is in the paintings you
+throw away.
+
+## What the skills do
+
+There are seven skills in the folder. One of them runs the conversation; the other six are
+the stages of the work, and the director brings each one in when it is needed.
+
+- **map-director** leads. It asks the few questions that matter (what the map is for, how
+  close people will zoom, what it should feel like), proposes concrete choices when you have
+  none, saves every decision, and can pick the project up again another day from the records.
+- **map-art-direction** finds the look. It paints the same small scene a few ways, shows them
+  side by side at full size, and turns the one you choose into a style contract that every
+  later painting is checked against.
+- **map-world-planning** gives the world room. Coastlines and high ground first, then rivers
+  that actually reach the sea, then space for every realm to have a capital, lesser towns and
+  countryside between them, then the journeys people make. It ends with a world file the
+  agent can render any rectangle of as a plain schematic guide.
+- **lantern-forest** and **lantern-village** are what I learned about woodland and
+  settlements, lifted out of the atlas project. Trees in habitats rather than scattered;
+  villages with a reason to be there, working yards, worn thresholds and gates that sit in
+  actual gaps in the wall.
+- **map-render** is the loop that does the painting. Prepare a guide for one rectangle,
+  paint it, look at it at native size, trace every river and road across its edges, then
+  accept it or repair a bounded patch with a mask. Nothing becomes a neighbour until it has
+  been looked at.
+- **map-release** gets it out. A clean master, labels on their own editable layer, safe
+  previews, and notes on what is still unresolved.
+
+The agent will want to paint one representative region first: a river crossing, a woodland
+edge, a settlement and some open ground. That pilot is where the method either works or
+doesn’t, and it is much cheaper to find out there than across eighty tiles. Expect some
+repairs; the image model will close a river mouth or leave a gate standing beside a wall now
+and then, and the review step exists to catch it.
+
+The helper that assembles the map in this kit is built for small maps, up to about sixteen
+megapixels. The hundred-megapixel atlas needed a tiled pipeline that stays private, and the
+[scaling notes](https://github.com/ryannel/experiments/blob/main/map_creation/docs/scaling.md)
+say what that takes if you want to go bigger.
+
+## How it went for me
+
+That is the tidy version. Here is how it actually went the first time, wrong turns included,
+because the wrong turns are where the skills came from.
+
+### Finding a look
 
 <Figure
   src={styleSearch}
@@ -73,7 +153,7 @@ everything that followed.
   caption="The first Lantern Sea, painted in a single generation on the first evening. Two continents, a dozen cities, one enormous castle per people."
 />
 
-## Filling it with someone else’s world
+### Filling it with someone else’s world
 
 An empty map is easy. The problem was that I had nothing to put in it. I didn’t want to write a
 setting, and I didn’t need one. What I needed was enough culture and geography for the map
@@ -96,7 +176,7 @@ and it was huge. Kingdoms don’t look like that. The redesign gave each realm r
 several settlements and the wilderness between them, added a third continent, and quietly
 made the map a much larger place than a single image could hold.
 
-## Wanting to lean in
+### Wanting to lean in
 
 <Figure
   src={firstMapCrop}
@@ -125,7 +205,7 @@ Everything I tried to fix that made the map worse.
   never there. It had to be painted at the scale it would be seen.
 </Callout>
 
-## Breaking it into squares
+### Breaking it into squares
 
 <Figure
   src={remake}
@@ -163,7 +243,7 @@ canvas of 12,276 × 8,184. Just over 100 megapixels, and nothing upscaled.
   halfway across its river. Every tile looked fine on its own. Eleven tiles in, I stopped.
 </Callout>
 
-## Doing the low-res version first
+### Doing the low-res version first
 
 <Figure
   src={blenderComparison}
@@ -187,7 +267,7 @@ leads with the atmosphere of the place, then names the handful of connections th
 hold: the river enters here, at this width; the road arrives from the west. Everything else,
 the rock faces and roofs and folds in the land, is the model’s to invent.
 
-## Connecting the squares
+### Connecting the squares
 
 Paint one square from the guide, then paint the next one with the finished edge of the first
 copied into its guide. That is the whole method. To show it working, I’ll follow two
@@ -259,7 +339,7 @@ riverbank or double a tree line.
   by tracing a route rather than by looking at a boundary.
 </Callout>
 
-## Watching it grow
+### Watching it grow
 
 <Figure
   src={progressFirst}
@@ -285,7 +365,7 @@ The labels go on last, on their own layer, and are positioned from the finished 
 rather than the plan, because the model routinely moves a landmark a couple of hundred pixels
 from where it was asked to put it.
 
-## You can paint your own
+### The whole method in nine lines
 
 None of this needs special tooling. It needs an image model that accepts a reference image,
 a coding agent to do the bookkeeping, and the patience to look at every join. The recipe:
@@ -313,13 +393,9 @@ a coding agent to do the bookkeeping, and the patience to look at every join. Th
 9. **Keep names off the painting.** Labels on a separate layer, positioned from the finished
    art.
 
-I have written this up as an agent skill in
-[my skills repository](https://github.com/ryannel/skills), with the guide renderer, the
-brief template, the seam assembly and the review checklist, so an agent can run the loop
-with you rather than you reinventing it. Budget roughly one image call per square plus one
-retry in five, and expect to spend more time looking than generating.
-
-{/* TODO: publish the atlas skill and point the link above at its folder before this note goes live. */}
+That is what the skills encode, so that an agent runs the loop with you rather than you
+reinventing it. Budget roughly one image call per square plus one retry in five, and expect
+to spend more time looking than generating.
 
 ## What it was for
 
