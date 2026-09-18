@@ -37,24 +37,21 @@ import AtlasHandoff from '../../components/AtlasHandoff.astro';
   wide
 />
 
-I’ve always been drawn to maps. Old hand-painted ones with compass stars and sea monsters in
-the corners. The hand-drawn ones in the front of fantasy novels, pored over before the first
-chapter. The road atlases my parents would unfold across the whole front of the car on family
-holidays. A good map makes you want to go there. You trace a road with your finger and wonder
-what is at the end of it. Now and then I’ve doodled my own, in tools like Inkarnate and
-Dungeondraft, chasing that feeling. There was always a world in my head, and what ended up on
-the page was never it.
+I’ve always been drawn to maps. Old hand-painted ones with compass stars and sea monsters. The
+hand-drawn ones at the start of a fantasy novel. The road atlases my parents would unfold
+across the whole front of the car on family holidays. A good map makes you want to trace a road
+with your finger and wonder what is at the end of it. Now and then I’ve doodled my own, using
+tools like Inkarnate and Dungeondraft, chasing that feeling. There was always a world in my
+head, and what ended up on the page was never it.
 
-When GPT-6 Astra came out with its new image model, I wanted another go. This time I wanted
-the whole map in my head: zoom out and there are continents, zoom in and there is a single
-painted hamlet on a dusty road.
+When GPT-6 Astra came out with its new image model, I wanted another go.
 
 Ten days, 433 turns with the agent and 300 million tokens later, I have one. 12,000 by 8,000
-pixels, painted in 81 overlapping pieces, and every one of them is worth leaning into.
+pixels, painted in 81 overlapping pieces, and every one of them is worth zooming into.
 
 I like it. It isn’t perfect: the cities are a little warped in places, and some of the tiles
 still don’t quite line up. But it is closer to the map in my head than anything I have ever
-managed to get down. Better still, you could have one of your own by the weekend.
+managed to get down. Better still, you could make one of your own by the weekend.
 
 Here’s how.
 
@@ -80,57 +77,24 @@ what everything was built with; check the task shows it. Astra directs and revie
 painting is done by GPT Image 2 through Codex’s built-in image tool, so there is nothing else
 to connect.
 
-Paste the starting prompt from the README and the agent takes it from there. There is nothing
-to install by hand, and you should never be handed a JSON file to fill in or a shell command to
-run. If that happens the skills have not loaded; ask it to read
-`.agents/skills/map-director/SKILL.md`.
+Then type `$map-director` and describe the world you have in mind, in a sentence or two. The
+director is the skill that runs the whole conversation. It asks the few questions that
+matter, brings in the other skills stage by stage, keeps the records, and can pick the
+project up again another day. You should never be handed a JSON file to fill in or a shell
+command to run.
 
-Agree a generation budget before the first batch. Most of the cost is in the paintings you
-throw away.
+Agree a generation budget with it before the first batch. Most of the cost is in the
+paintings you throw away.
 
-## What the skills do
+What follows are the stages the director will walk you through, and what each one looked
+like for me.
 
-There are seven skills in the folder. One of them runs the conversation; the other six are
-the stages of the work, and the director brings each one in when it is needed.
+## 1. Find the look
 
-- **map-director** leads. It asks the few questions that matter (what the map is for, how
-  close people will zoom, what it should feel like), proposes concrete choices when you have
-  none, saves every decision, and can pick the project up again another day from the records.
-- **map-art-direction** finds the look. It paints the same small scene a few ways, shows them
-  side by side at full size, and turns the one you choose into a style contract that every
-  later painting is checked against.
-- **map-world-planning** gives the world room. Coastlines and high ground first, then rivers
-  that actually reach the sea, then space for every realm to have a capital, lesser towns and
-  countryside between them, then the journeys people make. It ends with a world file the
-  agent can render any rectangle of as a plain schematic guide.
-- **lantern-forest** and **lantern-village** are what I learned about woodland and
-  settlements, lifted out of the atlas project. Trees in habitats rather than scattered;
-  villages with a reason to be there, working yards, worn thresholds and gates that sit in
-  actual gaps in the wall.
-- **map-render** is the loop that does the painting. Prepare a guide for one rectangle,
-  paint it, look at it at native size, trace every river and road across its edges, then
-  accept it or repair a bounded patch with a mask. Nothing becomes a neighbour until it has
-  been looked at.
-- **map-release** gets it out. A clean master, labels on their own editable layer, safe
-  previews, and notes on what is still unresolved.
-
-The agent will want to paint one representative region first: a river crossing, a woodland
-edge, a settlement and some open ground. That pilot is where the method either works or
-doesn’t, and it is much cheaper to find out there than across eighty tiles. Expect some
-repairs; the image model will close a river mouth or leave a gate standing beside a wall now
-and then, and the review step exists to catch it.
-
-The helper that assembles the map in this kit is built for small maps, up to about sixteen
-megapixels. The hundred-megapixel atlas needed a tiled pipeline that stays private, and the
-[scaling notes](https://github.com/ryannel/experiments/blob/main/map_creation/docs/scaling.md)
-say what that takes if you want to go bigger.
-
-## How it went for me
-
-That is the tidy version. Here is how it actually went the first time, wrong turns included,
-because the wrong turns are where the skills came from.
-
-### Finding a look
+The first skill paints the same small scene a few different ways, shows them to you at full
+size, and turns the one you choose into a style contract that every later painting is
+checked against. Do this before anything else. Style and geography fixed at the same time
+fight each other.
 
 <Figure
   src={styleSearch}
@@ -154,7 +118,12 @@ everything that followed.
   caption="The first Lantern Sea, painted in a single generation on the first evening. Two continents, a dozen cities, one enormous castle per people."
 />
 
-### Filling it with someone else’s world
+## 2. Give the world room
+
+Next the director asks what the map is for and who lives in it, and the planning skill turns
+the answers into a world: coastlines and high ground, rivers that actually reach the sea,
+enough room for every realm to have a capital, lesser towns and countryside between them, and
+the journeys people make. You can bring a setting of your own. I didn’t have one.
 
 An empty map is easy. The problem was that I had nothing to put in it. I didn’t want to write a
 setting, and I didn’t need one. What I needed was enough culture and geography for the map
@@ -177,7 +146,12 @@ and it was huge. Kingdoms don’t look like that. The redesign gave each realm r
 several settlements and the wilderness between them, added a third continent, and quietly
 made the map a much larger place than a single image could hold.
 
-### Wanting to lean in
+## 3. Paint one region first, at full size
+
+Before the world, the director paints one representative region, with a river crossing, a
+woodland edge and a settlement, at the size it will actually be seen. This is where the
+method either works or doesn’t, and it is far cheaper to find out on one square than on
+eighty. It is also where I learned the lesson the whole project rests on.
 
 <Figure
   src={firstMapCrop}
@@ -205,8 +179,6 @@ Everything I tried to fix that made the map worse.
   of the zoom had never been painted, and no amount of processing recovers detail that was
   never there. It had to be painted at the scale it would be seen.
 </Callout>
-
-### Breaking it into squares
 
 <Figure
   src={remake}
@@ -244,7 +216,12 @@ canvas of 12,276 × 8,184. Just over 100 megapixels, and nothing upscaled.
   halfway across its river. Every tile looked fine on its own. Eleven tiles in, I stopped.
 </Callout>
 
-### Doing the low-res version first
+## 4. Paint the map, one square at a time
+
+The render skill is a loop: prepare a guide for one rectangle, paint it, look at it at
+native size, trace every river and road across its edges, then accept it or repair a bounded
+patch with a mask. Nothing becomes a neighbour until it has been looked at. Here is that loop
+in practice, and why each part of it exists.
 
 <Figure
   src={blenderComparison}
@@ -267,8 +244,6 @@ What worked was less. The guide became a flat 2D render that takes three seconds
 leads with the atmosphere of the place, then names the handful of connections that must
 hold: the river enters here, at this width; the road arrives from the west. Everything else,
 the rock faces and roofs and folds in the land, is the model’s to invent.
-
-### Connecting the squares
 
 Paint one square from the guide, then paint the next one with the finished edge of the first
 copied into its guide. That is the whole method. To show it working, I’ll follow two
@@ -340,8 +315,6 @@ riverbank or double a tree line.
   by tracing a route rather than by looking at a boundary.
 </Callout>
 
-### Watching it grow
-
 <Figure
   src={progressFirst}
   alt="The remade world map with a patch of noticeably more detailed, differently lit painting in its northwest corner, where the first native tiles have been laid over the older map."
@@ -362,41 +335,27 @@ four needed a bounded repair. The rest were accepted as painted.
 Local checks sit alongside larger ones. Zoomed out, a realistic city becomes a grey smudge,
 so capitals are painted with a few exaggerated landmarks rather than more roofs. A river
 belongs to a journey from uplands to coast even while I’m painting one short stretch of it.
-The labels go on last, on their own layer, and are positioned from the finished painting
-rather than the plan, because the model routinely moves a landmark a couple of hundred pixels
-from where it was asked to put it.
 
-### The whole method in nine lines
+## 5. Trees and towns
 
-None of this needs special tooling. It needs an image model that accepts a reference image,
-a coding agent to do the bookkeeping, and the patience to look at every join. The recipe:
+Two of the skills, one for woodland and one for settlements, are what I learned about the
+two things the model gets wrong most often. Trees want to be in habitats, damp hollows and
+exposed slopes and managed edges, rather than scattered evenly like a census. Villages want a
+reason to be where they are: a through-route, a working yard, worn ground at the doors, and
+a gate that stands in an actual gap in the wall. Zoomed out, a realistic city becomes a grey
+smudge, so capitals get a few exaggerated landmarks rather than more roofs. The skills carry
+those rules so you don’t have to notice them the hard way.
 
-1. **Find the look first.** Generate whole-world maps until one has the texture you want,
-   then keep that painting as the style reference for everything else. Don’t try to fix
-   style and geography at the same time.
-2. **Give the world reasons.** Borrow a setting, or have the agent write one. You need a list
-   of places with a role each, and a sense of which places are connected. You do not need
-   lore.
-3. **Write the plan in world coordinates.** Coastlines, ridges, rivers, roads and named
-   sites, in a JSON file the agent can render any rectangle of. This is the low-res world.
-4. **Fix the unit.** Find the size your model actually returns and build the grid from that.
-   Overlap neighbours by one to two hundred pixels.
-5. **Guide crude, brief specific.** A flat shaded render with routes and blocks; a brief that
-   leads with atmosphere, then names the few connections that must hold with pixel
-   coordinates.
-6. **Paint outward from finished edges.** Copy the neighbour’s painted overlap into the new
-   guide. Order the queue by how many reviewed neighbours a square has.
-7. **Trace before you propagate.** Every river and road, source to edge, before the tile
-   becomes anyone’s neighbour. Remove or finish anything the model invented. Repair in
-   bounded rectangles.
-8. **Seam narrow, blend water wide.** Minimum-difference seam, small feather, and a soft
-   full-band blend across open sea.
-9. **Keep names off the painting.** Labels on a separate layer, positioned from the finished
-   art.
+## 6. Release
 
-That is what the skills encode, so that an agent runs the loop with you rather than you
-reinventing it. Budget roughly one image call per square plus one retry in five, and expect
-to spend more time looking than generating.
+The last skill prepares the map for sharing: a clean master, the labels on their own
+editable layer, safe previews, and a note of what is still unresolved. The labels go on last
+and are positioned from the finished painting rather than the plan, because the model
+routinely moves a landmark a couple of hundred pixels from where it was asked to put it.
+
+Budget roughly one image call per square plus one retry in five, and expect to spend more
+time looking than generating. That is the whole of it. The skills run the loop with you; you
+make the choices that matter and look at every join.
 
 ## What it was for
 
