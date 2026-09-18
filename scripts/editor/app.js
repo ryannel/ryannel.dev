@@ -1233,12 +1233,11 @@ export default {
           ) {
             e.preventDefault();
             const at = prev.textContent.length;
-            const gone = rangeOf(block);
             holderOf(block).remove();
             prev.append(...block.childNodes);
             placeCaret(prev, at);
             dirty.add(prev);
-            save(prev, { text: blockMarkdown(prev), remove: gone });
+            save(prev, { text: blockMarkdown(prev), joinNext: true });
           }
         }
         return;

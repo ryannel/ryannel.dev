@@ -284,14 +284,22 @@ export default function noteEditor() {
               const after = /^\r?\n(\r?\n)?/.exec(text.slice(end))?.[0].length ?? 0;
               return text.slice(0, lineStart) + text.slice(end + after);
             }
-            // Joining two blocks: the one after this is taken out first, so
-            // this block's offsets still hold.
-            if (msg.remove) {
-              const r = slice(text, base, { ...msg.remove, expect: undefined });
-              if (r.start <= end) throw new Error('can only join with a later block');
-              const rl = text.lastIndexOf('\n', r.start - 1) + 1;
-              const after = /^\r?\n(\r?\n)?/.exec(text.slice(r.end))?.[0].length ?? 0;
-              text = text.slice(0, rl) + text.slice(r.end + after);
+            // Joining with the block after this one (Backspace at its start):
+            // the text sent is both together, so the next block is taken out.
+            // It is found here, from the file as it is now, never from an
+            // offset the page remembered.
+            if (msg.joinNext) {
+              const rest = text.slice(end);
+              const gap = /^(?:[ \t]*\r?\n)+/.exec(rest)?.[0] ?? '';
+              const body = rest.slice(gap.length);
+              // After a blank line, a paragraph runs to the next blank line;
+              // after a single newline (a list), the next item is one line.
+              const stop = /\n[ \t]*\n/.test(gap)
+                ? /\r?\n[ \t]*\r?\n|$(?![\s\S])/.exec(body).index
+                : (body.indexOf('\n') + 1 || body.length + 1) - 1;
+              if (!body.slice(0, stop).trim()) throw new Error('nothing after this block to join');
+              const tail = rest.slice(gap.length + stop);
+              text = text.slice(0, end) + (tail || (rest.endsWith('\n') ? '\n' : ''));
             }
             // A quoted paragraph's range starts after its "> "; fold it in.
             const from = quoted ? lineStart + indent.length : start;
