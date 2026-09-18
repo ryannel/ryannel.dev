@@ -72,29 +72,18 @@ cd experiments
 git sparse-checkout set map_creation
 ```
 
-Open it in Codex as its own project. The folder’s settings pick GPT-6 Astra on High, which is
-what everything was built with; check the task shows it. Astra directs and reviews; the
-painting is done by GPT Image 2 through Codex’s built-in image tool, so there is nothing else
-to connect.
+Open it in Codex as its own project. It should default to GPT-6 Astra on High, which is what
+gave me the best results. Astra does the orchestration and the review; GPT Image 2 does the
+painting.
 
-Then type `$map-director` and describe the world you have in mind, in a sentence or two. The
-director is the skill that runs the whole conversation. It asks the few questions that
-matter, brings in the other skills stage by stage, keeps the records, and can pick the
-project up again another day. You should never be handed a JSON file to fill in or a shell
-command to run.
-
-Agree a generation budget with it before the first batch. Most of the cost is in the
-paintings you throw away.
-
-What follows are the stages the director will walk you through, and what each one looked
-like for me.
+Once you’re set up, type `$map-director` and describe the world you have in mind. The
+director skill runs you through a process that looks like this.
 
 ## 1. Find the look
 
-The first skill paints the same small scene a few different ways, shows them to you at full
-size, and turns the one you choose into a style contract that every later painting is
-checked against. Do this before anything else. Style and geography fixed at the same time
-fight each other.
+The first thing to settle is the art style. The director paints the same small scene a few
+different ways and asks you to choose, and everything painted after that will follow the same
+style. When I was figuring this out I spent an afternoon on it.
 
 <Figure
   src={styleSearch}
@@ -102,15 +91,10 @@ fight each other.
   caption="An afternoon of continents. Handsome, and about as inviting as elevation data."
 />
 
-The first afternoon went on the wrong kind of map. Ask an image model for a fantasy world and
-you get something like a satellite photograph: convincing terrain, sharp coastlines, a
-tasteful title, and nothing to look at. Roads were faint scratches, towns were smudges, and
-nothing suggested that anyone lived there.
-
-What I wanted was closer to a painted atlas. Individual trees. Miniature settlements tucked
-into slopes and shores with proper roofs. Rivers you could follow and a sea that glowed. By
-the evening the model had found it, and that painting became the style reference for
-everything that followed.
+The first tries came back looking like satellite photographs: convincing terrain, sharp
+coastlines, and nothing to look at. Roads were scratches, towns were smudges, and nothing
+suggested anyone lived there. So I talked to Astra about roads and rivers, about how towns
+should sit in the land, about the atmosphere I was after, and by the evening it landed here.
 
 <Figure
   src={firstMap}
@@ -118,22 +102,26 @@ everything that followed.
   caption="The first Lantern Sea, painted in a single generation on the first evening. Two continents, a dozen cities, one enormous castle per people."
 />
 
+Individual trees. Little settlements with proper roofs, tucked into slopes and shores. Rivers
+you can follow and a sea that glows. This painting became the style reference for everything
+that followed.
+
 ## 2. Give the world room
 
-Next the director asks what the map is for and who lives in it, and the planning skill turns
-the answers into a world: coastlines and high ground, rivers that actually reach the sea,
-enough room for every realm to have a capital, lesser towns and countryside between them, and
-the journeys people make. You can bring a setting of your own. I didn’t have one.
+With a look settled, the director asks what the map is for and who lives in it, and turns
+the answers into a world. Coastlines and high ground. Rivers that reach the sea. Room for
+every realm to have a capital, a few lesser towns and countryside between them. The
+journeys people make. You can bring a setting of your own to this. I didn’t have one.
 
-An empty map is easy. The problem was that I had nothing to put in it. I didn’t want to write a
-setting, and I didn’t need one. What I needed was enough culture and geography for the map
-to have reasons: why a road goes here, why a port sits there, why the hills are dangerous.
+An empty map is easy. The trouble was that I had nothing to put in it. I didn’t want to write
+a setting, and I didn’t need one. I needed just enough culture and geography for the map to
+have reasons: why a road goes here, why a port sits there, why the hills are dangerous.
 
 So I borrowed. Dungeons & Dragons has spent fifty years deciding where dwarves live and what
-goblins do to roads, and the 2014 Monster Manual became the working baseline for who lived
-where and how they behaved. The agent wrote the rest: a register of realms with capitals and
-secondary towns, a note on which peoples were at war, an introduction a player might read. I
-have never used any of it. It exists so that the painting has something to be about.
+goblins do to roads, and the 2014 Monster Manual became the baseline for who lived where and
+how they behaved. Astra wrote the rest: a register of realms with capitals and secondary
+towns, a note on which peoples were at war, an introduction a player might read. I have
+never used any of it. It exists so that the painting has something to be about.
 
 <Figure
   src={territorial}
@@ -141,10 +129,10 @@ have never used any of it. It exists so that the painting has something to be ab
   caption="The allocation study. Each outline is a realm that needs a capital, lesser towns and countryside between them, rather than one giant city standing for an entire people."
 />
 
-The first map’s failure was obvious once the register existed. Every people had one city,
-and it was huge. Kingdoms don’t look like that. The redesign gave each realm room for
-several settlements and the wilderness between them, added a third continent, and quietly
-made the map a much larger place than a single image could hold.
+Once the register existed, the first map’s mistake was obvious. Every people had one city,
+and it was huge. Kingdoms don’t look like that. The redesign gave each realm room for several
+settlements and the wilderness between them, added a third continent, and quietly made the
+map a much bigger place than a single picture could hold.
 
 ## 3. Paint one region first, at full size
 
