@@ -197,29 +197,56 @@ export default {
     /* ---- messaging ---- */
     // Writes go one at a time, each with the hash the last reply gave, so a
     // blur save and an idle save landing together never make the second stale.
+    // Writes go one at a time. Each waits for the previous write's refresh
+    // (which brings new source ranges) and only then reads the range of the
+    // block it is about, so a split landing right after an idle save never
+    // splices with offsets the earlier save moved.
     const WRITES = new Set(['replace', 'insert-after', 'attrs', 'frontmatter', 'figure']);
     const writes = [];
     let writing = false;
+    let awaitingRefresh = false;
+    let writeTimer = null;
     const nextWrite = () => {
       clearTimeout(writeTimer);
       writing = false;
+      awaitingRefresh = false;
       const next = writes.shift();
       if (next) dispatch(next);
     };
-    let writeTimer = null;
-    const dispatch = ({ event, payload, id }) => {
+    const dispatch = ({ event, payload, id, el, index }) => {
       writing = true;
+      if (el) {
+        // Where the block is now: the same element after a refresh in place,
+        // or the block at its index after the article was swapped.
+        const holder = el.isConnected ? el : blocks()[index];
+        const range = holder && rangeOf(holder);
+        if (!range) {
+          console.warn('[note-editor] dropped a write: its block is gone', event, payload);
+          pending.delete(id);
+          nextWrite();
+          return;
+        }
+        payload = { ...payload, ...range };
+        // What the file holds there now, as last rendered, not as first loaded.
+        if ('expect' in payload && original.has(holder)) payload.expect = original.get(holder);
+      }
       server.send(`note-editor:${event}`, { id, slug, hash, ...payload });
       // No reply within a few seconds means the server is gone; don't hold the rest.
       clearTimeout(writeTimer);
       writeTimer = setTimeout(nextWrite, 5000);
     };
+    /**
+     * `meta.el` is the [data-src] block a write's range refers to (for a block
+     * save, its holder); the range is read when the write actually goes out.
+     */
     const send = (event, payload, meta) => {
       const id = ++msgId;
       if (meta) pending.set(id, meta);
       if (WRITES.has(event)) {
-        if (writing) writes.push({ event, payload, id });
-        else dispatch({ event, payload, id });
+        const el = meta?.el ?? (meta?.block && !meta.block.__anchor ? holderOf(meta.block) : null);
+        const entry = { event, payload, id, el, index: el ? blocks().indexOf(el) : -1 };
+        if (writing) writes.push(entry);
+        else dispatch(entry);
       } else {
         server.send(`note-editor:${event}`, { id, slug, hash, ...payload });
       }
@@ -236,12 +263,18 @@ export default {
       pending.delete(msg.id);
       // Nothing changed, so no refresh is coming to use the caret stash.
       if (msg.changed === false && stashFor === msg.id) sessionStorage.removeItem(KEY_STASH);
+      if (msg.changed !== false) {
+        // The next write waits for this one's refresh; if none comes, don't wait forever.
+        awaitingRefresh = true;
+        clearTimeout(writeTimer);
+        writeTimer = setTimeout(nextWrite, 3000);
+      }
       // Typing that landed after the save went out is still unsaved.
       if (meta?.block && baseline.get(meta.block) === blockMarkdown(meta.block))
         dirty.delete(meta.block);
       setState(dirty.size ? 'Unsaved' : 'Saved');
       meta?.then?.();
-      nextWrite();
+      if (!awaitingRefresh) nextWrite();
       // A `refresh` follows from the server; if the write changed nothing, it won't.
     });
     server.on('note-editor:stale', () => {
@@ -383,14 +416,18 @@ export default {
         const anchor = block.__anchor;
         const tight = anchor.tagName === 'LI' && /^([-*]|\d+\.) /.test(text);
         baseline.set(block, text);
-        send('insert-after', { ...rangeOf(anchor), text, tight }, { block });
+        send('insert-after', { text, tight }, { block, el: anchor });
         return;
       }
       const range = rangeOf(block);
       if (!range) return;
       if (kind === 'caption') {
         baseline.set(block, blockMarkdown(block));
-        send('attrs', { ...range, set: { caption: block.textContent.trim() } }, { block });
+        send(
+          'attrs',
+          { set: { caption: block.textContent.trim() } },
+          { block, el: holderOf(block) },
+        );
         return;
       }
       if (kind === 'label') {
@@ -504,7 +541,7 @@ export default {
         blocks().indexOf(anchor) + 1 + anchor.querySelectorAll('[data-src]').length + skip;
       sessionStorage.setItem(KEY_STASH, JSON.stringify({ index, caret: 0, base: null, ...rest }));
       setState('Saving…');
-      send('insert-after', { ...rangeOf(anchor), text }, {});
+      send('insert-after', { text }, { el: anchor });
     };
     const insertDivider = (anchor) => insertAfter(anchor, '---', { selectCard: true });
     const insertCallout = (anchor) =>
@@ -518,7 +555,7 @@ export default {
         JSON.stringify({ index, caret: 0, base: null, selectCard: true }),
       );
       setState('Adding image…');
-      send('figure', { ...rangeOf(anchor), file, alt: '' }, {});
+      send('figure', { file, alt: '' }, { el: anchor });
     };
     const uploadImage = (file, anchor) => {
       const reader = new FileReader();
@@ -739,13 +776,12 @@ export default {
     };
     const setCalloutType = (aside, type) => {
       const label = aside.querySelector('.callout-label');
-      const range = rangeOf(aside);
       const custom =
         label &&
         label.textContent.trim() !== CALLOUT_LABELS[/callout-(\w+)/.exec(aside.className)?.[1]];
       stash(editableOf(aside) ?? label, {});
       setState('Saving…');
-      send('attrs', { ...range, set: { type, ...(custom ? {} : { label: null }) } }, {});
+      send('attrs', { set: { type, ...(custom ? {} : { label: null }) } }, { el: aside });
     };
 
     let barTimer = null;
@@ -836,7 +872,7 @@ export default {
                   onSubmit: (alt) => {
                     ui.toolbar.hide();
                     stash(card, { selectCard: true });
-                    send('attrs', { ...rangeOf(card), set: { alt } }, {});
+                    send('attrs', { set: { alt } }, { el: card });
                   },
                   onCancel: () => selectCard(card),
                 },
@@ -880,7 +916,7 @@ export default {
         JSON.stringify({ index: Math.max(0, index - 1), caret: 1e9, base: null }),
       );
       setState('Saving…');
-      send('replace', { ...rangeOf(card), delete: true }, {});
+      send('replace', { delete: true }, { el: card });
     };
     const editCaption = (card) => {
       deselectCard();
@@ -1162,13 +1198,12 @@ export default {
           // An empty caption goes; the figure stays selected.
           e.preventDefault();
           const card = block.closest('figure');
-          const range = rangeOf(card);
           clearTimeout(timers.get(block));
           dirty.delete(block);
           block.remove();
           if (baseline.get(block) !== '') {
             stash(card, { selectCard: true });
-            send('attrs', { ...range, set: { caption: null } }, {});
+            send('attrs', { set: { caption: null } }, { el: card });
           }
           selectCard(card);
           return;
@@ -1383,9 +1418,13 @@ export default {
         const before = blocks();
         const after = [...fresh.querySelectorAll(BLOCK_SELECTOR)];
         const active = document.activeElement?.closest?.('[contenteditable="true"]');
+        // A new block on the page that is still to be written (or a split
+        // whose write is queued) does not change the shape yet; the write that
+        // adds it brings its own refresh.
+        const phantomOk = writes.length > 0 || !article.querySelector('.note-editor-new');
         const sameShape =
           before.length === after.length &&
-          !article.querySelector('.note-editor-new') &&
+          phantomOk &&
           before.every(
             (o, i) =>
               o.tagName === after[i].tagName &&
@@ -1415,6 +1454,9 @@ export default {
             const oe = editableOf(o);
             const ne = editableOf(n);
             if (!oe || !ne) return;
+            // The first half of a split whose write is still queued: the file
+            // still holds the whole paragraph, the page already shows the halves.
+            if (o.nextElementSibling?.__split) return;
             if (oe === active) {
               // The block being typed in: only take the file's version when
               // nothing typed here is still waiting to be saved.
@@ -1452,6 +1494,8 @@ export default {
         if (refreshAgain) {
           refreshAgain = false;
           refresh();
+        } else if (awaitingRefresh) {
+          nextWrite();
         }
       }
     };
