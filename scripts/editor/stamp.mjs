@@ -32,5 +32,5 @@ export const stampSource = {
     return enabled ? { position: true } : {};
   },
   element: { filter: BLOCKS, visit: stamp },
-  mdxJsxFlowElement: { filter: ['Figure', 'Callout', 'AtlasHandoff'], visit: stamp },
+  mdxJsxFlowElement: { filter: ['Figure', 'Callout'], visit: stamp },
 };

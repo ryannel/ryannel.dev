@@ -14,20 +14,16 @@ links:
 
 import world from '../../assets/atlas-experiment/world-and-detail.jpg';
 import asterfall from '../../assets/atlas-experiment/asterfall.jpg';
+import crownmere from '../../assets/atlas-experiment/crownmere.jpg';
 import styleSearch from '../../assets/atlas-experiment/style-search.jpg';
 import firstMap from '../../assets/atlas-experiment/first-map.jpg';
-import firstMapCrop from '../../assets/atlas-experiment/first-map-crownmere-100pct.png';
 import territorial from '../../assets/atlas-experiment/territorial-plan.jpg';
-import remake from '../../assets/atlas-experiment/remake-4092.jpg';
 import tileGrid from '../../assets/atlas-experiment/tile-grid.jpg';
-import blenderComparison from '../../assets/atlas-experiment/blender-comparison.jpg';
-import guide from '../../assets/atlas-experiment/rough-guide.png';
-import north from '../../assets/atlas-experiment/north-painting.png';
-import south from '../../assets/atlas-experiment/south-painting.png';
-import join from '../../assets/atlas-experiment/river-join.png';
-import progressFirst from '../../assets/atlas-experiment/progress-first-tiles.jpg';
-import progressHalf from '../../assets/atlas-experiment/progress-halfway.jpg';
-import AtlasHandoff from '../../components/AtlasHandoff.astro';
+import tileSteps from '../../assets/atlas-experiment/tile-steps.jpg';
+import tileJoin from '../../assets/atlas-experiment/tile-join.jpg';
+import tileBlock from '../../assets/atlas-experiment/tile-block.jpg';
+import growth from '../../assets/atlas-experiment/growth.jpg';
+import labelsPair from '../../assets/atlas-experiment/labels-pair.jpg';
 
 <Figure
   src={world}
@@ -38,7 +34,7 @@ import AtlasHandoff from '../../components/AtlasHandoff.astro';
 />
 
 I’ve always been drawn to maps. Old hand-painted ones with compass stars and sea monsters. The
-hand-drawn ones at the start of a fantasy novel. The road atlases my parents would unfold
+hand-drawn ones on the first pages of a fantasy novel. The road atlases my parents would unfold
 across the whole front of the car on family holidays. A good map makes you want to trace a road
 with your finger and wonder what is at the end of it. Now and then I’ve doodled my own, using
 tools like Inkarnate and Dungeondraft, chasing that feeling. There was always a world in my
@@ -46,8 +42,9 @@ head, and what ended up on the page was never it.
 
 When GPT-6 Astra came out with its new image model, I wanted another go.
 
-Ten days, 433 turns with the agent and 300 million tokens later, I have one. 12,000 by 8,000
-pixels, painted in 81 overlapping pieces, and every one of them is worth zooming into.
+Ten days of trial and error, 433 turns with the agent and 300 million tokens later, I have one.
+12,000 by 8,000 pixels, painted in 81 overlapping pieces, and every one of them is worth
+zooming into.
 
 I like it. It isn’t perfect: the cities are a little warped in places, and some of the tiles
 still don’t quite line up. But it is closer to the map in my head than anything I have ever
@@ -76,14 +73,18 @@ Open it in Codex as its own project. It should default to GPT-6 Astra on High, w
 gave me the best results. Astra does the orchestration and the review; GPT Image 2 does the
 painting.
 
-Once you’re set up, type `$map-director` and describe the world you have in mind. The
-director skill runs you through a process that looks like this.
+Once you’re set up, type `$map-director` and describe the world you have in mind. The director
+skill will run you through a process that looks like this.
 
 ## 1. Find the look
 
 The first thing to settle is the art style. The director paints the same small scene a few
 different ways and asks you to choose, and everything painted after that will follow the same
-style. When I was figuring this out I spent an afternoon on it.
+style.
+
+I spent an afternoon on this while trying to figure out the process. The first tries came back
+looking like satellite photographs: convincing terrain, sharp coastlines, and nothing to look
+at.
 
 <Figure
   src={styleSearch}
@@ -91,10 +92,9 @@ style. When I was figuring this out I spent an afternoon on it.
   caption="An afternoon of continents. Handsome, and about as inviting as elevation data."
 />
 
-The first tries came back looking like satellite photographs: convincing terrain, sharp
-coastlines, and nothing to look at. Roads were scratches, towns were smudges, and nothing
-suggested anyone lived there. So I talked to Astra about roads and rivers, about how towns
-should sit in the land, about the atmosphere I was after, and by the evening it landed here.
+Roads were scratches, towns were smudges, and nothing suggested anyone lived there. So I talked
+to Astra about roads and rivers, about how towns should sit in the land, about the atmosphere I
+was after, and by the evening it landed here.
 
 <Figure
   src={firstMap}
@@ -106,248 +106,125 @@ Individual trees. Little settlements with proper roofs, tucked into slopes and s
 you can follow and a sea that glows. This painting became the style reference for everything
 that followed.
 
-## 2. Give the world room
+## 2. Populate the world
 
-With a look settled, the director asks what the map is for and who lives in it, and turns
-the answers into a world. Coastlines and high ground. Rivers that reach the sea. Room for
-every realm to have a capital, a few lesser towns and countryside between them. The
-journeys people make. You can bring a setting of your own to this. I didn’t have one.
+With the look settled, the next thing to figure out is who lives in this world. This is where
+the map gets its story: the peoples and their realms, where each keeps its capital and its
+lesser towns, how they build and what their country feels like, and the journeys that join
+them. All of it is laid over the land, so that a road has somewhere to go and a port has a
+reason to be where it is.
 
-An empty map is easy. The trouble was that I had nothing to put in it. I didn’t want to write
-a setting, and I didn’t need one. I needed just enough culture and geography for the map to
-have reasons: why a road goes here, why a port sits there, why the hills are dangerous.
+This is where you get to be creative. Bring as much or as little as you like, and when you
+run short of ideas, ask the agent to figure it out for you.
 
-So I borrowed. Dungeons & Dragons has spent fifty years deciding where dwarves live and what
-goblins do to roads, and the 2014 Monster Manual became the baseline for who lived where and
-how they behaved. Astra wrote the rest: a register of realms with capitals and secondary
-towns, a note on which peoples were at war, an introduction a player might read. I have
-never used any of it. It exists so that the painting has something to be about.
+Me? I asked it to draw inspiration from Dungeons & Dragons, and to lay out a world that made
+room for all the diversity of that setting.
 
 <Figure
   src={territorial}
   alt="The painted map overlaid with 28 numbered, colour-coded territory outlines, titled Room for countries, not just landmarks."
-  caption="The allocation study. Each outline is a realm that needs a capital, lesser towns and countryside between them, rather than one giant city standing for an entire people."
+  caption="The world, populated. Each outline is a realm with a capital, lesser towns and countryside between them."
 />
 
-Once the register existed, the first map’s mistake was obvious. Every people had one city,
-and it was huge. Kingdoms don’t look like that. The redesign gave each realm room for several
-settlements and the wilderness between them, added a third continent, and quietly made the
-map a much bigger place than a single picture could hold.
+## 3. Paint the first tile
 
-## 3. Paint one region first, at full size
+With the world populated, the next step is to paint one piece of it, at the size it will be
+seen. This is the tile where the look and the atmosphere either come together or don’t, so
+re-roll it until you are happy. It is also where you decide how places are shown. A town can be a handful of roofs, a
+marker, or something in between, and whatever you choose here is what the rest of the map
+will do.
 
-Before the world, the director paints one representative region, with a river crossing, a
-woodland edge and a settlement, at the size it will actually be seen. This is where the
-method either works or doesn’t, and it is far cheaper to find out on one square than on
-eighty. It is also where I learned the lesson the whole project rests on.
-
-<Figure
-  src={firstMapCrop}
-  alt="A heavily enlarged crop of the first map around the capital Crownmere: a castle about sixty pixels wide, a river, two smaller towns and their labels, all soft and blurred."
-  caption="Crownmere, the capital of the largest kingdom, at 100% zoom. This is the whole city."
-/>
-
-The map was 1536 × 1024 pixels. That is a fine picture and a hopeless atlas. The capital of
-the largest kingdom was sixty pixels across. There was no leaning in, because there was
-nothing further down.
-
-Everything I tried to fix that made the map worse.
-
-- **Re-rendering it larger.** A render at five times the pixels came back at the size I asked
-  for and fell apart at 100%: dense marks that could have been anything, walls that enclosed
-  nothing.
-- **Placing sprites.** A hundred thousand little trees and houses drawn over the terrain was
-  fast and looked flat, like a board game on top of a painting.
-- **Enlarging it region by region.** Feeding crops of the map back into the model produced
-  sharp new pixels around the same wrong shapes. Every malformed ship and castle was
-  faithfully elaborated.
-
-<Callout type="failed">
-  All three treated the map as an image to be scaled. The information I wanted at the bottom
-  of the zoom had never been painted, and no amount of processing recovers detail that was
-  never there. It had to be painted at the scale it would be seen.
-</Callout>
+I went with cities as landmarks: each one painted into the land so it looks like it belongs
+there, but bigger and bolder than it should be, so it still reads from a long way out. A
+castle you can find from the whole-world view, and then lean into.
 
 <Figure
-  src={remake}
-  alt="A remade Lantern Sea map with three continents and central islands, noticeably brighter and more detailed than the first, with realm names in gold lettering."
-  caption="The remake at 4092 × 2728: one composition and nine detail paintings, joined along seams. Brighter, sharper, and still a long way from a roof."
-/>
-
-The first thing that worked was small. The agent painted a fresh composition of the whole
-world, cut it into nine overlapping pieces, and repainted each piece as its own image. The
-nine paintings were then joined along seams chosen where they differed least. It came out at
-4092 × 2728, and for the first time you could see a town’s shape rather than its smudge.
-
-Two things learnt here held for the rest of the project. The model returns 1536 × 1024
-images whatever size you ask for, so that became the unit of production. And a narrow seam
-through matching pixels keeps roofs and tree crowns intact where a wide blend turns them to
-soup.
-
-It was still not enough. The capital was now about a hundred and fifty pixels wide. So I did
-the arithmetic the other way round: start from how much detail a single painting holds, and
-work out how many paintings the world needs. The answer was a grid of nine by nine, 81
-paintings, each overlapping its neighbours by a band a couple of hundred pixels wide, on a
-canvas of 12,276 × 8,184. Just over 100 megapixels, and nothing upscaled.
-
-<Figure
-  src={tileGrid}
-  alt="The remade world map divided by a nine-by-nine grid of labelled tiles. Four tiles in the western kingdom are highlighted in green as painted, four to their north are outlined in gold as next, and the rest are dimmed."
-  caption="The tile plan over the low-res world, four squares in. Green is painted, gold is next, and every square shares a band with its neighbours."
+  src={crownmere}
+  alt="The capital Crownmere at full resolution: a castle with blue slate roofs on a rise above a river bend, a walled town below it, a bridge, quays with boats, and fields and hedgerows all around."
+  caption="Crownmere. The castle is far too big for the town, on purpose."
   wide
 />
 
-<Callout type="failed">
-  The first attempt at the grid painted each square from the plan alone, without seeing its
-  neighbours. Towns appeared twice: once in the tile that planned them and once in the tile
-  next door that had been told they were nearby. Rivers ended in woods. A bridge stopped
-  halfway across its river. Every tile looked fine on its own. Eleven tiles in, I stopped.
-</Callout>
+## 4. Paint the map, one tile at a time
 
-## 4. Paint the map, one square at a time
-
-The render skill is a loop: prepare a guide for one rectangle, paint it, look at it at
-native size, trace every river and road across its edges, then accept it or repair a bounded
-patch with a mask. Nothing becomes a neighbour until it has been looked at. Here is that loop
-in practice, and why each part of it exists.
+With the first tile right, the rest of the map is the same thing done eighty more times. The
+world is cut into a grid of tiles, each the size the image model paints best, overlapping its
+neighbours by a band a couple of hundred pixels wide. Then the loop: draw a rough guide for
+the next tile from the plan, copy in the painted edges of any finished neighbours, paint,
+check that every river and road runs on across the joins, and accept it or repaint the piece
+that went wrong. Nothing becomes a neighbour until it has been looked at.
 
 <Figure
-  src={blenderComparison}
-  alt="Three panels: an earlier painted region, a flat Blender layout of the same area with corrugated grey mountains, smooth green land and roads, and the four guided paintings stitched together."
-  caption="Left to right: the earlier painting, the Blender layout of the same region, and the four paintings made from it. The corrugated mountains in the middle came through as a comb."
+  src={tileGrid}
+  alt="The world map divided by a nine-by-nine grid of tiles. Four tiles in the western kingdom are highlighted in green as painted, four to their north are outlined in gold as next, and the rest are dimmed."
+  caption="The plan, four tiles in. Green is painted, gold is next, and every tile shares a band with its neighbours."
+  wide
 />
 
-The fix for doubled towns is to paint each square from a low-resolution version of the whole
-world, so that everything already has a position before anything is painted. Underneath the
-atlas is a plan in world coordinates: coastlines, ridges, fourteen rivers, sixty roads and
-84 named places. From that plan the agent renders a rough guide for any rectangle. Shading
-suggests relief, a blue line reserves the river, flat blocks hold space for buildings.
-
-The guide is deliberately crude, and getting it crude enough took a while. The first guides
-came out of Blender, and the terrain had a ripple in it that the model dutifully painted as
-comb-like mountains. Briefs that described the whole region and its neighbours produced
-castles relocated from off-frame into view. Extra reference images produced extra rivers.
-
-What worked was less. The guide became a flat 2D render that takes three seconds. The brief
-leads with the atmosphere of the place, then names the handful of connections that must
-hold: the river enters here, at this width; the road arrives from the west. Everything else,
-the rock faces and roofs and folds in the land, is the model’s to invent.
-
-Paint one square from the guide, then paint the next one with the finished edge of the first
-copied into its guide. That is the whole method. To show it working, I’ll follow two
-neighbouring regions: down from the furnaces of Cinderfast, along a small river, to the
-coast at Basalt Haven.
+The guide is deliberately crude: shaded relief, a blue line for the river, a pale one for
+each road, a marker where a settlement goes. Everything else, the rock and the roofs and the
+folds in the land, is the model’s to invent. What is not up for invention is the strip of
+finished painting copied along the top and the left. That strip is the most specific
+instruction in the whole brief. It carries the river at its real width, the trees on its real
+banks, and the light of the painting that already exists.
 
 <Figure
-  src={guide}
-  alt="The rough guide for Cinderfast: softly shaded brown and green terrain, a pale road near the upper right, and simple blocks marking the industrial settlement."
-  caption="The guide for the northern region. Almost everything that makes the finished place worth looking at is still missing, on purpose."
+  src={tileSteps}
+  alt="Two panels. Top: a flat schematic guide with a blue river, pale roads and two numbered settlement markers, with strips of finished painting along its top and left edges. Bottom: the painted tile that came back, with the river, a bridge town, a walled fortress and forested hills."
+  caption="One tile. The guide, with the finished edges of its neighbours copied in, and the painting that came back."
+  wide
 />
 
+Then look at the join, at the map’s own pixels. The two paintings overlap along the shared
+band and are cut where they differ least, and the question is not whether the seam shows but
+whether the water and the roads go through. A seam can be invisible and still pinch a
+riverbank or double a line of trees.
+
 <Figure
-  src={north}
-  alt="The painted Cinderfast region: large furnace buildings and quarry roads on the right, pine woodland on the left, and a winding stream descending through the middle to the bottom edge."
-  caption="Cinderfast after painting and one local repair. Follow the stream from the cascades in the upper half to where it leaves at the bottom edge."
+  src={tileJoin}
+  alt="A native-resolution strip across the boundary between two tiles, with the shared band marked by two dashed lines. A walled town sits in the tile above, a road runs down through the band into the tile below, and a fortress with red banners stands at the bottom right."
+  caption="Where a finished tile above meets a new one below. Both painted the shared band, and the road and the fields go on through it."
+  wide
 />
 
-The painting turns that sparse guide into a landscape, and it adds something the plan never
-asked for: a small foothill stream coming down out of the cascades. A stream is a lovely
-thing to have invented. It is also a commitment, because water goes somewhere. In the first
-result it didn’t. It petered out short of the bottom edge, so the agent repainted a bounded
-rectangle around the last stretch and left every other pixel alone. Once the stream reached
-the edge, its exit was recorded in the plan with the same authority as a river I had drawn
-myself. The painting had added information back to the world.
-
-<AtlasHandoff />
-
-The region below starts with the last 129 pixels of the region above, copied straight into
-the top of its guide. Another finished neighbour supplies the strip down the left. Those
-painted strips are the most specific instruction in the whole brief. They carry the river at
-its actual width, the trees on its actual banks, and the colour and scale of the painting
-that already exists. The guide is suggestive. The neighbours are authoritative.
+Every tile inherits from the ones before it, so the painting spreads outward from finished
+edges, and the order is chosen so that most tiles start with two painted sides rather than
+one. Here are four of them together, the way they sit in the finished map.
 
 <Figure
-  src={south}
-  alt="The next painted region, Basalt Haven. The river enters from the woodland at the top, bends through the valley, passes under an arched road bridge and reaches an open sandy mouth. A port with copper and green roofs occupies the coast to the right."
-  caption="The southern painting takes the inherited river through a road bridge to an open mouth. Basalt Haven sits along the coast to the right."
-/>
-
-Now I can follow the stream out of one painting, through the wooded valley, under the bridge
-and into the sea. That whole journey is the check. Looking only at the boundary would pass a
-river that joins beautifully and then stops a field short of the coast. The road gets the
-same walk: in from the west, over the bridge, into the settlement, with enough water left
-between the quays for a boat to get out.
-
-The painting still changes the plan. On the eastern side of this region a separate channel
-reached the coast sooner than the guide expected. Once I accepted that coastline, the brief
-for the next tile east had to be rewritten, or it would have inherited an instruction to
-keep painting a river through open sea.
-
-<Figure
-  src={join}
-  alt="A close strip across the assembled boundary between Cinderfast and Basalt Haven, showing the stream, both banks, paths and surrounding trees continuing between the two paintings."
-  caption="The assembled join at native detail. The banks, the nearby paths and the woodland all have to survive the transition."
-/>
-
-Even with the painted strip in front of it, the model reinterprets the overlap. Assembly
-finds a path through the shared band where the two paintings differ least and softens it
-with a six-pixel feather. Open water gets a wide, gentle blend instead, because a narrow cut
-across calm sea leaves a visible step in the colour. Then I look at the seam at native size,
-following the water and its banks across the join. A seam can be invisible and still pinch a
-riverbank or double a tree line.
-
-<Callout type="surprise">
-  I went in assuming seams would be the hard part. They weren’t. A seam through matching
-  pixels is only a compositing aid, and it will faithfully continue a mistake on either side
-  of it. Every serious error in this map was a connectivity error, and every one was caught
-  by tracing a route rather than by looking at a boundary.
-</Callout>
-
-<Figure
-  src={progressFirst}
-  alt="The remade world map with a patch of noticeably more detailed, differently lit painting in its northwest corner, where the first native tiles have been laid over the older map."
-  caption="The first native tiles, dropped onto the remake so I could see them in context. The older map underneath is the low-res version of the world."
+  src={tileBlock}
+  alt="Four adjacent tiles of the finished map with their outlines drawn in gold, overlapping at the edges. A castle town at the top left, farmland and a river running down through all four, a marsh with a stockade at the bottom left, and a harbour town on a rocky coast at the bottom right."
+  caption="Four tiles, from the capital down to the coast. The river crosses every join, and the road follows it to the harbour."
+  wide
 />
 
 <Figure
-  src={progressHalf}
-  alt="The world map about half painted at native scale. The western continent, the desert and the islands are finished; the eastern edge still shows the older, coarser map."
-  caption="Halfway. The painting order picks whichever unpainted square has the most reviewed neighbours, so most tiles inherit two finished edges rather than one."
+  src={growth}
+  alt="Four snapshots of the whole world map with the unpainted part dimmed: a corner of the western continent painted, then the whole western half, then most of the east, then all of it."
+  caption="The map growing: 20 tiles, 45, 65, and all 81. The last 61 were painted in a single day."
+  wide
 />
 
-The atlas grew by repeating that loop: render a guide, paint a square, trace what appeared,
-join it to its neighbours, carry the reviewed edges outward. The last 61 squares were
-painted in a single day. In the final batch of 36, three first attempts were thrown out and
-four needed a bounded repair. The rest were accepted as painted.
+Budget roughly one painting per tile plus a retry for every five, and expect to spend more
+time looking than generating.
 
-Local checks sit alongside larger ones. Zoomed out, a realistic city becomes a grey smudge,
-so capitals are painted with a few exaggerated landmarks rather than more roofs. A river
-belongs to a journey from uplands to coast even while I’m painting one short stretch of it.
+## 5. Labels last
 
-## 5. Trees and towns
+The names go on at the very end, on their own layer, placed from the finished painting rather
+than the plan, because the model moves a landmark a couple of hundred pixels from where it
+was asked to put it more often than not. The painting underneath stays clean, so the map can
+be relabelled, or lent to a different world entirely, without repainting a thing.
 
-Two of the skills, one for woodland and one for settlements, are what I learned about the
-two things the model gets wrong most often. Trees want to be in habitats, damp hollows and
-exposed slopes and managed edges, rather than scattered evenly like a census. Villages want a
-reason to be where they are: a through-route, a working yard, worn ground at the doors, and
-a gate that stands in an actual gap in the wall. Zoomed out, a realistic city becomes a grey
-smudge, so capitals get a few exaggerated landmarks rather than more roofs. The skills carry
-those rules so you don’t have to notice them the hard way.
-
-## 6. Release
-
-The last skill prepares the map for sharing: a clean master, the labels on their own
-editable layer, safe previews, and a note of what is still unresolved. The labels go on last
-and are positioned from the finished painting rather than the plan, because the model
-routinely moves a landmark a couple of hundred pixels from where it was asked to put it.
-
-Budget roughly one image call per square plus one retry in five, and expect to spend more
-time looking than generating. That is the whole of it. The skills run the loop with you; you
-make the choices that matter and look at every join.
+<Figure
+  src={labelsPair}
+  alt="The same region of the map twice: on the left with no text, on the right with the labels Crownmere, Gatewell, Hammerfall, Dunford, Saint Orrel, Copperstairs and Barleycross laid over it."
+  caption="Crownmere without its labels, and with them."
+  wide
+/>
 
 ## What it was for
 
-I still don’t run a campaign, and I still don’t know who Cinderfast’s furnaces belong to. But
-I can hang above the Lantern Sea, lean in, and keep leaning in, through the kingdom and the
-coast and the river valley, down to the bridge where the road crosses. It doesn’t run out.
-That was the whole point.
+I still don’t run a campaign, and I still don’t know whose red banners fly over that fortress
+in the east. But I can hang above the Lantern Sea, lean in, and keep leaning in, through the
+kingdom and the coast and the river valley, down to the bridge where the road crosses. It
+doesn’t run out. That was the whole point.
