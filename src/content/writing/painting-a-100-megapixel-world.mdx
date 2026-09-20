@@ -28,7 +28,7 @@ import labelsPair from '../../assets/atlas-experiment/labels-pair.jpg';
 <Figure
   src={world}
   alt="The complete Lantern Sea world map, with a small gold rectangle on the royal capital and an inset in the lower right showing that rectangle at full size: a castle with blue roofs above a walled town, a river and fields."
-  caption="The whole map, with the marked piece of it at its own pixels. Everything on the map is painted at that level of detail."
+  caption="The whole map, with the marked piece at its own pixels. All of it is painted at that detail."
   priority
   wide
 />
@@ -42,7 +42,7 @@ head, and what ended up on the page was never it.
 
 When GPT-6 Astra came out with its new image model, I wanted another go.
 
-Ten days of trial and error, 433 turns with the agent and 300 million tokens later, I have one.
+Ten days, 433 turns with the agent and 300 million tokens later, I have one.
 12,000 by 8,000 pixels, painted in 81 overlapping pieces, and every one of them is worth
 zooming into.
 
@@ -69,20 +69,19 @@ cd experiments
 git sparse-checkout set map_creation
 ```
 
-Open it in Codex as its own project. It should default to GPT-6 Astra on High, which is what
-gave me the best results. Astra does the orchestration and the review; GPT Image 2 does the
+Open it in Codex as its own project. It should default to GPT-6 Astra on High, which gave me
+the best results. Astra does the orchestration and the review; GPT Image 2 does the
 painting.
 
 Once you’re set up, type `$map-director` and describe the world you have in mind. The director
-skill will run you through a process that looks like this.
+skill runs you through a process like this.
 
 ## 1. Find the look
 
 The first thing to settle is the art style. The director paints the same small scene a few
-different ways and asks you to choose, and everything painted after that will follow the same
-style.
+different ways and asks you to choose. Everything after follows that style.
 
-I spent an afternoon on this while trying to figure out the process. The first tries came back
+I spent an afternoon on this. The first tries came back
 looking like satellite photographs: convincing terrain, sharp coastlines, and nothing to look
 at.
 
@@ -103,16 +102,14 @@ was after, and by the evening it landed here.
 />
 
 Individual trees. Little settlements with proper roofs, tucked into slopes and shores. Rivers
-you can follow and a sea that glows. This painting became the style reference for everything
-that followed.
+you can follow and a sea that glows. This painting became the reference for everything that
+followed, the style and the coastlines both.
 
 ## 2. Populate the world
 
-With the look settled, the next thing to figure out is who lives in this world. This is where
-the map gets its story: the peoples and their realms, where each keeps its capital and its
-lesser towns, how they build and what their country feels like, and the journeys that join
-them. All of it is laid over the land, so that a road has somewhere to go and a port has a
-reason to be where it is.
+With the look settled, the question is who lives here. This is where the map gets its story: the peoples and their realms, where each keeps its capital and its
+lesser towns, how they build, and the roads that join them. All of it is laid over the land,
+so a road has somewhere to go and a port has a reason to be there.
 
 This is where you get to be creative. Bring as much or as little as you like, and when you
 run short of ideas, ask the agent to figure it out for you.
@@ -123,20 +120,19 @@ room for all the diversity of that setting.
 <Figure
   src={territorial}
   alt="The painted map overlaid with 28 numbered, colour-coded territory outlines, titled Room for countries, not just landmarks."
-  caption="The world, populated. Each outline is a realm with a capital, lesser towns and countryside between them."
+  caption="The world, carved into 28 realms, each with a capital, lesser towns and countryside between."
 />
 
 ## 3. Paint the first tile
 
-With the world populated, the next step is to paint one piece of it, at the size it will be
-seen. This is the tile where the look and the atmosphere either come together or don’t, so
-re-roll it until you are happy. It is also where you decide how places are shown. A town can be a handful of roofs, a
-marker, or something in between, and whatever you choose here is what the rest of the map
-will do.
+Now paint one piece of it, at the size it will be seen. Mine was the tile with the capital in
+it. This is where it either comes together or doesn’t, so re-roll until you’re happy. It is
+also where you decide how places are shown. A town can be a handful of roofs, a marker, or
+something in between. Whatever you choose here, every later tile copies.
 
-I went with cities as landmarks: each one painted into the land so it looks like it belongs
-there, but bigger and bolder than it should be, so it still reads from a long way out. A
-castle you can find from the whole-world view, and then lean into.
+I went with cities as landmarks: each painted into the land so it belongs there, but bigger
+and bolder than it should be, so it still reads from a long way out. A castle you can spot
+from the whole-world view, then lean into.
 
 <Figure
   src={crownmere}
@@ -150,22 +146,22 @@ castle you can find from the whole-world view, and then lean into.
 With the first tile right, the rest of the map is the same thing, done eighty more times. The
 world is cut into a grid of tiles, each 1,536 by 1,024 pixels because that is what GPT Image 2
 paints, and each overlapping its neighbours by a couple of hundred pixels. Then the agent
-loops. It draws a rough guide for the next tile, copies in the painted edges of any finished
-neighbours, paints it, checks that every river and road carries on across the joins, and
-repaints just the patch that didn’t.
+loops. It draws a rough guide for the next tile and copies in the painted edges of any
+finished neighbours. It paints. It checks that every river and road carries on across the
+joins, and repaints the patch that didn’t.
 
 <Figure
   src={tileGrid}
   alt="The world map divided by a nine-by-nine grid of tiles. Four tiles in the western kingdom are highlighted in green as painted, four to their north are outlined in gold as next, and the rest are dimmed."
-  caption="The plan, four tiles in. Green is painted, gold is next. Every tile overlaps the ones beside it."
+  caption="The plan, four tiles in. Green is painted, gold is next."
   wide
 />
 
 The guide is deliberately crude. Shaded relief, a blue line for the river, a pale one for
 each road, a marker where a settlement goes. Everything else, the rock and the roofs and the
-folds in the land, is the model’s to invent. The most important thing in the guide is the
-strip of finished painting copied in along the top and the left. It shows the model the river
-at its real width, the trees on its real banks, and the light it has to match.
+folds in the land, is the model’s to invent. The most important part is the strip of
+finished painting copied in along the top and left. It shows the model the river at its real
+width and the light it has to match.
 
 <Figure
   src={tileSteps}
@@ -182,12 +178,12 @@ can be invisible and still pinch a riverbank or double a row of trees.
 <Figure
   src={tileJoin}
   alt="A native-resolution strip across the boundary between two tiles, with the shared band marked by two dashed lines. A walled town sits in the tile above, a road runs down through the band into the tile below, and a fortress with red banners stands at the bottom right."
-  caption="The join between two tiles, at full size. The dashed lines mark the strip both tiles painted. The road and the fields carry straight through."
+  caption="At full size. The dashed lines mark the strip both tiles painted; the road and the fields carry straight through."
   wide
 />
 
-Most tiles start with two painted sides rather than one, so the map grows outward from what
-is already done. Here are four of them together, the way they sit in the finished map.
+Most tiles start with two painted sides, not one. The map grows outward. Here are four
+together, the way they sit in the finished map.
 
 <Figure
   src={tileBlock}
@@ -195,6 +191,8 @@ is already done. Here are four of them together, the way they sit in the finishe
   caption="Four tiles, from the capital down to the coast. The gold lines are the tile edges."
   wide
 />
+
+Do that eighty times and the map closes up.
 
 <Figure
   src={growth}
@@ -205,10 +203,10 @@ is already done. Here are four of them together, the way they sit in the finishe
 
 ## 5. Labels last
 
-The names go on at the very end, as a separate layer laid over the painting. You place them from the finished
-painting, not the plan, because the model will happily put a town a couple of hundred pixels
-from where you asked. The painting underneath stays clean, so you can rename everything
-later, or hand the map to another world, without repainting a thing.
+The names go on last, as a separate layer over the painting. You place them from the
+finished painting, not the plan, because the model will happily put a town a couple of
+hundred pixels from where you asked. The painting underneath stays clean. Rename everything
+later, or lift the whole thing into a different setting, and you repaint nothing.
 
 <Figure
   src={labelsPair}
