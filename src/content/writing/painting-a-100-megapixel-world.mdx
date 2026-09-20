@@ -145,75 +145,70 @@ castle you can find from the whole-world view, and then lean into.
   wide
 />
 
-## 4. Paint the map, one tile at a time
+## 4. Paint the rest, one tile at a time
 
-With the first tile right, the rest of the map is the same thing done eighty more times. The
-world is cut into a grid of tiles, each the size the image model paints best, overlapping its
-neighbours by a band a couple of hundred pixels wide. Then the loop: draw a rough guide for
-the next tile from the plan, copy in the painted edges of any finished neighbours, paint,
-check that every river and road runs on across the joins, and accept it or repaint the piece
-that went wrong. Nothing becomes a neighbour until it has been looked at.
+With the first tile right, the rest of the map is the same thing, done eighty more times. The
+world is cut into a grid of tiles, each 1,536 by 1,024 pixels because that is what GPT Image 2
+paints, and each overlapping its neighbours by a couple of hundred pixels. Then the agent
+loops. It draws a rough guide for the next tile, copies in the painted edges of any finished
+neighbours, paints it, checks that every river and road carries on across the joins, and
+repaints just the patch that didn’t.
 
 <Figure
   src={tileGrid}
   alt="The world map divided by a nine-by-nine grid of tiles. Four tiles in the western kingdom are highlighted in green as painted, four to their north are outlined in gold as next, and the rest are dimmed."
-  caption="The plan, four tiles in. Green is painted, gold is next, and every tile shares a band with its neighbours."
+  caption="The plan, four tiles in. Green is painted, gold is next. Every tile overlaps the ones beside it."
   wide
 />
 
-The guide is deliberately crude: shaded relief, a blue line for the river, a pale one for
+The guide is deliberately crude. Shaded relief, a blue line for the river, a pale one for
 each road, a marker where a settlement goes. Everything else, the rock and the roofs and the
-folds in the land, is the model’s to invent. What is not up for invention is the strip of
-finished painting copied along the top and the left. That strip is the most specific
-instruction in the whole brief. It carries the river at its real width, the trees on its real
-banks, and the light of the painting that already exists.
+folds in the land, is the model’s to invent. The most important thing in the guide is the
+strip of finished painting copied in along the top and the left. It shows the model the river
+at its real width, the trees on its real banks, and the light it has to match.
 
 <Figure
   src={tileSteps}
   alt="Two panels. Top: a flat schematic guide with a blue river, pale roads and two numbered settlement markers, with strips of finished painting along its top and left edges. Bottom: the painted tile that came back, with the river, a bridge town, a walled fortress and forested hills."
-  caption="One tile. The guide, with the finished edges of its neighbours copied in, and the painting that came back."
+  caption="One tile. The guide going in, and the painting that came back."
   wide
 />
 
-Then look at the join, at the map’s own pixels. The two paintings overlap along the shared
-band and are cut where they differ least, and the question is not whether the seam shows but
-whether the water and the roads go through. A seam can be invisible and still pinch a
-riverbank or double a line of trees.
+Then you look at the join. Where two tiles overlap, the kit cuts them along the line where
+they differ least, and the agent brings you a strip across it at full size. The question
+isn’t whether the seam shows. It’s whether the river and the road carry on through it. A seam
+can be invisible and still pinch a riverbank or double a row of trees.
 
 <Figure
   src={tileJoin}
   alt="A native-resolution strip across the boundary between two tiles, with the shared band marked by two dashed lines. A walled town sits in the tile above, a road runs down through the band into the tile below, and a fortress with red banners stands at the bottom right."
-  caption="Where a finished tile above meets a new one below. Both painted the shared band, and the road and the fields go on through it."
+  caption="The join between two tiles, at full size. The dashed lines mark the strip both tiles painted. The road and the fields carry straight through."
   wide
 />
 
-Every tile inherits from the ones before it, so the painting spreads outward from finished
-edges, and the order is chosen so that most tiles start with two painted sides rather than
-one. Here are four of them together, the way they sit in the finished map.
+Most tiles start with two painted sides rather than one, so the map grows outward from what
+is already done. Here are four of them together, the way they sit in the finished map.
 
 <Figure
   src={tileBlock}
   alt="Four adjacent tiles of the finished map with their outlines drawn in gold, overlapping at the edges. A castle town at the top left, farmland and a river running down through all four, a marsh with a stockade at the bottom left, and a harbour town on a rocky coast at the bottom right."
-  caption="Four tiles, from the capital down to the coast. The river crosses every join, and the road follows it to the harbour."
+  caption="Four tiles, from the capital down to the coast. The gold lines are the tile edges."
   wide
 />
 
 <Figure
   src={growth}
   alt="Four snapshots of the whole world map with the unpainted part dimmed: a corner of the western continent painted, then the whole western half, then most of the east, then all of it."
-  caption="The map growing: 20 tiles, 45, 65, and all 81. The last 61 were painted in a single day."
+  caption="The map filling in: 20 tiles, 45, 65, all 81. The last 61 in a single day."
   wide
 />
 
-Budget roughly one painting per tile plus a retry for every five, and expect to spend more
-time looking than generating.
-
 ## 5. Labels last
 
-The names go on at the very end, on their own layer, placed from the finished painting rather
-than the plan, because the model moves a landmark a couple of hundred pixels from where it
-was asked to put it more often than not. The painting underneath stays clean, so the map can
-be relabelled, or lent to a different world entirely, without repainting a thing.
+The names go on at the very end, as a separate layer laid over the painting. You place them from the finished
+painting, not the plan, because the model will happily put a town a couple of hundred pixels
+from where you asked. The painting underneath stays clean, so you can rename everything
+later, or hand the map to another world, without repainting a thing.
 
 <Figure
   src={labelsPair}
@@ -221,6 +216,13 @@ be relabelled, or lent to a different world entirely, without repainting a thing
   caption="Crownmere without its labels, and with them."
   wide
 />
+
+## What you end up with
+
+One painting, the names in a file of their own on top of it, and a folder of notes on every
+decision you made along the way. Figure on one painting per tile, plus a retry every fifth one
+or so, and most of the time spent looking rather than painting. A region in a weekend is
+realistic. The whole world took me ten days.
 
 ## What it was for
 
