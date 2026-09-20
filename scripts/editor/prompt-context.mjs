@@ -20,6 +20,11 @@ try {
   }
   if (ctx.selection) lines.push(`Selected text: “${ctx.selection}”`);
   lines.push('"This" or "here" in the prompt refers to that block unless it says otherwise.');
+  // The `{/* … */}` comments in the note: things left for Claude to pick up.
+  if (ctx.notes?.length) {
+    lines.push('Notes left in the file for you:');
+    for (const note of ctx.notes) lines.push(`  line ${note.line}: “${note.text}”`);
+  }
   console.log(lines.join('\n'));
 } catch {
   // No context file, or unreadable: say nothing.

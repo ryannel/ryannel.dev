@@ -14,11 +14,15 @@ export const escapeText = (s) =>
     .replace(/(^|\s)\*(?=\S)/g, '$1\\*');
 
 /** One inline element or text node → markdown. */
+/** Inline HTML the notes may use; kept as tags, since MDX accepts them. */
+const KEPT_TAGS = new Set(['KBD', 'SUP', 'SUB', 'ABBR', 'MARK', 'CITE', 'SMALL', 'U', 'Q']);
+
 export const toMarkdown = (node) => {
   if (node.nodeType === Node.TEXT_NODE) return escapeText(node.data);
   if (node.nodeType !== Node.ELEMENT_NODE) return '';
   if (node.matches('.note-editor-plus, .callout-label')) return '';
   const inner = [...node.childNodes].map(toMarkdown).join('');
+  const style = node.getAttribute('style') ?? '';
   switch (node.tagName) {
     case 'EM':
     case 'I':
@@ -26,8 +30,15 @@ export const toMarkdown = (node) => {
     case 'STRONG':
     case 'B':
       // Google Docs pastes wrap everything in <b style="font-weight:normal">.
-      if (/font-weight:\s*(normal|400)/.test(node.getAttribute('style') ?? '')) return inner;
+      if (/font-weight:\s*(normal|400)/.test(style)) return inner;
       return inner.trim() ? `**${inner}**` : inner;
+    case 'SPAN': {
+      // Google Docs spells bold and italic as styled spans.
+      const bold = /font-weight:\s*(bold|[6-9]00)/.test(style);
+      const italic = /font-style:\s*italic/.test(style);
+      if (!inner.trim()) return inner;
+      return bold && italic ? `***${inner}***` : bold ? `**${inner}**` : italic ? `*${inner}*` : inner;
+    }
     case 'DEL':
     case 'S':
     case 'STRIKE':
@@ -37,8 +48,15 @@ export const toMarkdown = (node) => {
     case 'A':
       return `[${inner}](${node.getAttribute('href')})`;
     case 'BR':
-      return ' ';
+      // A hard line break: a backslash before the newline, the CommonMark
+      // spelling that survives re-wrapping (two trailing spaces would not).
+      return '\\\n';
     default:
+      if (KEPT_TAGS.has(node.tagName)) {
+        const title = node.tagName === 'ABBR' && node.title ? ` title="${node.title.replace(/"/g, '&quot;')}"` : '';
+        const tag = node.tagName.toLowerCase();
+        return `<${tag}${title}>${inner}</${tag}>`;
+      }
       return inner;
   }
 };
@@ -69,15 +87,26 @@ export const prefixFor = (el) => {
   }
 };
 
+/**
+ * Text that would read as a block marker at the start of a line is escaped, so
+ * a paragraph that begins "1986. It was…" or "-5 °C" stays a paragraph.
+ */
+const escapeMarker = (body) =>
+  body.replace(/^(#{1,6}(?=\s)|[-*+](?=\s)|>|\d+(?=[.)]\s))/, (m) =>
+    /^\d/.test(m) ? m + '\\' : '\\' + m,
+  );
+
 export const blockMarkdown = (el) =>
-  (prefixFor(el) + toMarkdown(el))
-    .replace(/[ \t]+/g, ' ')
-    .replace(/\n/g, ' ')
-    .trim()
-    // "#Heading" and "-item" are what people type; give Markdown its space.
-    .replace(/^(#{1,6}|-|\d+\.)(?=[^\s#])/, '$1 ')
-    // The note's title is the page's only level-one heading; "#" means a section.
-    .replace(/^# /, '## ');
+  (prefixFor(el) +
+    escapeMarker(
+      toMarkdown(el)
+        .replace(/[ \t]+/g, ' ')
+        // Keep hard breaks ("\\\n"); every other newline is just rendering.
+        .replace(/ *\\\n */g, '\0')
+        .replace(/\n/g, ' ')
+        .replace(/ *\0 */g, '\\\n')
+        .trim(),
+    )).trim();
 
 /* ----------------------------------------------------------------------------
    Markdown → HTML, for pasted text and the as-you-type shortcuts.
@@ -131,19 +160,33 @@ export const htmlToBlocks = (html) => {
     const md = toMarkdown(node).replace(/\s+/g, ' ').trim();
     if (md) blocks.push(prefix + md);
   };
-  const walk = (node) => {
+  const walk = (node, prefix = '') => {
     for (const child of node.childNodes) {
-      if (child.nodeType !== Node.ELEMENT_NODE || !child.matches(BLOCK)) {
-        push(child);
+      if (child.nodeType !== Node.ELEMENT_NODE) {
+        push(child, prefix);
       } else if (child.querySelector(BLOCK)) {
-        walk(child);
+        // A wrapper (Google Docs puts everything in one <b>): look inside it.
+        const own = child.tagName === 'BLOCKQUOTE' ? '> ' : prefix;
+        if (child.tagName === 'LI') {
+          // An item with a nested list: its own text first, then the nested items.
+          const shallow = child.cloneNode(true);
+          for (const el of shallow.querySelectorAll(BLOCK)) el.remove();
+          push(shallow, itemPrefix(child));
+        }
+        walk(child, own);
+      } else if (!child.matches(BLOCK)) {
+        push(child, prefix);
       } else if (/^H[1-6]$/.test(child.tagName)) {
         push(child, child.tagName <= 'H2' ? '## ' : '### ');
       } else {
-        push(child, child.tagName === 'LI' ? '- ' : '');
+        push(child, child.tagName === 'LI' ? itemPrefix(child) : prefix);
       }
     }
   };
+  const itemPrefix = (li) =>
+    li.parentElement?.tagName === 'OL'
+      ? `${Number(li.parentElement.getAttribute('start') ?? 1) + [...li.parentElement.children].indexOf(li)}. `
+      : '- ';
   walk(doc.body);
   return blocks;
 };

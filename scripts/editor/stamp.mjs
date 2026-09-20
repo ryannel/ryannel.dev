@@ -15,7 +15,7 @@ export const enable = () => {
   enabled = true;
 };
 
-const BLOCKS = ['p', 'h1', 'h2', 'h3', 'h4', 'li', 'blockquote', 'hr'];
+const BLOCKS = ['p', 'h1', 'h2', 'h3', 'h4', 'li', 'blockquote', 'hr', 'pre', 'table'];
 
 const stamp = (node, ctx) => {
   if (!enabled || !node.position?.start || !node.position?.end) return;
@@ -33,4 +33,22 @@ export const stampSource = {
   },
   element: { filter: BLOCKS, visit: stamp },
   mdxJsxFlowElement: { filter: ['Figure', 'Callout'], visit: stamp },
+  // An MDX comment, `{/* … */}`, is a note the writer leaves for Claude: in
+  // dev it renders as a card the editor can edit; in a build it is nothing.
+  mdxFlowExpression(node, ctx) {
+    if (!enabled) return;
+    const m = /^\s*\/\*([\s\S]*?)\*\/\s*$/.exec(node.value ?? '');
+    if (!m) return;
+    const { start, end } = node.position ?? {};
+    const properties = { className: ['note-editor-comment'] };
+    if (typeof start?.offset === 'number' && typeof end?.offset === 'number') {
+      properties['data-src'] = `${start.offset}-${end.offset}`;
+    }
+    ctx.replaceNode(node, {
+      type: 'element',
+      tagName: 'aside',
+      properties,
+      children: [{ type: 'text', value: m[1].trim() }],
+    });
+  },
 };

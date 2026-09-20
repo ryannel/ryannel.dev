@@ -45,6 +45,7 @@ Then open <http://localhost:4321>. Drafts and samples are visible in dev and exc
 | `npm run check` | Type-check and validate all frontmatter against the schemas |
 | `npm run verify` | Assert things about `dist/` — run it after a build |
 | `npm test` | Build fixture content designed to break the publication rule, and check it doesn't |
+| `npm run test:editor` | Unit tests for the in-browser editor's text handling (`scripts/test-editor.mjs`) |
 | `npm run og` | Regenerate `public/og.png` after editing `scripts/generate-og.mjs` |
 | `npm run grain` | Regenerate `public/grain.png`, the dark-mode texture |
 
@@ -156,42 +157,77 @@ Ghost. Open the note, click the pencil (**Edit note**) in Astro's dev toolbar at
 the window, and click into any paragraph, heading, list item, quote, callout, caption, the title
 or the description. Text is written back into the MDX file when you pause, leave the block or
 press ⌘S. The page updates in place, without a reload, and the caret stays where it was. A pill
-in the top-right shows the save state and the word count.
+in the top right shows the save state, the word count (or how many of the total are selected),
+and a TK count you can click to jump to the next one. Click the pill for a menu: note settings,
+shortcuts, new note, undo, redo, focus mode, and the file path.
 
 **Markdown as you type.** `**bold**`, `*italic*`, `` `code` ``, `~~struck~~` and `[text](url)`
 convert the moment you close them. At the start of a block, `## ` and `### ` make a heading,
 `- ` a list, `1. ` a numbered list, `> ` a quote, and `---` on its own line a divider. Backspace
-at the start of a heading, item or quote turns it back into a paragraph.
+at the start of a heading, item or quote turns it back into a paragraph. Quotes and apostrophes
+turn curly and `...` becomes an ellipsis as you go, outside code, and a paragraph that would
+otherwise read as markdown (a number and a full stop, a leading dash) is escaped so it stays a
+paragraph. ⇧Enter is a line break inside a block, written to the file as a backslash hard break.
+Editing a hand-wrapped paragraph re-wraps it at around 95 columns, so the first edit to an old
+one reflows the whole thing in the diff.
 
 **Selecting text** shows a formatting bar: bold, italic, code, strikethrough, link, and the
-block's kind (heading, subheading, quote). Inside a callout the bar also has the callout's type
-and a way to remove it. ⌘B, ⌘I and ⌘K work too; ⌘K with nothing selected inserts the URL as a
-link. Put the caret in a link to see, edit or remove it.
+block's kind (heading, subheading, quote); inside a callout, also the callout's type. ⌘B, ⌘I,
+⌘E and ⌘K work too; ⌘K with nothing selected inserts a URL, and typing a title there suggests
+notes to link instead. `[[` does the same linking from the keyboard, with a list of the site's
+notes to pick from. Put the caret in a link to see, edit or remove it. Copying a selection puts
+markdown on the clipboard, not HTML.
 
 **Blocks.** Enter at the end of a block opens a new one below it (a new item after an item,
 a new line after a quote line); Enter in the middle splits it; Enter on an empty item or quote
 line leaves the list or quote. ⌘Enter opens a paragraph after whatever the block sits in, which
 is how you get out of a callout. Backspace at the start of a paragraph joins it to the one
-above. Arrow keys move between blocks, including onto figures and dividers.
+above. Arrow keys move between blocks, including onto cards; ⌘⇧↑ and ⌘⇧↓ move the current block
+(or a selected card) past its neighbour, and ⌘D duplicates it.
 
-**Cards.** A figure or divider is selected with a click, or by arrowing onto it. Its bar sets
-alt text, caption and the wide layout, or removes it; Backspace removes it too, and Enter opens
-a paragraph after it.
+**Cards.** A figure, divider, code block, table, or note to Claude is a card: click it, or arrow
+onto it, to select. Backspace removes any card, Enter opens a paragraph after it, and a figure's
+bar also sets alt text, caption, the wide layout, and Replace, which swaps in another image from
+`src/assets/`. Anything the editor can't edit in place, such as a code block, a table, a note to
+Claude, or a component it doesn't know, is a card too: Enter, or a double-click, opens its source
+in a plain monospace box, a code block's with its language shown. ⌘Enter keeps the change,
+Escape leaves it as it was, and clicking away keeps it too.
 
 **Adding things.** In an empty block, type `/` (or click the `+` in the margin) for a menu:
-heading, subheading, bullet list, numbered list, quote, divider, image and callout. *Image*
-lists everything under `src/assets/`; dropping or pasting an image file onto the page uploads
-it to `src/assets/<note>/` and adds a figure, with the import written for you. Pasted text
-keeps its markdown and its links, and a pasted passage lands as separate paragraphs.
+heading, subheading, bullet list, numbered list, quote, divider, image, callout, and a note to
+Claude. *Image* lists everything under `src/assets/`; dropping or pasting an image file onto
+the page uploads it to `src/assets/<note>/` and adds a figure, with the import written for you.
+Pasted text keeps its markdown and its links, and a pasted passage lands as separate paragraphs.
+A note to Claude is an MDX comment (`{/* … */}`): a small gold card in dev, nothing at all in a
+build.
+
+**Undo** (⌘Z) and **redo** (⌘⇧Z) step back and forward through the file's history for as long as
+the dev server keeps running, including over a change Claude made from the terminal; unsaved
+typing in a block still undoes within that block first. ⌘. opens the note's settings: draft and
+featured toggles, published and updated dates, tags, the file path (click to copy), and a
+ready-to-publish checklist: a description is set, every image has alt text, no TK is left, no
+notes to Claude are left, no unused imports remain (a *Tidy* button removes them), and draft is
+off. Publishing itself is still a plain push.
+
+⌘⌥N, or the pencil on any page that isn't a note, asks for a title and creates
+`src/content/writing/<slug>.mdx` with today's date, `draft: true` and a description of `TK`, then
+opens it with its first block ready to type into. ⌘⇧F is focus mode, dimming everything but the
+block the caret is in. ⌘/ lists every shortcut, including a few not mentioned above: ⌘⇧X for
+strikethrough, ⌘⌥0/2/3 for paragraph, heading and subheading, ⌘⇧7/8/9 for numbered list, bullet
+list and quote. Escape steps out of whatever is open one level at a time, then out of the block.
 
 The editor also records which block the cursor is in (`.astro/editor-context.json`), and the
 Claude Code hook in `.claude/settings.json` (and the Codex one in `.codex/hooks.json`) passes
-that along with every prompt. So with the caret in a paragraph, "tighten this" or "add a callout
-after this" needs no further pointing. Claude's edits land in the file and the page reloads.
+that along with every prompt, along with the text of any open notes to Claude, listed under
+"Notes left in the file for you". So with the caret in a paragraph, "tighten this" or "add a
+callout after this" needs no further pointing. Claude's edits land in the file, the page reloads
+as before, and the blocks whose text changed flash gold, with the pill saying how many.
 
 All of it lives in `scripts/editor/` and is inert outside `astro dev`: production HTML carries
 no `data-src` stamps and no editor code, and `npm run verify` checks that. Removing a figure
-leaves its `import` line behind; tidy those by hand when a note is done.
+leaves its `import` line behind; the checklist in ⌘. notices, and *Tidy* removes it. Nested lists
+still aren't editable in place (edit those in the source), and selection can't span more than
+one block.
 
 ### Images and diagrams
 

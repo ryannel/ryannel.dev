@@ -40,6 +40,29 @@ const CSS = `
     align-items: center; justify-content: center; cursor: pointer; color: ${GOLD}; border: 1px solid color-mix(in srgb, ${GOLD} 55%, transparent);
     font: 18px/1 system-ui, sans-serif; background: transparent; opacity: .6; }
   .note-editor-plus:hover { opacity: 1; }
+  .note-editor-panel { position: fixed; top: 52px; right: 12px; width: min(340px, calc(100vw - 24px)); max-height: calc(100vh - 70px);
+    overflow-y: auto; padding: 14px 16px 16px; z-index: 2147482500; }
+  .note-editor-panel h2 { margin: 0 0 10px; font: 600 13px/1 system-ui, sans-serif; color: ${GOLD}; letter-spacing: .04em; text-transform: uppercase; }
+  .note-editor-panel h2 + h2, .note-editor-panel .row + h2 { margin-top: 18px; }
+  .note-editor-panel .row { display: flex; align-items: center; gap: 10px; min-height: 30px; }
+  .note-editor-panel .row + .row { margin-top: 4px; }
+  .note-editor-panel label { flex: 1; color: rgba(255,255,255,.75); }
+  .note-editor-panel input[type="text"], .note-editor-panel input[type="date"] { all: unset; box-sizing: border-box; flex: 1; height: 28px; padding: 0 8px;
+    border-radius: 5px; background: rgba(255,255,255,.08); font: 13px system-ui, sans-serif; color: inherit; color-scheme: dark; }
+  .note-editor-panel input[type="text"]:focus, .note-editor-panel input[type="date"]:focus { background: rgba(255,255,255,.14); }
+  .note-editor-panel input[type="checkbox"] { accent-color: ${GOLD}; width: 16px; height: 16px; margin: 0; }
+  .note-editor-panel .check { display: flex; gap: 8px; align-items: baseline; padding: 3px 0; color: rgba(255,255,255,.75); }
+  .note-editor-panel .check.ok { color: rgba(255,255,255,.45); }
+  .note-editor-panel .check .m { width: 14px; flex: none; text-align: center; color: ${GOLD}; }
+  .note-editor-panel .check.ok .m { color: #8bc48a; }
+  .note-editor-panel .check button, .note-editor-panel .row > button { all: unset; cursor: pointer; color: ${GOLD}; text-decoration: underline; text-underline-offset: 2px; }
+  .note-editor-panel .path { font: 12px ui-monospace, Menlo, monospace; color: rgba(255,255,255,.55); word-break: break-all; cursor: pointer; }
+  .note-editor-panel .path:hover { color: #fff; }
+  .note-editor-panel table { border-collapse: collapse; width: 100%; }
+  .note-editor-panel td { padding: 3px 0; vertical-align: top; color: rgba(255,255,255,.75); }
+  .note-editor-panel td:first-child { white-space: nowrap; padding-right: 14px; color: #fff; font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+  .note-editor-panel .close { all: unset; position: absolute; top: 8px; right: 12px; cursor: pointer; color: rgba(255,255,255,.5); font-size: 18px; line-height: 1; }
+  .note-editor-panel .close:hover { color: #fff; }
 `;
 
 const pageRect = (rect) => ({
@@ -60,6 +83,8 @@ const placeAt = (el, rect, { below = false, alignLeft = false } = {}) => {
   let left = alignLeft ? r.left : r.left + r.width / 2 - w / 2;
   left = Math.max(scrollX + 8, Math.min(left, scrollX + innerWidth - w - 8));
   let top = below || rect.top - h - 10 < 0 ? r.bottom + 8 : r.top - h - 8;
+  // Never off the bottom of the window: flip above when there is no room below.
+  if (top + h > scrollY + innerHeight - 8) top = Math.max(scrollY + 8, r.top - h - 8);
   el.style.left = `${left}px`;
   el.style.top = `${top}px`;
 };
@@ -92,10 +117,51 @@ export const createUi = () => {
   plus.hidden = true;
   plus.addEventListener('mousedown', (e) => e.preventDefault());
 
-  const mount = () => document.body.append(style, bar, menu, plus);
+  const panel = document.createElement('div');
+  panel.className = 'note-editor-ui note-editor-panel';
+  panel.hidden = true;
+
+  const mount = () => document.body.append(style, bar, menu, plus, panel);
   const unmount = () => {
-    for (const el of [style, bar, menu, plus]) el.remove();
+    for (const el of [style, bar, menu, plus, panel]) el.remove();
   };
+
+  /* ---- the panel: note settings, the shortcut list ---- */
+  let panelKind = null;
+  const panelApi = {
+    open: false,
+    kind: () => (panelApi.open ? panelKind : null),
+    /** `build(root)` fills the panel; a close button and Escape are added here. */
+    show(kind, build) {
+      panel.replaceChildren();
+      const close = document.createElement('button');
+      close.type = 'button';
+      close.className = 'close';
+      close.textContent = '×';
+      close.title = 'Close (Escape)';
+      close.addEventListener('click', () => panelApi.hide());
+      panel.append(close);
+      build(panel);
+      panel.hidden = false;
+      panelKind = kind;
+      panelApi.open = true;
+    },
+    hide() {
+      if (!panelApi.open) return;
+      panel.hidden = true;
+      panelApi.open = false;
+      panelKind = null;
+      panel.replaceChildren();
+    },
+    contains: (node) => panel.contains(node),
+  };
+  panel.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      panelApi.hide();
+    }
+  });
 
   /* ---- the bar: a row of buttons, a select, a link, or an input ---- */
   const toolbar = {
@@ -145,13 +211,15 @@ export const createUi = () => {
       toolbar.open = true;
     },
     /** Swap the bar for one text field. */
-    prompt(rect, { value = '', placeholder, onSubmit, onCancel }, opts) {
+    prompt(rect, { value = '', placeholder, onSubmit, onCancel, onInput, onKey }, opts) {
       bar.replaceChildren();
       const input = document.createElement('input');
       input.value = value;
       input.placeholder = placeholder ?? '';
+      if (onInput) input.addEventListener('input', () => onInput(input.value));
       input.addEventListener('keydown', (e) => {
         e.stopPropagation();
+        if (onKey?.(e)) return;
         if (e.key === 'Enter') {
           e.preventDefault();
           onSubmit(input.value.trim());
@@ -179,6 +247,7 @@ export const createUi = () => {
   let menuIndex = 0;
   let menuPick = null;
   let menuInput = null;
+  let menuOnHide = null;
   const renderMenu = () => {
     for (const el of menu.querySelectorAll('.item, .empty')) el.remove();
     if (!menuVisible.length) {
@@ -213,9 +282,10 @@ export const createUi = () => {
   const menuApi = {
     open: false,
     /** items: { key?, label, hint?, ...anything }. `search` adds a text field. */
-    show(rect, items, onPick, { search = false, placeholder = '' } = {}) {
+    show(rect, items, onPick, { search = false, placeholder = '', onHide = null } = {}) {
       menuItems = items;
       menuPick = onPick;
+      menuOnHide = onHide;
       menuIndex = 0;
       menu.replaceChildren();
       menuInput = null;
@@ -267,9 +337,13 @@ export const createUi = () => {
       return false;
     },
     hide() {
+      const wasOpen = menuApi.open;
       menu.hidden = true;
       menuApi.open = false;
       menuPick = null;
+      const fn = menuOnHide;
+      menuOnHide = null;
+      if (wasOpen) fn?.();
     },
     contains: (node) => menu.contains(node),
   };
@@ -293,5 +367,5 @@ export const createUi = () => {
     },
   };
 
-  return { mount, unmount, toolbar, menu: menuApi, plus: plusApi, placeAt };
+  return { mount, unmount, toolbar, menu: menuApi, plus: plusApi, panel: panelApi, placeAt };
 };

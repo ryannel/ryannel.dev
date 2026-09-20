@@ -8,6 +8,9 @@
  *     or a component's attributes, add an image, and record where the cursor
  *     is for Claude.
  *
+ * The text work itself lives in edits.mjs, as plain functions with tests. This
+ * file is the part that touches the disk: paths, hashes, replies, history.
+ *
  * The MDX file stays the only source of truth. Every write is a plain file
  * write; Astro re-renders the page afterwards.
  */
@@ -16,12 +19,32 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSy
 import { basename, extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { enable } from './stamp.mjs';
+import {
+  applyInsertAfter,
+  applyRaw,
+  applyReplace,
+  importName,
+  localDate,
+  mdxComments,
+  moveBlock,
+  newNoteText,
+  orphanImports,
+  quote,
+  readFrontmatter,
+  removeImports,
+  scanFences,
+  setAttrs,
+  setFrontmatter,
+  sliceBlock,
+  slugify,
+} from './edits.mjs';
 
 const NOTES_DIR = 'src/content/writing';
 const ASSETS_DIR = 'src/assets';
 const CONTEXT_FILE = '.astro/editor-context.json';
 const SLUG = /^[a-z0-9][a-z0-9-]*$/;
 const IMAGE = /\.(png|jpe?g|gif|webp|avif|svg)$/i;
+const HISTORY = 100;
 
 const hashOf = (text) => createHash('sha1').update(text).digest('hex').slice(0, 12);
 
@@ -33,126 +56,6 @@ const noteFile = (root, slug) => {
     if (file.startsWith(resolve(root, NOTES_DIR)) && existsSync(file)) return file;
   }
   return null;
-};
-
-/**
- * Re-wrap markdown the way the notes are written by hand: ~95 columns, every
- * line after the first indented with `cont`. Paragraphs (blank-line
- * separated) each start with `indent`. Never breaks inside a word, so links
- * and inline code survive.
- */
-const WRAP = 95;
-const wrap = (text, cont = '', indent = cont) => {
-  const out = [];
-  text.split('\n').forEach((para, i) => {
-    let line = i === 0 ? '' : para ? indent : '';
-    for (const word of para.split(' ')) {
-      if (line.trim() && (line + ' ' + word).length > WRAP) {
-        out.push(line);
-        line = cont + word;
-      } else {
-        line = line.trim() ? line + ' ' + word : line + word;
-      }
-    }
-    out.push(line);
-  });
-  return out.join('\n');
-};
-
-/**
- * A block's opening letters with markdown syntax stripped, so the page's text
- * and the file's source can be compared before anything is overwritten.
- */
-const letters = (s) =>
-  s
-    .replace(/^\s*(?:#{1,6}\s+|(?:[-*]|\d+\.|>)\s+)/, '')
-    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
-    .replace(/[^\p{L}]/gu, '')
-    .slice(0, 12)
-    .toLowerCase();
-
-/* ----------------------------------------------------------------------------
-   Block markers. A block's markdown may start with a list bullet, a number or
-   a quote mark; the page sends the kind it wants and the file keeps its own
-   spelling of it ("*" bullets, "3." numbering).
-   ------------------------------------------------------------------------- */
-const MARKER = /^(?:([-*])|(\d+)\.|(>))[ \t]+/;
-const kindOf = (m) => (!m ? 'p' : m[3] ? 'quote' : m[2] ? 'ol' : 'ul');
-const isHeading = (s) => /^#{1,6} /.test(s);
-
-/** Lay one block out: marker, wrapped body, continuation lines prefixed. */
-const layout = (md, indent) => {
-  const m = MARKER.exec(md);
-  const body = md.slice(m?.[0].length ?? 0);
-  const marker = !m ? '' : m[3] ? '> ' : m[0].replace(/[ \t]+$/, ' ');
-  const cont = m?.[3] ? indent + '> ' : indent + ' '.repeat(marker.length);
-  return { marker, text: marker + wrap(body, cont), kind: kindOf(m), m };
-};
-
-/** What separates this block from the next one of the same kind. */
-const separator = (kind, m, indent) =>
-  kind === 'ul'
-    ? '\n' + indent + m[0].replace(/[ \t]+$/, ' ')
-    : kind === 'ol'
-      ? `\n${indent}${Number(m[2]) + 1}. `
-      : kind === 'quote'
-        ? `\n${indent}>\n${indent}> `
-        : '\n\n' + indent;
-
-/** Make sure the range [s, e) sits between blank lines. */
-const blankAround = (text, s, e) => {
-  let before = text.slice(0, s);
-  let after = text.slice(e);
-  const lineOf = before.slice(before.lastIndexOf('\n') + 1);
-  if (lineOf.trim()) {
-    before += '\n\n' + lineOf.match(/^[ \t]*/)[0];
-  } else if (before && !/\n[ \t]*\n[ \t]*$/.test(before)) {
-    before += '\n' + lineOf;
-  }
-  if (after.trim() && !/^[ \t]*\n[ \t]*\n/.test(after)) {
-    after = (/^[ \t]*\n/.test(after) ? '\n' : '\n\n') + after;
-  }
-  return before + text.slice(s, e) + after;
-};
-
-/* ----------------------------------------------------------------------------
-   JSX attributes on a component's opening tag.
-   ------------------------------------------------------------------------- */
-const ATTR = /([A-Za-z][\w-]*)(?:=("(?:[^"\\]|\\.)*"|\{[^}]*\}))?/g;
-
-const readTag = (src) => {
-  const m = /^<([A-Z]\w*)([^>]*?)(\/?)>/s.exec(src);
-  if (!m) throw new Error('not a component block');
-  const attrs = [...m[2].matchAll(ATTR)].map(([, name, value]) => ({ name, value }));
-  return {
-    name: m[1],
-    attrs,
-    selfClosing: Boolean(m[3]),
-    multiline: m[2].includes('\n'),
-    end: m[0].length,
-  };
-};
-
-const writeTag = ({ name, attrs, selfClosing, multiline }) => {
-  const parts = attrs.map((a) => (a.value === undefined ? a.name : `${a.name}=${a.value}`));
-  if (multiline || parts.join(' ').length > 80) {
-    return `<${name}\n${parts.map((p) => '  ' + p).join('\n')}\n${selfClosing ? '/>' : '>'}`;
-  }
-  return `<${name}${parts.length ? ' ' + parts.join(' ') : ''}${selfClosing ? ' />' : '>'}`;
-};
-
-const quote = (v) => `"${String(v).replace(/"/g, '”')}"`;
-
-/** camelCase identifier for an image file, unique among the note's imports. */
-const importName = (file, text) => {
-  const base = basename(file, extname(file))
-    .replace(/[^a-zA-Z0-9]+(.)?/g, (_, c) => (c ? c.toUpperCase() : ''))
-    .replace(/^[^a-zA-Z]+/, '');
-  let name = (base || 'image').replace(/^./, (c) => c.toLowerCase());
-  const taken = new Set([...text.matchAll(/^import\s+(\w+)\s+from/gm)].map((m) => m[1]));
-  let candidate = name;
-  for (let i = 2; taken.has(candidate); i++) candidate = name + i;
-  return candidate;
 };
 
 const listImages = (root) => {
@@ -168,6 +71,20 @@ const listImages = (root) => {
   };
   walk(dir);
   return out.sort();
+};
+
+/** Every note, for the internal-link picker. Files starting `__` are drafts of mine. */
+const listNotes = (root) => {
+  const dir = resolve(root, NOTES_DIR);
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
+    .filter((name) => /\.mdx?$/.test(name) && !name.startsWith('__'))
+    .map((name) => {
+      const front = readFrontmatter(readFileSync(join(dir, name), 'utf8'));
+      const slug = basename(name, extname(name));
+      return { slug, title: front.title || slug, draft: front.draft };
+    })
+    .sort((a, b) => a.title.localeCompare(b.title));
 };
 
 export default function noteEditor() {
@@ -196,13 +113,19 @@ export default function noteEditor() {
         // the reload that follows an editor write and ask the app to refresh
         // its blocks in place instead. Changes from anywhere else (Claude, an
         // editor) still reload as normal.
-        let quietUntil = 0;
+        //
+        // Astro can answer one content change with more than one reload, so
+        // every reload within two seconds of the last write that changed the
+        // file is taken to be that write's, and carries the write's id. A
+        // change from anywhere else in that window is caught by the next
+        // write's hash check instead.
+        let last = null;
         const hot = server.environments.client.hot;
         const rawSend = hot.send.bind(hot);
         hot.send = (...args) => {
           const payload = typeof args[0] === 'string' ? null : args[0];
-          if (payload?.type === 'full-reload' && Date.now() < quietUntil) {
-            toolbar.send('note-editor:refresh', {});
+          if (payload?.type === 'full-reload' && last && last.until > Date.now()) {
+            toolbar.send('note-editor:refresh', last.shape);
             return;
           }
           return rawSend(...args);
@@ -219,167 +142,129 @@ export default function noteEditor() {
         const reply = (event, payload) => toolbar.send(`note-editor:${event}`, payload);
 
         /**
-         * Apply `edit(text, base) -> newText` to the note if the client's view of
-         * the file is current. Every write goes through here.
+         * Undo history, per file, for as long as the dev server runs. A write
+         * that finds the file changed underneath it replies `stale` and stops
+         * before it gets here, so the stacks survive an edit from Claude or
+         * from a text editor: that edit is just another state of the file, and
+         * an undo after it puts back what was there before it, which is what
+         * you mean when you ask for one.
          */
-        const write = (msg, edit) => {
+        const past = new Map();
+        const future = new Map();
+        const remember = (stack, file, text) => {
+          const kept = stack.get(file) ?? [];
+          kept.push(text);
+          if (kept.length > HISTORY) kept.shift();
+          stack.set(file, kept);
+        };
+
+        /**
+         * Apply `edit(text, base, file) -> newText` to the note if the client's
+         * view of the file is current. Every write goes through here.
+         */
+        /**
+         * What the page needs to know about the file after a write: its hash,
+         * where the code fences are (the highlighter loses their positions, so
+         * they are read off the file and matched up in order on the page), and
+         * the front matter. Sent with every `saved` and `refresh`, so the page
+         * never has to ask again mid-refresh.
+         */
+        const shape = (text) => ({
+          hash: hashOf(text),
+          fences: scanFences(text),
+          frontmatter: readFrontmatter(text),
+        });
+
+        const write = (msg, edit, { history = true, extra } = {}) => {
           const note = read(msg.slug);
           if (!note) return reply('error', { id: msg.id, message: `No note for “${msg.slug}”.` });
           if (msg.hash !== note.hash) return reply('stale', { id: msg.id, hash: note.hash });
           let next;
           try {
-            next = edit(note.text, note.base);
+            next = edit(note.text, note.base, note.file);
           } catch (err) {
             logger.warn(`note-editor: ${err.message}`);
             return reply('error', { id: msg.id, message: err.message });
           }
           if (next === note.text)
-            return reply('saved', { id: msg.id, hash: note.hash, changed: false });
-          quietUntil = Date.now() + 2000;
+            return reply('saved', { id: msg.id, hash: note.hash, changed: false, ...extra });
+          if (history) {
+            remember(past, note.file, note.text);
+            future.delete(note.file);
+          }
+          const after = shape(next);
+          last = { id: msg.id, until: Date.now() + 2000, shape: { id: msg.id, ...after } };
           writeFileSync(note.file, next);
-          reply('saved', { id: msg.id, hash: hashOf(next), changed: true });
-        };
-
-        /** The block's source slice, checked against what the browser thinks is there. */
-        const slice = (text, base, msg) => {
-          const start = base + msg.start;
-          const end = base + msg.end;
-          if (!(start >= base && end <= text.length && start < end)) {
-            throw new Error('block range is outside the file');
-          }
-          const current = text.slice(start, end);
-          if (msg.expect && letters(current) !== letters(msg.expect)) {
-            throw new Error('block on the page no longer matches the file; reload');
-          }
-          return { start, end, current };
-        };
-
-        /** Where the block's line begins, its indentation, and whether a quote mark precedes it. */
-        const lead = (text, start) => {
-          const lineStart = text.lastIndexOf('\n', start - 1) + 1;
-          const before = text.slice(lineStart, start);
-          const indent = /^[ \t]*/.exec(before)[0];
-          const quoted = /^[ \t]*>[ \t]?$/.test(before);
-          return { lineStart, indent, quoted };
+          reply('saved', { id: msg.id, ...after, changed: true, ...extra });
         };
 
         toolbar.on('note-editor:hello', (msg) => {
           const note = read(msg.slug);
           if (!note) return reply('error', { id: msg.id, message: `No note for “${msg.slug}”.` });
-          reply('hello', { id: msg.id, hash: note.hash, file: relative(root, note.file) });
+          reply('hello', { id: msg.id, file: relative(root, note.file), ...shape(note.text) });
         });
 
-        // Replace one block's source with new markdown. The text may start with
-        // a marker ("- ", "2. ", "> ") or heading hashes; the block becomes that
-        // kind, keeping the file's own bullet or number where the kind is the
-        // same. With `after`, the block is split in two (Enter); with `delete`,
-        // it is removed.
-        toolbar.on('note-editor:replace', (msg) => {
-          write(msg, (text, base) => {
-            const { start, end, current } = slice(text, base, msg);
-            const { lineStart, indent, quoted } = lead(text, start);
-            const md = String(msg.text ?? '');
-            if (msg.delete || (typeof msg.after !== 'string' && !md.trim())) {
-              // Take the block, its indentation, and one of the blank lines around it.
-              const after = /^\r?\n(\r?\n)?/.exec(text.slice(end))?.[0].length ?? 0;
-              return text.slice(0, lineStart) + text.slice(end + after);
-            }
-            // Joining with the block after this one (Backspace at its start):
-            // the text sent is both together, so the next block is taken out.
-            // It is found here, from the file as it is now, never from an
-            // offset the page remembered.
-            if (msg.joinNext) {
-              const rest = text.slice(end);
-              const gap = /^(?:[ \t]*\r?\n)+/.exec(rest)?.[0] ?? '';
-              const body = rest.slice(gap.length);
-              // After a blank line, a paragraph runs to the next blank line;
-              // after a single newline (a list), the next item is one line.
-              const stop = /\n[ \t]*\n/.test(gap)
-                ? /\r?\n[ \t]*\r?\n|$(?![\s\S])/.exec(body).index
-                : (body.indexOf('\n') + 1 || body.length + 1) - 1;
-              if (!body.slice(0, stop).trim()) throw new Error('nothing after this block to join');
-              const tail = rest.slice(gap.length + stop);
-              text = text.slice(0, end) + (tail || (rest.endsWith('\n') ? '\n' : ''));
-            }
-            // A quoted paragraph's range starts after its "> "; fold it in.
-            const from = quoted ? lineStart + indent.length : start;
-            const was = quoted ? '> ' + current : current;
-            const had = MARKER.exec(was);
-            const want = MARKER.exec(md);
-            const spelled =
-              had && want && kindOf(had) === kindOf(want) && kindOf(want) !== 'quote'
-                ? had[0].replace(/[ \t]+$/, ' ') + md.slice(want[0].length)
-                : md;
-            const block = layout(spelled, indent);
-            let body = block.text;
-            if (typeof msg.after === 'string') {
-              const sep = separator(block.kind, block.m, indent);
-              const cont =
-                block.kind === 'quote' ? indent + '> ' : indent + ' '.repeat(block.marker.length);
-              body += sep + wrap(msg.after, cont);
-            }
-            let next = text.slice(0, from) + body + text.slice(end);
-            const changed = kindOf(had) !== block.kind || isHeading(was) !== isHeading(spelled);
-            return changed ? blankAround(next, from, from + body.length) : next;
-          });
+        // The source of one range, for editing a block as raw markdown.
+        toolbar.on('note-editor:source', (msg) => {
+          const note = read(msg.slug);
+          if (!note) return reply('error', { id: msg.id, message: `No note for “${msg.slug}”.` });
+          try {
+            const { current } = sliceBlock(note.text, note.base, { ...msg, expect: undefined });
+            reply('source', { id: msg.id, hash: note.hash, text: current });
+          } catch (err) {
+            reply('error', { id: msg.id, message: err.message });
+          }
         });
 
-        // Insert a new block after an existing one. `tight` puts it on the next
-        // line (a new item in the same list) instead of after a blank line.
-        toolbar.on('note-editor:insert-after', (msg) => {
-          write(msg, (text, base) => {
-            const { start, end } = slice(text, base, msg);
-            const { indent, quoted } = lead(text, start);
-            const md = String(msg.text ?? '');
-            const block = layout(md, indent);
-            // A quote after a quote stays in the same quote; an item after an
-            // item (tight) in the same list.
-            const sep =
-              block.kind === 'quote' && quoted
-                ? `\n${indent}>\n${indent}`
-                : msg.tight
-                  ? '\n' + indent
-                  : '\n\n' + indent;
-            return text.slice(0, end) + sep + block.text + text.slice(end);
-          });
-        });
+        toolbar.on('note-editor:replace', (msg) =>
+          write(msg, (text, base) => applyReplace(text, base, msg)),
+        );
+
+        toolbar.on('note-editor:insert-after', (msg) =>
+          write(msg, (text, base) => applyInsertAfter(text, base, msg)),
+        );
+
+        // A block's source put back verbatim: fences, tables, MDX comments,
+        // anything the editor shows as text rather than as prose.
+        toolbar.on('note-editor:raw', (msg) =>
+          write(msg, (text, base) => applyRaw(text, base, msg)),
+        );
+
+        // Swap a block with its neighbour.
+        toolbar.on('note-editor:move', (msg) =>
+          write(msg, (text, base) => moveBlock(text, base, msg)),
+        );
+
+        // Undo and redo go through the hash check like any other write, but
+        // step through the history instead of adding to it.
+        const travel = (msg, back) => {
+          const [from, to] = back ? [past, future] : [future, past];
+          write(
+            msg,
+            (text, _base, file) => {
+              const kept = from.get(file);
+              if (!kept?.length) throw new Error(`nothing to ${back ? 'undo' : 'redo'}`);
+              remember(to, file, text);
+              return kept.pop();
+            },
+            { history: false, extra: back ? { undone: true } : { redone: true } },
+          );
+        };
+        toolbar.on('note-editor:undo', (msg) => travel(msg, true));
+        toolbar.on('note-editor:redo', (msg) => travel(msg, false));
 
         // Set, change or remove attributes on a component block (<Figure>,
-        // <Callout>): `set` maps names to strings, true for a bare flag, or
-        // null to remove.
-        const setAttrs = (current, set) => {
-          const tag = readTag(current);
-          for (const [name, value] of Object.entries(set ?? {})) {
-            const gone = value === null || value === undefined || value === false || value === '';
-            const attr = { name, value: value === true ? undefined : quote(value) };
-            const at = tag.attrs.findIndex((a) => a.name === name);
-            if (at >= 0) tag.attrs.splice(at, 1, ...(gone ? [] : [attr]));
-            else if (!gone) tag.attrs.push(attr);
-          }
-          // Keep flags after the values, the way the notes write them.
-          tag.attrs.sort((a, b) => (a.value === undefined) - (b.value === undefined));
-          return writeTag(tag) + current.slice(tag.end);
-        };
+        // <Callout>).
         toolbar.on('note-editor:attrs', (msg) => {
           write(msg, (text, base) => {
-            const { start, end, current } = slice(text, base, { ...msg, expect: undefined });
+            const { start, end, current } = sliceBlock(text, base, { ...msg, expect: undefined });
             return text.slice(0, start) + setAttrs(current, msg.set) + text.slice(end);
           });
         });
 
-        // Title and description live in the front matter.
+        // The note's own settings live in the front matter.
         toolbar.on('note-editor:frontmatter', (msg) => {
-          write(msg, (text) => {
-            const field =
-              msg.field === 'title' ? 'title' : msg.field === 'description' ? 'description' : null;
-            if (!field) throw new Error('only title and description can be edited here');
-            const line = new RegExp(`^${field}:.*$`, 'm');
-            if (!line.test(text)) throw new Error(`${field}: not found in front matter`);
-            return text.replace(
-              line,
-              `${field}: ${JSON.stringify(String(msg.value ?? '').trim())}`,
-            );
-          });
+          write(msg, (text) => setFrontmatter(text, String(msg.field ?? ''), msg.value));
         });
 
         // Images: the ones already under src/assets, and new ones from the page.
@@ -409,20 +294,28 @@ export default function noteEditor() {
 
         // A <Figure> for an image under src/assets, after the given block: the
         // import goes with the others at the top, the block after the anchor.
+        // With `replace`, the block in the range is an existing figure and only
+        // its `src` changes; its alt, caption and layout are left alone.
         toolbar.on('note-editor:figure', (msg) => {
           write(msg, (text, base) => {
             const file = String(msg.file ?? '');
             if (!IMAGE.test(file) || file.includes('..')) throw new Error('not an image');
             if (!existsSync(resolve(root, ASSETS_DIR, file))) throw new Error('image not found');
-            const { end } = slice(text, base, msg);
+            const { start, end, current } = sliceBlock(text, base, msg);
             const rel = `../../assets/${file}`;
             const existing = new RegExp(
               `^import\\s+(\\w+)\\s+from\\s+'${rel.replace(/[.]/g, '\\.')}';?$`,
               'm',
             ).exec(text);
             const name = existing?.[1] ?? importName(file, text);
-            const figure = `\n\n<Figure\n  src={${name}}\n  alt=${quote(msg.alt ?? '')}\n/>`;
-            let next = text.slice(0, end) + figure + text.slice(end);
+            let next;
+            if (msg.replace) {
+              const tag = setAttrs(current, { src: { expr: name } });
+              next = text.slice(0, start) + tag + text.slice(end);
+            } else {
+              const figure = `\n\n<Figure\n  src={${name}}\n  alt=${quote(msg.alt ?? '')}\n/>`;
+              next = text.slice(0, end) + figure + text.slice(end);
+            }
             if (!existing) {
               const line = `import ${name} from '${rel}';`;
               const imports = [...next.matchAll(/^import .*$/gm)];
@@ -438,6 +331,38 @@ export default function noteEditor() {
             }
             return next;
           });
+        });
+
+        // Every note, for linking one to another.
+        toolbar.on('note-editor:notes', (msg) => {
+          reply('notes', { id: msg.id, notes: listNotes(root) });
+        });
+
+        // A new note, from its title alone. Not a write: there is no file yet.
+        toolbar.on('note-editor:create', (msg) => {
+          try {
+            const title = String(msg.title ?? '').trim();
+            const slug = slugify(title);
+            if (!slug || !SLUG.test(slug)) throw new Error('that title makes no slug');
+            if (noteFile(root, slug)) throw new Error(`“${slug}” is taken`);
+            const file = resolve(root, NOTES_DIR, slug + '.mdx');
+            if (!file.startsWith(resolve(root, NOTES_DIR))) throw new Error('bad slug');
+            writeFileSync(file, newNoteText(title, localDate()));
+            reply('created', { id: msg.id, slug, file: relative(root, file) });
+          } catch (err) {
+            reply('error', { id: msg.id, message: err.message });
+          }
+        });
+
+        // Imports left behind by a removed figure: what they are, and taking
+        // them out.
+        toolbar.on('note-editor:check', (msg) => {
+          const note = read(msg.slug);
+          if (!note) return reply('error', { id: msg.id, message: `No note for “${msg.slug}”.` });
+          reply('check', { id: msg.id, orphans: orphanImports(note.text) });
+        });
+        toolbar.on('note-editor:tidy', (msg) => {
+          write(msg, (text) => removeImports(text, orphanImports(text)));
         });
 
         // Where the cursor is, for the Claude Code prompt hook.
@@ -458,6 +383,10 @@ export default function noteEditor() {
                 url: msg.url,
                 block: msg.block ? { line, text: msg.block.text } : null,
                 selection: msg.selection || null,
+                pinned: msg.pinned ?? null,
+                // The `{/* … */}` notes left in the file, so a prompt can be
+                // "do the ones I left for you".
+                notes: mdxComments(note.text),
               },
               null,
               2,
