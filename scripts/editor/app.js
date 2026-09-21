@@ -39,8 +39,10 @@ const KEY_ON = 'note-editor:on';
 const KEY_STASH = 'note-editor:stash';
 const KEY_SCROLL = 'note-editor:scroll';
 const KEY_TEXTS = 'note-editor:texts';
-const KEY_FOCUS = 'note-editor:focus';
-const IDLE_MS = 2000;
+const KEY_MARKS = 'note-editor:marks';
+const KEY_LAST = 'note-editor:last:';
+const IDLE_MS = 900;
+const SAVE_GAP_MS = 600;
 const EDITABLE = 'P, H1, H2, H3, H4, LI, FIGCAPTION';
 const CARD = 'FIGURE, HR, PRE, TABLE, .note-editor-comment';
 const CALLOUT_LABELS = {
@@ -50,7 +52,7 @@ const CALLOUT_LABELS = {
   update: 'Update',
   note: 'Note',
 };
-const TK = /\bTK\b/g;
+const TK = /\bTK\b/;
 
 const slugOf = () => /^\/writing\/([a-z0-9-]+)\/?$/.exec(location.pathname)?.[1] ?? null;
 const escapeHtml = (s) =>
@@ -68,20 +70,35 @@ const caretOffset = (el) => {
   return r.toString().replace(/\u200B/g, '').length;
 };
 
-/** A range over the characters [from, to) of a block's text. */
+/**
+ * Offsets count visible characters: the zero-width spaces the shortcuts
+ * leave behind are skipped, the way caretOffset skips them.
+ */
+const visibleLength = (node) => node.data.replace(/\u200B/g, '').length;
+const rawIndex = (node, visible) => {
+  let seen = 0;
+  for (let i = 0; i < node.data.length; i++) {
+    if (seen === visible && node.data[i] !== '\u200B') return i;
+    if (node.data[i] !== '\u200B') seen++;
+    if (seen === visible && i + 1 === node.data.length) return node.data.length;
+  }
+  return node.data.length;
+};
+
+/** A range over the visible characters [from, to) of a block's text. */
 const rangeOfChars = (el, from, to) => {
   const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
   const range = document.createRange();
   let seen = 0;
   let started = false;
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-    const next = seen + node.data.length;
+    const next = seen + visibleLength(node);
     if (!started && from <= next) {
-      range.setStart(node, from - seen);
+      range.setStart(node, rawIndex(node, from - seen));
       started = true;
     }
     if (started && to <= next) {
-      range.setEnd(node, to - seen);
+      range.setEnd(node, rawIndex(node, to - seen));
       return range;
     }
     seen = next;
@@ -99,17 +116,17 @@ const placeCaret = (el, offset) => {
     el.focus({ preventScroll: true });
     return;
   }
-  while (left > node.data.length) {
+  while (left > visibleLength(node)) {
     const next = walker.nextNode();
     if (!next) {
-      left = node.data.length;
+      left = visibleLength(node);
       break;
     }
-    left -= node.data.length;
+    left -= visibleLength(node);
     node = next;
   }
   const range = document.createRange();
-  range.setStart(node, Math.min(left, node.data.length));
+  range.setStart(node, rawIndex(node, Math.min(left, visibleLength(node))));
   range.collapse(true);
   const sel = getSelection();
   sel.removeAllRanges();
@@ -174,7 +191,6 @@ const SHORTCUTS = [
   ['⌘K', 'Link — with nothing selected, paste a URL; type a title to link a note'],
   ['[[', 'Link to another note, as you type'],
   ['⌘⌥0 · ⌘⌥2 · ⌘⌥3', 'Paragraph · heading · subheading'],
-  ['⌘⇧7 · ⌘⇧8 · ⌘⇧9', 'Numbered list · bullet list · quote'],
   ['/ or +', 'Menu in an empty block: heading, list, quote, divider, image, callout, note to Claude'],
   ['Enter', 'New block (or leave a list or quote from an empty line); on a card, edit it'],
   ['⇧Enter', 'Line break inside the block'],
@@ -182,12 +198,12 @@ const SHORTCUTS = [
   ['Backspace', 'At the start: heading, item or quote back to a paragraph, or join with the block above'],
   ['↑ ↓ ← →', 'Between blocks, onto cards'],
   ['⌘⇧↑ · ⌘⇧↓', 'Move the block up or down'],
-  ['⌘D', 'Duplicate the block'],
   ['⌘Z · ⌘⇧Z', 'Undo · redo the last change to the file'],
+  ['⌘⇧G', 'Next block changed outside the editor; Escape there accepts it, ⌘⌫ puts it back'],
   ['⌘S', 'Save now (it saves when you pause anyway)'],
   ['⌘.', 'Note settings and the ready-to-publish checklist'],
   ['⌘⌥N', 'New note'],
-  ['⌘⇧F', 'Focus mode: dim everything but the block you are in'],
+  ['⌘⇧R', 'Read it back: editing off, then on again with the caret where it was'],
   ['⌘/', 'This list'],
   ['Escape', 'Close what is open, then leave the block'],
 ];
@@ -288,12 +304,15 @@ export default {
     pill.hidden = true;
     pill.innerHTML = `
       <style>
-        div.pill { position: fixed; top: 12px; right: 12px; z-index: 2147483000;
+        div.pill { position: fixed; bottom: 56px; right: 12px; z-index: 2147483000;
           font: 500 12px/1 system-ui, sans-serif; letter-spacing: .02em; color: #1c1b19;
+          font-variant-numeric: tabular-nums;
           background: ${GOLD}; padding: 7px 10px; border-radius: 999px; cursor: pointer;
           box-shadow: 0 1px 6px rgba(0,0,0,.25); display: flex; gap: 8px; align-items: center;
-          transition: background .2s; }
-        div.pill:hover { background: color-mix(in srgb, ${GOLD} 85%, white); }
+          transition: background .2s, opacity .3s; }
+        div.pill:hover { background: color-mix(in srgb, ${GOLD} 85%, white); opacity: 1; }
+        div.pill.is-typing { opacity: .35; }
+        div.pill.is-typing .words, div.pill.is-typing .tk { display: none; }
         div.pill .state { opacity: .75; }
         div.pill .state.is-note { opacity: 1; font-weight: 600; }
         div.pill .words, div.pill .tk { opacity: .6; font-weight: 400; }
@@ -307,6 +326,13 @@ export default {
     const stateEl = pill.querySelector('.state');
     const wordsEl = pill.querySelector('.words');
     const tkEl = pill.querySelector('.tk');
+    // While you type the pill goes quiet: dimmer, and only the save state.
+    let typingTimer = null;
+    const typing = () => {
+      pillEl.classList.add('is-typing');
+      clearTimeout(typingTimer);
+      typingTimer = setTimeout(() => pillEl.classList.remove('is-typing'), 1500);
+    };
     let stateTimer = null;
     /** The save state; with `ms`, a passing message that gives way to it. */
     const setState = (text, ms = 0) => {
@@ -323,14 +349,75 @@ export default {
     const updateWords = () => {
       const prose = article.querySelector('.prose');
       if (!prose) return;
-      const total = wordCount(prose.textContent);
-      const sel = getSelection();
-      const picked =
-        sel && !sel.isCollapsed && article.contains(sel.anchorNode) ? wordCount(sel.toString()) : 0;
-      wordsEl.textContent = picked
-        ? `${picked.toLocaleString()} of ${total.toLocaleString()} words`
-        : `${total.toLocaleString()} words`;
+      wordsEl.textContent = `${wordCount(prose.textContent).toLocaleString()} words`;
       markTK();
+    };
+
+    /* ---- marks: what changed outside the editor, until you have looked ---- */
+    // key (the block's text) -> { before: markdown or null }
+    const marks = new Map(JSON.parse(sessionStorage.getItem(KEY_MARKS) || '[]'));
+    const markKey = (el) => el?.textContent.trim() ?? '';
+    const saveMarks = () => sessionStorage.setItem(KEY_MARKS, JSON.stringify([...marks]));
+    // A quote's paragraph sits inside the quote: one rule for the pair, on the outer one.
+    const isMarked = (b) =>
+      marks.has(markKey(b)) && !marks.has(markKey(b.parentElement?.closest('[data-src]')));
+    const kin = (holder) =>
+      [holder, holder.parentElement?.closest('[data-src]'), ...holder.querySelectorAll('[data-src]')].filter(Boolean);
+    const renderMarks = () => {
+      for (const b of blocks()) b.classList.toggle('note-editor-marked', isMarked(b));
+      const n = article.querySelectorAll('.note-editor-marked').length;
+      if (!n && marks.size) {
+        marks.clear();
+        saveMarks();
+      }
+    };
+    /** Mark blocks as changed outside; `before` is the markdown each held, when known. */
+    const markChanged = (list) => {
+      for (const { el, before } of list) marks.set(markKey(el), { before: before ?? null });
+      saveMarks();
+      renderMarks();
+      if (!list.length) return;
+      for (const { el } of list) {
+        el.classList.add('note-editor-changed');
+        el.addEventListener('animationend', () => el.classList.remove('note-editor-changed'), {
+          once: true,
+        });
+      }
+      const n = list.length;
+      setState(`Changed outside the editor · ${n} block${n > 1 ? 's' : ''} · ⌘⇧G`, 6000);
+    };
+    const acknowledge = (holder) => {
+      for (const el of kin(holder)) marks.delete(markKey(el));
+      saveMarks();
+      renderMarks();
+      setState(marks.size ? `${marks.size} left · ⌘⇧G` : 'Saved', 1500);
+    };
+    /** The next marked block after the caret, wrapping round. */
+    const nextMark = () => {
+      const list = blocks().filter(isMarked);
+      if (!list.length) return setState('Nothing changed outside the editor', 1500);
+      const at = document.activeElement?.closest?.('[data-src]') ?? selectedCard;
+      const i = at ? list.findIndex((b) => b === at || b.contains(at)) : -1;
+      const target = list[(i + 1) % list.length];
+      for (const b of list) b.classList.toggle('is-current', b === target);
+      deselectCard();
+      const el = editableOf(target);
+      if (el) placeCaret(el, 0);
+      else selectCard(target);
+      target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      const before = marks.get(markKey(target))?.before;
+      setState(before ? 'Escape keeps it, ⌘⌫ puts the old text back' : 'Escape keeps it', 3000);
+    };
+    /** Put back what a marked block said before the change outside. */
+    const revertMark = (block) => {
+      const holder = isCard(block) ? block : holderOf(block);
+      const m = marks.get(markKey(holder));
+      if (!m) return;
+      if (!m.before || isCard(holder)) return setState('No earlier text for this block', 2000);
+      for (const el of kin(holder)) marks.delete(markKey(el));
+      saveMarks();
+      dirty.add(block);
+      save(block, { text: m.before }, {});
     };
 
     /* ---- TK: the placeholders still to fill in, counted and lit ---- */
@@ -340,7 +427,7 @@ export default {
       const walker = document.createTreeWalker(article, NodeFilter.SHOW_TEXT);
       for (let node = walker.nextNode(); node; node = walker.nextNode()) {
         if (node.parentElement?.closest('.note-editor-source, .endmatter')) continue;
-        for (const m of node.data.matchAll(TK)) {
+        for (const m of node.data.matchAll(new RegExp(TK, 'g'))) {
           const r = document.createRange();
           r.setStart(node, m.index);
           r.setEnd(node, m.index + 2);
@@ -354,6 +441,7 @@ export default {
     };
     /** Select the next TK after the caret, wrapping round. */
     const nextTK = () => {
+      if (tkRanges.length && !tkRanges[0].startContainer.isConnected) markTK();
       if (!tkRanges.length) return;
       const sel = getSelection();
       const from = sel?.rangeCount ? sel.getRangeAt(0) : null;
@@ -411,9 +499,10 @@ export default {
         to { background: transparent; box-shadow: 0 0 0 8px transparent; } }
       .note-editor-changed { animation: note-editor-flash 2.6s ease-out; border-radius: 2px; }
       @media (prefers-reduced-motion: reduce) { .note-editor-changed { animation: none; outline: 2px solid color-mix(in srgb, ${GOLD} 60%, transparent); outline-offset: 6px; } }
-      article.note-editor-focus :is(.prose > *, .note-header > *):not(:focus-within, .is-selected, :has(.note-editor-source)) {
-        opacity: .28; transition: opacity .35s; }
-      article.note-editor-focus :is(.prose > *, .note-header > *):hover { opacity: .7; }
+      .note-editor-marked { position: relative; }
+      .note-editor-marked::before { content: ''; position: absolute; left: -14px; top: .15em; bottom: .15em; width: 2px;
+        border-radius: 1px; background: ${GOLD}; }
+      .note-editor-marked.is-current::before { width: 4px; left: -15px; }
     `;
 
     /* ---- messaging ---- */
@@ -437,15 +526,27 @@ export default {
     let writing = false;
     let awaitingRefresh = false;
     let writeTimer = null;
+    // The write whose reply is awaited. A reply for any other id is a late
+    // one, after its watchdog gave up on it, and is ignored rather than let
+    // loose on a queue that has moved on.
+    let inFlight = null;
+    // Where the caret goes after each write, by write id: `stash()` fills a
+    // slot, `send` moves the slot under the write's id, and the refresh that
+    // write brings consumes it. Two quick writes no longer share one slot.
+    const stashes = new Map();
+    let lastStashId = null;
     const nextWrite = () => {
       clearTimeout(writeTimer);
       writing = false;
       awaitingRefresh = false;
+      inFlight = null;
       const next = writes.shift();
       if (next) dispatch(next);
     };
     const dispatch = ({ event, payload, id, el, other, index }) => {
       writing = true;
+      inFlight = id;
+      sentWrites.add(id);
       if (el) {
         // Where the block is now: the same element after a refresh in place,
         // or the block at its index after the article was swapped.
@@ -497,6 +598,12 @@ export default {
           other: meta?.other,
           index: el ? blocks().indexOf(el) : -1,
         };
+        const slot = sessionStorage.getItem(KEY_STASH);
+        if (slot) {
+          sessionStorage.removeItem(KEY_STASH);
+          stashes.set(id, JSON.parse(slot));
+          lastStashId = id;
+        }
         if (writing) writes.push(entry);
         else dispatch(entry);
       } else {
@@ -520,13 +627,17 @@ export default {
       pending.delete(msg.id);
       meta?.then?.(msg);
     });
-    let stashFor = null; // the write whose refresh will consume the stash
     server.on('note-editor:saved', (msg) => {
-      take(msg);
       const meta = pending.get(msg.id);
       pending.delete(msg.id);
+      sentWrites.delete(msg.id);
+      if (msg.id !== inFlight) {
+        stashes.delete(msg.id);
+        return; // a late reply; its write was given up on
+      }
+      take(msg);
       // Nothing changed, so no refresh is coming to use the caret stash.
-      if (msg.changed === false && stashFor === msg.id) sessionStorage.removeItem(KEY_STASH);
+      if (msg.changed === false) stashes.delete(msg.id);
       if (msg.changed !== false) {
         // The next write waits for this one's refresh; if none comes, don't wait forever.
         awaitingRefresh = true;
@@ -536,41 +647,82 @@ export default {
       // Typing that landed after the save went out is still unsaved.
       if (meta?.block && baseline.get(meta.block) === blockMarkdown(meta.block))
         dirty.delete(meta.block);
-      if (msg.undone) setState('Undone', 1800);
-      else if (msg.redone) setState('Redone', 1800);
+      lastSavedAt = Date.now();
+      if (msg.undone || msg.redone) {
+        const what = msg.undone ? 'Undone' : 'Redone';
+        setState(msg.outside ? `${what}: a change made outside the editor` : what, msg.outside ? 3500 : 1800);
+      }
       else if (meta?.said) setState(meta.said, 1800);
       else setState(dirty.size ? 'Unsaved' : 'Saved');
       meta?.then?.(msg);
       if (!awaitingRefresh) nextWrite();
       // A `refresh` follows from the server; if the write changed nothing, it won't.
     });
-    server.on('note-editor:stale', () => {
-      setState('Changed elsewhere, reloading');
-      pending.clear();
-      writes.length = 0;
-      writing = false;
-      // The content change that made us stale also triggers Astro's reload.
-    });
-    server.on('note-editor:refresh', (msg) => refresh(msg));
-    server.on('note-editor:error', (msg) => {
-      setState(`Not saved: ${msg.message}`);
-      console.warn('[note-editor]', msg.message);
-      // Don't keep retrying the same rejected text across reloads.
+    server.on('note-editor:stale', (msg) => {
+      // The file changed outside before this write: take the change now, in
+      // place (a block typed in that also changed outside keeps the file's
+      // version and puts the typing aside), then send the unsaved blocks again.
       const meta = pending.get(msg.id);
       pending.delete(msg.id);
+      sentWrites.delete(msg.id);
+      stashes.delete(msg.id);
+      if (msg.id !== inFlight) return;
+      clearTimeout(writeTimer);
+      writing = false;
+      awaitingRefresh = false;
+      inFlight = null;
+      if (meta?.block && isText(meta.block)) dirty.add(meta.block);
+      else if (meta?.block) setState('Not saved: the file changed first. Try again.', 4000);
+      refresh({ ...msg, id: 0, now: true }).then(() => {
+        for (const block of dirty) schedule(block);
+        nextWrite();
+      });
+    });
+    server.on('note-editor:refresh', (msg) => refresh(msg));
+    let kept = null; // typing the file would not take: { index, html }
+    const sentWrites = new Set();
+    server.on('note-editor:error', (msg) => {
+      const meta = pending.get(msg.id);
+      pending.delete(msg.id);
+      stashes.delete(msg.id);
+      const wasWrite = sentWrites.delete(msg.id);
+      if (wasWrite && msg.id !== inFlight) return; // late; its write was given up on
+      console.warn('[note-editor]', msg.message);
+      // Don't keep retrying the same rejected text across reloads.
       if (meta?.block) dirty.delete(meta.block);
       meta?.fail?.(msg.message);
-      sessionStorage.removeItem(KEY_STASH);
-      nextWrite();
+      if (wasWrite) nextWrite();
       // A split that was refused leaves a half on the page the file never had;
       // the only honest page is the file's.
-      if (meta?.block?.nextElementSibling?.__split) setTimeout(() => location.reload(), 800);
+      if (meta?.block?.nextElementSibling?.__split) {
+        setState(`Not saved: ${msg.message}`);
+        setTimeout(() => location.reload(), 800);
+        return;
+      }
+      if (/no longer matches/.test(msg.message) && meta?.block && isText(meta.block)) {
+        // The file moved under this block (Claude, most likely). Keep what was
+        // typed to one side, show the file, and offer the typed version back.
+        kept = { index: blocks().indexOf(holderOf(meta.block)), html: meta.block.innerHTML };
+        setState('The file changed under you: showing it. Your version is in the pill menu.', 8000);
+        hello().then((h) => refresh(h ? { ...h, id: 0 } : { id: 0, fences }));
+        return;
+      }
+      setState(`Not saved: ${msg.message}`);
     });
-    for (const event of ['assets', 'uploaded', 'source', 'notes', 'check']) {
+    const reapplyKept = () => {
+      if (!kept) return;
+      const el = editableOf(blocks()[kept.index] ?? blocks().at(-1));
+      if (!el) return;
+      el.innerHTML = kept.html;
+      kept = null;
+      placeCaret(el, el.textContent.length);
+      schedule(el);
+    };
+    for (const event of ['assets', 'uploaded', 'source', 'notes', 'check', 'git']) {
       server.on(`note-editor:${event}`, (msg) => {
         const meta = pending.get(msg.id);
         pending.delete(msg.id);
-        meta?.then?.(msg.files ?? msg.file ?? msg.text ?? msg.notes ?? msg.orphans ?? msg);
+        meta?.then?.(msg.files ?? msg.file ?? msg.text ?? msg.notes ?? msg.orphans ?? msg.state ?? msg);
       });
     }
     // The server answers in a few ms unless it is busy re-rendering; an old or
@@ -759,16 +911,26 @@ export default {
       const expect = original.get(holder) ?? holder.textContent;
       const message = { ...range, expect, text: blockMarkdown(block), ...structural };
       baseline.set(block, blockMarkdown(block));
-      stashFor = send('replace', message, { block });
+      send('replace', message, { block });
+    };
+    /** Add to the caret stash of the last write sent, or to the slot if none is pending. */
+    const amendStash = (block, extra) => {
+      const s = stashes.get(lastStashId);
+      if (s) Object.assign(s, extra);
+      else stash(block, extra);
     };
 
+    let lastSavedAt = 0;
     const schedule = (block) => {
       dirty.add(block);
       setState('Unsaved');
+      typing();
       clearTimeout(timers.get(block));
+      // Save on a pause, but never within a breath of the previous write.
+      const wait = Math.max(IDLE_MS, lastSavedAt + SAVE_GAP_MS - Date.now());
       timers.set(
         block,
-        setTimeout(() => save(block), IDLE_MS),
+        setTimeout(() => save(block), wait),
       );
       countWords();
     };
@@ -867,7 +1029,7 @@ export default {
       const index = blocks().indexOf(anchor) + 1 + anchor.querySelectorAll('[data-src]').length;
       sessionStorage.setItem(
         KEY_STASH,
-        JSON.stringify({ index, caret: 0, base: null, selectCard: true }),
+        JSON.stringify({ index, caret: 0, base: null, selectCard: true, promptAlt: true }),
       );
       setState('Adding image…');
       send('figure', { file, alt: '' }, { el: anchor });
@@ -888,21 +1050,6 @@ export default {
         );
       };
       reader.readAsDataURL(file);
-    };
-    /** Duplicate a block right after itself. */
-    const duplicate = (block) => {
-      const holder = holderOf(block);
-      if (!holder.dataset.src) return;
-      if (dirty.has(block)) save(block);
-      const text = isCard(holder) ? null : blockMarkdown(block);
-      if (text === null) {
-        // A card: copy its source as it is.
-        ask('source', rangeOf(holder)).then((src) =>
-          insertAfter(holder, src, { selectCard: true, tight: holder.tagName === 'LI' }),
-        );
-        return;
-      }
-      insertAfter(holder, text, { caret: 0, tight: block.tagName === 'LI' });
     };
 
     /**
@@ -1148,7 +1295,7 @@ export default {
           },
           {
             html: '“ ”',
-            title: 'Quote ⌘⇧9',
+            title: 'Quote',
             active: kind === 'quote',
             run: () => convert(block, kind === 'quote' ? 'p' : 'quote'),
           },
@@ -1292,21 +1439,7 @@ export default {
             label: 'Alt text',
             title: img?.alt ? `Alt: ${img.alt}` : 'No alt text yet',
             active: Boolean(img?.alt),
-            run: () =>
-              ui.toolbar.prompt(
-                card.getBoundingClientRect(),
-                {
-                  value: img?.alt ?? '',
-                  placeholder: 'Describe the image for people who cannot see it',
-                  onSubmit: (alt) => {
-                    ui.toolbar.hide();
-                    stash(card, { selectCard: true });
-                    send('attrs', { set: { alt } }, { el: card });
-                  },
-                  onCancel: () => selectCard(card),
-                },
-                { below: true },
-              ),
+            run: () => askAlt(card),
           },
           {
             label: 'Caption',
@@ -1345,6 +1478,25 @@ export default {
         { label: 'Remove', danger: true, run: () => removeCard(card) },
       );
       ui.toolbar.show(card.getBoundingClientRect(), items, { below: true });
+    };
+    /** The alt text, asked for in place; a new figure asks as soon as it lands. */
+    const askAlt = (card) => {
+      const img = card.querySelector(':scope > img');
+      ui.toolbar.prompt(
+        card.getBoundingClientRect(),
+        {
+          value: img?.alt ?? '',
+          placeholder: 'Describe the image for people who cannot see it',
+          onSubmit: (alt) => {
+            ui.toolbar.hide();
+            if (alt === (img?.alt ?? '')) return selectCard(card);
+            stash(card, { selectCard: true });
+            send('attrs', { set: { alt } }, { el: card });
+          },
+          onCancel: () => selectCard(card),
+        },
+        { below: true },
+      );
     };
     const deselectCard = () => {
       if (!selectedCard) return;
@@ -1452,18 +1604,18 @@ export default {
               : value;
         if (text === src) return cancel();
         leave();
-        stash(card, { selectCard: true });
-        setState('Saving…');
-        // No `expect`: the fence line or the tag is not in the page's text; the
-        // file hash already guards against writing over someone else's change.
-        send('raw', { text }, { el: card, said: 'Saved' });
-        if (!text.trim()) {
+        if (text.trim()) stash(card, { selectCard: true });
+        else {
           const index = blocks().indexOf(card);
           sessionStorage.setItem(
             KEY_STASH,
             JSON.stringify({ index: Math.max(0, index - 1), caret: 1e9, base: null }),
           );
         }
+        setState('Saving…');
+        // No `expect`: the fence line or the tag is not in the page's text; the
+        // file hash already guards against writing over someone else's change.
+        send('raw', { text }, { el: card, said: 'Saved' });
       };
       const onKey = (e) => {
         e.stopPropagation();
@@ -1542,12 +1694,37 @@ export default {
       send(which, {}, { fail: () => setState(`Nothing to ${which}`, 1500) });
     };
 
-    /* ---- focus mode ---- */
-    const setFocusMode = (state) => {
-      article.classList.toggle('note-editor-focus', state);
-      sessionStorage.setItem(KEY_FOCUS, state ? '1' : '');
-      setState(state ? 'Focus on' : 'Focus off', 1200);
+    /**
+     * Read it back: editing off, so the page is what a reader gets, and on
+     * again with the caret where it was. The toggle itself is the toolbar's.
+     */
+    const readBack = () => {
+      if (on) {
+        const active = document.activeElement?.closest?.('[contenteditable="true"]');
+        const target = active ?? selectedCard;
+        if (target) {
+          const holder = isCard(target) ? target : holderOf(target);
+          sessionStorage.setItem(
+            KEY_STASH,
+            JSON.stringify({
+              index: blocks().indexOf(holder),
+              caret: active ? (caretOffset(active) ?? 0) : 0,
+              base: null,
+              selectCard: !active,
+            }),
+          );
+        }
+        app.toggleState({ state: false });
+      } else {
+        app.toggleState({ state: true });
+      }
     };
+    document.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.code === 'KeyR') {
+        e.preventDefault();
+        readBack();
+      }
+    });
 
     /* ---- panels: the note's settings, the shortcut list ---- */
     const el = (tag, props = {}, ...children) => {
@@ -1623,7 +1800,6 @@ export default {
         };
         const desc = article.querySelector('.note-header .description')?.textContent.trim() ?? '';
         item(desc && !TK.test(desc), 'A description, for the list and the link preview');
-        TK.lastIndex = 0;
         const noAlt = [...article.querySelectorAll('.prose figure img')].filter((i) => !i.alt.trim());
         item(!noAlt.length, noAlt.length ? `${noAlt.length} image(s) without alt text` : 'Alt text on every image', {
           label: 'Show',
@@ -1661,6 +1837,17 @@ export default {
           orphans.replaceWith(fresh);
         });
         item(!fm.draft, fm.draft ? 'Still a draft' : 'Not a draft: it ships on the next push');
+        const gitRow = item(true, 'Checking git…');
+        ask('git').then((state) => {
+          if (!gitRow.isConnected) return;
+          const text = {
+            clean: 'Committed: nothing to push',
+            modified: 'Differs from what is committed: push when it is ready',
+            untracked: 'Not in git yet',
+            unknown: 'Git status unknown',
+          }[state] ?? 'Git status unknown';
+          gitRow.replaceWith(item(state === 'clean', text));
+        });
         root.append(
           el('div', { className: 'row' }, el('label', { textContent: 'Publishing is a push: commit when it is ready.' })),
         );
@@ -1683,12 +1870,9 @@ export default {
         { label: 'Keyboard shortcuts', hint: '⌘/', run: showShortcuts },
         { label: 'New note', hint: '⌘⌥N', run: newNote },
         { label: 'Undo last change', hint: '⌘Z', run: () => history('undo') },
-        { label: 'Redo', hint: '⌘⇧Z', run: () => history('redo') },
-        {
-          label: article.classList.contains('note-editor-focus') ? 'Focus mode off' : 'Focus mode',
-          hint: '⌘⇧F',
-          run: () => setFocusMode(!article.classList.contains('note-editor-focus')),
-        },
+        { label: 'Read it back', hint: '⌘⇧R', run: readBack },
+        ...(marks.size ? [{ label: `Next changed block (${marks.size})`, hint: '⌘⇧G', run: nextMark }] : []),
+        ...(kept ? [{ label: 'Reapply my version of the block', hint: '', run: reapplyKept }] : []),
         { label: file, hint: 'file', run: () => navigator.clipboard?.writeText(file) },
       ];
       ui.menu.show(rect, items, (item) => item.run());
@@ -1713,11 +1897,27 @@ export default {
         const range = rangeOf(block);
         const copy = block.cloneNode(true);
         for (const el of copy.querySelectorAll('.callout-label')) el.remove();
+        // A heading's section: it and everything after it up to the next
+        // heading of its level or higher, among the note's top-level blocks.
+        let section = null;
+        if (/^H[1-4]$/.test(block.tagName) && block.parentElement?.classList.contains('prose')) {
+          const level = Number(block.tagName[1]);
+          let last = block;
+          for (let sib = block.nextElementSibling; sib; sib = sib.nextElementSibling) {
+            if (/^H[1-4]$/.test(sib.tagName) && Number(sib.tagName[1]) <= level) break;
+            if (sib.dataset.src || sib.querySelector('[data-src]')) last = sib;
+          }
+          const tail = last.dataset.src ? last : [...last.querySelectorAll('[data-src]')].at(-1);
+          const end = tail ? rangeOf(tail).end : range.end;
+          section = { start: range.start, end, title: block.textContent.trim() };
+        }
         send('context', {
           url: location.href,
           block: { ...range, text: copy.textContent.trim().replace(/\s+/g, ' ').slice(0, 400) },
+          section,
           selection: sel.toString().trim().slice(0, 600),
         });
+        rememberLast();
       }, 300);
     };
 
@@ -1749,6 +1949,7 @@ export default {
         document.execCommand('insertText', false, '…');
       }
     };
+    let lastKeyAt = 0;
     let composing = false;
     const onComposition = (e) => {
       composing = e.type === 'compositionstart';
@@ -1899,9 +2100,9 @@ export default {
         // ⌘⇧N is the browser's own (a private window) and cannot be taken.
         e.preventDefault();
         newNote();
-      } else if (e.shiftKey && key === 'f') {
+      } else if (e.shiftKey && e.code === 'KeyG') {
         e.preventDefault();
-        setFocusMode(!article.classList.contains('note-editor-focus'));
+        nextMark();
       } else if (key === '/' && !e.shiftKey) {
         e.preventDefault();
         if (ui.panel.kind() === 'shortcuts') ui.panel.hide();
@@ -1920,15 +2121,16 @@ export default {
     };
 
     const onKeydown = (e) => {
+      lastKeyAt = Date.now();
       if (ui.menu.open && ui.menu.key(e)) return;
       const mod = e.metaKey || e.ctrlKey;
       if (selectedCard && e.target === selectedCard) {
         if (mod && e.shiftKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
           e.preventDefault();
           moveBlock(selectedCard, e.key === 'ArrowUp' ? -1 : 1);
-        } else if (mod && e.key.toLowerCase() === 'd') {
+        } else if (mod && e.key === 'Backspace' && marks.has(markKey(selectedCard))) {
           e.preventDefault();
-          duplicate(selectedCard);
+          revertMark(selectedCard);
         } else if (e.key === 'Backspace' || e.key === 'Delete') {
           e.preventDefault();
           removeCard(selectedCard);
@@ -1942,8 +2144,10 @@ export default {
             newBlockAfter(card, { asListItem: false });
           }
         } else if (e.key === 'Escape') {
+          const card = selectedCard;
           if (ui.panel.open) ui.panel.hide();
-          else deselectCard();
+          else if (marks.has(markKey(card))) acknowledge(card);
+          else if (!moveTo(card, -1, true)) deselectCard();
         } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
           e.preventDefault();
           moveTo(selectedCard, -1, true);
@@ -1993,11 +2197,6 @@ export default {
           askLink(block, caretRect(block));
           return;
         }
-        if (key === 'd') {
-          e.preventDefault();
-          if (kindOf(block) === 'block') duplicate(block);
-          return;
-        }
       }
       if (mod && e.shiftKey && key === 'x') {
         e.preventDefault();
@@ -2010,16 +2209,16 @@ export default {
         if (kindOfBlock(block) !== to) convert(block, to);
         return;
       }
-      if (mod && e.shiftKey && isText(block) && !block.closest('aside') && /^Digit[789]$/.test(e.code)) {
+      if (mod && e.key === 'Backspace' && marks.has(markKey(holderOf(block)))) {
         e.preventDefault();
-        const to = { 7: 'ol', 8: 'ul', 9: 'quote' }[e.code.slice(-1)];
-        convert(block, kindOfBlock(block) === to ? 'p' : to);
+        revertMark(block);
         return;
       }
       if (e.key === 'Escape') {
-        // Step out: the menu, a panel, the bar, then the block.
+        // Step out: the menu, a panel, the bar, a mark, then the block.
         if (ui.panel.open) ui.panel.hide();
         else if (ui.toolbar.open) ui.toolbar.hide();
+        else if (marks.has(markKey(holderOf(block)))) acknowledge(holderOf(block));
         else {
           ui.menu.hide();
           if (isText(block) && /^\/\S*$/.test(block.textContent.replace(/\u00A0/g, ' ').trim())) {
@@ -2060,7 +2259,7 @@ export default {
           // Save this block and carry on in a fresh one once the page is back;
           // if the save is already on its way, just ask for the new block.
           if (dirty.has(block)) save(block, undefined, { openBelow: true });
-          else stash(block, { openBelow: true });
+          else amendStash(block, { openBelow: true });
           return;
         }
         if (kind !== 'block') {
@@ -2311,6 +2510,21 @@ export default {
       showBar();
       countWords();
     };
+    // Switching to the terminal is the moment the file has to be current.
+    const onVisibility = () => {
+      if (document.hidden) saveAll();
+    };
+    let resizeTimer = null;
+    const onResize = () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        if (selectedCard) selectCard(selectedCard);
+        else {
+          showBar();
+          showPlus();
+        }
+      }, 150);
+    };
     let scrollTimer = null;
     const onScroll = () => {
       ui.toolbar.hide();
@@ -2363,7 +2577,15 @@ export default {
     let refreshing = false;
     let refreshAgain = false;
     let refreshWith = null;
+    let outsideTimer = null;
     const refresh = async (shape) => {
+      // A change from outside waits for a pause in the typing: nothing moves
+      // under the caret while it is hot.
+      if (shape?.outside && !shape.now && (Date.now() - lastKeyAt < 1200 || dirty.size || composing)) {
+        clearTimeout(outsideTimer);
+        outsideTimer = setTimeout(() => refresh(shape), 500);
+        return;
+      }
       if (shape?.fences) refreshWith = shape;
       if (refreshing) {
         refreshAgain = true;
@@ -2372,6 +2594,15 @@ export default {
       shape = refreshWith;
       refreshWith = null;
       refreshing = true;
+      if (shape?.id && stashes.has(shape.id)) {
+        sessionStorage.setItem(KEY_STASH, JSON.stringify(stashes.get(shape.id)));
+        stashes.delete(shape.id);
+      }
+      const outside = Boolean(shape?.outside);
+      // What the page says now, to tell afterwards what the outside changed.
+      const was = outside
+        ? blocks().map((b) => ({ text: markKey(b), md: editableOf(b) ? blockMarkdown(editableOf(b)) : null }))
+        : null;
       try {
         const res = await fetch(location.href, { cache: 'no-store' });
         const fresh = new DOMParser()
@@ -2394,19 +2625,25 @@ export default {
         // whose write is queued) does not change the shape yet; the write that
         // adds it brings its own refresh.
         const phantomOk = writes.length > 0 || !article.querySelector('.note-editor-new');
+        // A block's own classes, without the editor's (a comment's class is
+        // the page's: the stamp gives it to both sides).
+        const chrome = (c) => c.replace(/\s*(note-editor-(?!comment)\S+|is-selected|is-current)/g, '').trim();
         const sameShape =
           before.length === after.length &&
           phantomOk &&
           before.every(
             (o, i) =>
               o.tagName === after[i].tagName &&
-              o.className.replace(/\s*(note-editor-\S+|is-selected)/g, '').trim() ===
-                after[i].className.trim(),
+              chrome(o.className) === chrome(after[i].className),
           );
         if (sameShape) {
+          const changed = [];
+          let conflict = false;
           before.forEach((o, i) => {
+            if (outside && markKey(after[i]) !== was[i].text) changed.push({ el: o, before: was[i].md });
             const n = after[i];
             if (n.dataset.src) o.dataset.src = n.dataset.src;
+            const stood = original.get(o);
             original.set(o, n.textContent);
             if (isCard(o) && !o.contains(document.activeElement) && o.innerHTML !== n.innerHTML) {
               // A figure's alt or caption changed, a code block was edited: take
@@ -2429,6 +2666,23 @@ export default {
             // The first half of a split whose write is still queued: the file
             // still holds the whole paragraph, the page already shows the halves.
             if (o.nextElementSibling?.__split) return;
+            if (outside && dirty.has(oe)) {
+              // Unsaved typing here. If the file's block is as it was, the
+              // typing is saved again after this; if it changed too, the
+              // file's version takes the page and the typed one waits in the
+              // pill menu, never merged.
+              if (stood === undefined || stood === n.textContent) return;
+              kept = { index: i, html: oe.innerHTML };
+              clearTimeout(timers.get(oe));
+              timers.delete(oe);
+              dirty.delete(oe);
+              const at = oe === active ? (caretOffset(oe) ?? 0) : null;
+              oe.innerHTML = ne.innerHTML;
+              if (at !== null) placeCaret(oe, Math.min(at, oe.textContent.length));
+              baseline.set(oe, blockMarkdown(oe));
+              conflict = true;
+              return;
+            }
             if (oe === active) {
               // The block being typed in: only take the file's version when
               // nothing typed here is still waiting to be saved.
@@ -2442,6 +2696,11 @@ export default {
             baseline.set(oe, blockMarkdown(oe));
           });
           countWords();
+          if (outside) markChanged(changed);
+          else renderMarks();
+          if (conflict) {
+            setState('This block changed under you: showing the file. Your version is in the pill menu.', 8000);
+          }
           // A card edited in place stays selected; the rest of the stash is moot.
           const s = JSON.parse(sessionStorage.getItem(KEY_STASH) || 'null');
           sessionStorage.removeItem(KEY_STASH);
@@ -2463,6 +2722,8 @@ export default {
         prepare();
         restore();
         setState(dirty.size ? 'Unsaved' : 'Saved');
+        if (outside) markChanged(diffBlocks(was));
+        else renderMarks();
         if (ui.panel.kind() === 'settings') showSettings();
       } catch (err) {
         console.warn('[note-editor] refresh failed, reloading', err);
@@ -2472,10 +2733,22 @@ export default {
         if (refreshAgain) {
           refreshAgain = false;
           refresh();
-        } else if (awaitingRefresh) {
+        } else if (awaitingRefresh && shape?.id === inFlight) {
           nextWrite();
         }
       }
+    };
+    /**
+     * Blocks on the page now whose text was not there before: the change from
+     * outside, with the old markdown of the block that stood in its place.
+     */
+    const diffBlocks = (was) => {
+      const old = new Set(was.map((w) => w.text));
+      const now = new Set(blocks().map(markKey));
+      return blocks()
+        .map((el, i) => ({ el, i }))
+        .filter(({ el }) => !old.has(markKey(el)))
+        .map(({ el, i }) => ({ el, before: was[i] && !now.has(was[i].text) ? was[i].md : null }));
     };
 
     /* ---- turning editing on and off ---- */
@@ -2487,7 +2760,6 @@ export default {
       if (state) {
         document.head.append(style);
         ui.mount();
-        article.classList.toggle('note-editor-focus', Boolean(sessionStorage.getItem(KEY_FOCUS)));
         article.addEventListener('beforeinput', onBeforeInput);
         article.addEventListener('input', onInput);
         article.addEventListener('compositionstart', onComposition);
@@ -2503,16 +2775,17 @@ export default {
         article.addEventListener('drop', onDrop);
         document.addEventListener('selectionchange', onSelection);
         window.addEventListener('scroll', onScroll, { passive: true });
+        window.addEventListener('resize', onResize);
+        document.addEventListener('visibilitychange', onVisibility);
         await hello();
         if (!on) return;
         prepare();
-        restore();
+        if (!restore()) resumeLast();
         showChanged();
       } else {
         saveAll();
         style.remove();
         ui.unmount();
-        article.classList.remove('note-editor-focus');
         if (globalThis.CSS?.highlights) CSS.highlights.delete('note-editor-tk');
         for (const el of article.querySelectorAll('.note-editor-new, .note-editor-source')) el.remove();
         for (const el of article.querySelectorAll('[contenteditable="true"]')) {
@@ -2539,6 +2812,8 @@ export default {
         article.removeEventListener('drop', onDrop);
         document.removeEventListener('selectionchange', onSelection);
         window.removeEventListener('scroll', onScroll);
+        window.removeEventListener('resize', onResize);
+        document.removeEventListener('visibilitychange', onVisibility);
       }
     };
 
@@ -2548,26 +2823,20 @@ export default {
      * without reading the whole note again.
      */
     const showChanged = () => {
+      renderMarks();
       const raw = sessionStorage.getItem(KEY_TEXTS);
       if (!raw) return;
-      const { at, texts, path } = JSON.parse(raw);
-      // Astro often reloads twice for one change; the snapshot from before the
-      // first reload has to outlive the second, or the flash is lost with it.
-      if (Date.now() - at > 4000) sessionStorage.removeItem(KEY_TEXTS);
-      if (path !== location.pathname) return; // another note's snapshot
-      const was = new Set(texts);
-      const changed = blocks().filter((b) => !was.has(b.textContent.trim()));
-      if (!changed.length) return;
-      for (const b of changed) {
-        b.classList.add('note-editor-changed');
-        b.addEventListener('animationend', () => b.classList.remove('note-editor-changed'), {
-          once: true,
-        });
-      }
-      setState(`Changed outside the editor · ${changed.length} block${changed.length > 1 ? 's' : ''}`, 5000);
-      const first = changed[0].getBoundingClientRect();
-      if (first.bottom < 0 || first.top > innerHeight) {
-        changed[0].scrollIntoView({ block: 'center', behavior: 'smooth' });
+      const snap = JSON.parse(raw);
+      sessionStorage.removeItem(KEY_TEXTS);
+      // Same note, different file: what is here now that was not, is what
+      // changed while the page was away. The marks it makes outlive Astro's
+      // second reload, so nothing is lost to it.
+      if (snap.path !== location.pathname || snap.hash === hash) return;
+      const changed = diffBlocks(snap.was);
+      markChanged(changed);
+      const first = changed[0]?.el.getBoundingClientRect();
+      if (first && (first.bottom < 0 || first.top > innerHeight)) {
+        changed[0].el.scrollIntoView({ block: 'center', behavior: 'smooth' });
       }
     };
 
@@ -2580,7 +2849,7 @@ export default {
         scrollTo(0, Number(y));
       }
       const raw = sessionStorage.getItem(KEY_STASH);
-      if (!raw) return;
+      if (!raw) return y !== null;
       sessionStorage.removeItem(KEY_STASH);
       const s = JSON.parse(raw);
       let index = s.index;
@@ -2608,6 +2877,7 @@ export default {
       if (s.selectCard && isCard(holder)) {
         selectCard(holder);
         holder.scrollIntoView({ block: 'nearest' });
+        if (s.promptAlt) askAlt(holder);
         return;
       }
       const el = editableOf(holder);
@@ -2622,10 +2892,10 @@ export default {
           el.innerHTML = s.html;
           schedule(el);
         } else {
-          console.warn(
-            '[note-editor] dropped unsaved typing: the block changed underneath it',
-            s.html,
-          );
+          // The block changed underneath the typing: the file's version shows,
+          // the typed one waits in the pill menu.
+          kept = { index: s.index, html: s.html };
+          setState('This block changed under you: showing the file. Your version is in the pill menu.', 8000);
         }
       }
       placeCaret(el, s.focusNext ? 0 : Math.min(s.caret ?? 0, el.textContent.length));
@@ -2640,6 +2910,43 @@ export default {
       // Enter was pressed in a new block: carry on in the next one.
       if (s.openBelow) newBlockAfter(holder);
       showPlus();
+      return true;
+    };
+    /**
+     * Opening a note lands where you last were in it: the same block, at the
+     * same height on the screen, remembered per note across sessions.
+     */
+    const rememberLast = () => {
+      const active = document.activeElement?.closest?.('[contenteditable="true"]') ?? selectedCard;
+      if (!active) return;
+      const holder = isCard(active) ? active : holderOf(active);
+      const index = blocks().indexOf(holder);
+      if (index < 0) return;
+      try {
+        localStorage.setItem(
+          KEY_LAST + slug,
+          JSON.stringify({
+            index,
+            caret: isCard(active) ? 0 : (caretOffset(active) ?? 0),
+            top: holder.getBoundingClientRect().top,
+            text: markKey(holder).slice(0, 40),
+          }),
+        );
+      } catch {}
+    };
+    const resumeLast = () => {
+      let s = null;
+      try {
+        s = JSON.parse(localStorage.getItem(KEY_LAST + slug) || 'null');
+      } catch {}
+      if (!s) return;
+      const holder = blocks()[s.index];
+      if (!holder || markKey(holder).slice(0, 40) !== s.text) return;
+      const el = editableOf(holder);
+      if (el) placeCaret(el, Math.min(s.caret, el.textContent.length));
+      else if (isCard(holder)) selectCard(holder);
+      else return;
+      scrollBy({ top: holder.getBoundingClientRect().top - s.top });
     };
 
     // Before a refresh or reload: keep the caret, and any text typed since the
@@ -2654,6 +2961,9 @@ export default {
         return;
       }
       const previous = JSON.parse(sessionStorage.getItem(KEY_STASH) || '{}');
+      // A write that lands on a card (an image just added, a source edit)
+      // has said where to go; the caret's own place does not override it.
+      if (previous.selectCard || previous.editSource) return;
       const structural = previous.focusNext || previous.focusPrev;
       const typedSince =
         !structural && dirty.has(active) && baseline.get(active) !== blockMarkdown(active);
@@ -2674,17 +2984,20 @@ export default {
       if (!on) return;
       sessionStorage.setItem(KEY_SCROLL, String(scrollY));
       // What every block said, so the ones a reload changes can be pointed out.
-      const previous = JSON.parse(sessionStorage.getItem(KEY_TEXTS) || 'null');
-      if (!previous || Date.now() - previous.at > 4000) {
-        sessionStorage.setItem(
-          KEY_TEXTS,
-          JSON.stringify({
-            at: Date.now(),
-            path: location.pathname,
-            texts: blocks().map((b) => b.textContent.trim()),
-          }),
-        );
-      }
+      sessionStorage.setItem(
+        KEY_TEXTS,
+        JSON.stringify({
+          hash,
+          path: location.pathname,
+          was: blocks().map((b) => ({
+            text: markKey(b),
+            md: editableOf(b) ? blockMarkdown(editableOf(b)) : null,
+          })),
+        }),
+      );
+      // A write still in flight keeps its caret stash for the page that comes back.
+      const s = stashes.get(lastStashId);
+      if (s && !sessionStorage.getItem(KEY_STASH)) sessionStorage.setItem(KEY_STASH, JSON.stringify(s));
       stashCurrent();
     });
 

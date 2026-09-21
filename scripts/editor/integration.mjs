@@ -14,6 +14,7 @@
  * The MDX file stays the only source of truth. Every write is a plain file
  * write; Astro re-renders the page afterwards.
  */
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { basename, extname, join, relative, resolve } from 'node:path';
@@ -120,6 +121,9 @@ export default function noteEditor() {
         // change from anywhere else in that window is caught by the next
         // write's hash check instead.
         let last = null;
+        // The hash of each note as the editor last wrote it, so a change on
+        // disk can be told apart from the editor's own write.
+        const written = new Map();
         const hot = server.environments.client.hot;
         const rawSend = hot.send.bind(hot);
         hot.send = (...args) => {
@@ -178,7 +182,10 @@ export default function noteEditor() {
         const write = (msg, edit, { history = true, extra } = {}) => {
           const note = read(msg.slug);
           if (!note) return reply('error', { id: msg.id, message: `No note for “${msg.slug}”.` });
-          if (msg.hash !== note.hash) return reply('stale', { id: msg.id, hash: note.hash });
+          // The file moved on since the page last saw it (a change from outside
+          // that the page has not taken yet): send its shape, and the page
+          // refreshes in place and sends the write again.
+          if (msg.hash !== note.hash) return reply('stale', { id: msg.id, outside: true, ...shape(note.text) });
           let next;
           try {
             next = edit(note.text, note.base, note.file);
@@ -194,13 +201,34 @@ export default function noteEditor() {
           }
           const after = shape(next);
           last = { id: msg.id, until: Date.now() + 2000, shape: { id: msg.id, ...after } };
+          written.set(note.file, after.hash);
           writeFileSync(note.file, next);
           reply('saved', { id: msg.id, ...after, changed: true, ...extra });
         };
 
+        // A note the page has said hello for is watched. A change to it that
+        // the editor did not write (Claude, a text editor) is sent to the page
+        // as a refresh flagged `outside`, and the reload Astro sends for it is
+        // swallowed like the editor's own: the page updates in place, keeps
+        // its caret, and marks what changed. Anything else still reloads.
+        const open = new Set();
+        server.watcher.on('change', (path) => {
+          const file = resolve(path);
+          if (!open.has(file) || !existsSync(file)) return;
+          const text = readFileSync(file, 'utf8');
+          const current = shape(text);
+          if (written.get(file) === current.hash) return;
+          written.set(file, current.hash);
+          last = { id: 0, until: Date.now() + 2000, shape: { id: 0, outside: true, ...current } };
+          // Astro is about to re-render; let it, then ask for the in-place refresh.
+          setTimeout(() => toolbar.send('note-editor:refresh', last.shape), 150);
+        });
+
         toolbar.on('note-editor:hello', (msg) => {
           const note = read(msg.slug);
           if (!note) return reply('error', { id: msg.id, message: `No note for “${msg.slug}”.` });
+          open.add(note.file);
+          if (!written.has(note.file)) written.set(note.file, note.hash);
           reply('hello', { id: msg.id, file: relative(root, note.file), ...shape(note.text) });
         });
 
@@ -239,6 +267,10 @@ export default function noteEditor() {
         // step through the history instead of adding to it.
         const travel = (msg, back) => {
           const [from, to] = back ? [past, future] : [future, past];
+          // An undo that starts from text the editor never wrote is undoing a
+          // change made outside it (Claude, an editor); the page says so.
+          const note = read(msg.slug);
+          const outside = Boolean(note && written.has(note.file) && written.get(note.file) !== note.hash);
           write(
             msg,
             (text, _base, file) => {
@@ -247,7 +279,7 @@ export default function noteEditor() {
               remember(to, file, text);
               return kept.pop();
             },
-            { history: false, extra: back ? { undone: true } : { redone: true } },
+            { history: false, extra: { ...(back ? { undone: true } : { redone: true }), outside } },
           );
         };
         toolbar.on('note-editor:undo', (msg) => travel(msg, true));
@@ -356,6 +388,26 @@ export default function noteEditor() {
 
         // Imports left behind by a removed figure: what they are, and taking
         // them out.
+        // Whether the note differs from what is committed: publishing is a push.
+        toolbar.on('note-editor:git', (msg) => {
+          const note = read(msg.slug);
+          if (!note) return reply('git', { id: msg.id, state: 'unknown' });
+          try {
+            const out = execFileSync('git', ['status', '--porcelain', '--', note.file], {
+              cwd: root,
+              encoding: 'utf8',
+              timeout: 3000,
+            });
+            const code = out.slice(0, 2);
+            reply('git', {
+              id: msg.id,
+              state: !out.trim() ? 'clean' : code.includes('?') ? 'untracked' : 'modified',
+            });
+          } catch {
+            reply('git', { id: msg.id, state: 'unknown' });
+          }
+        });
+
         toolbar.on('note-editor:check', (msg) => {
           const note = read(msg.slug);
           if (!note) return reply('error', { id: msg.id, message: `No note for “${msg.slug}”.` });
@@ -371,8 +423,17 @@ export default function noteEditor() {
           if (!note) return;
           const dir = join(root, '.astro');
           if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-          const start = note.base + (msg.block?.start ?? 0);
-          const line = note.text.slice(0, start).split('\n').length;
+          const lineAt = (offset) => note.text.slice(0, note.base + offset).split('\n').length;
+          const line = lineAt(msg.block?.start ?? 0);
+          // A heading's scope runs to the next heading of its level or higher;
+          // the page sends the range, the lines are counted here.
+          const section = msg.section
+            ? {
+                title: msg.section.title,
+                from: lineAt(msg.section.start),
+                to: lineAt(Math.max(msg.section.start, msg.section.end - 1)),
+              }
+            : null;
           writeFileSync(
             join(root, CONTEXT_FILE),
             JSON.stringify(
@@ -381,9 +442,10 @@ export default function noteEditor() {
                 file: relative(root, note.file),
                 slug: msg.slug,
                 url: msg.url,
+                scope: msg.selection ? 'selection' : section ? 'section' : msg.block ? 'block' : null,
                 block: msg.block ? { line, text: msg.block.text } : null,
+                section,
                 selection: msg.selection || null,
-                pinned: msg.pinned ?? null,
                 // The `{/* … */}` notes left in the file, so a prompt can be
                 // "do the ones I left for you".
                 notes: mdxComments(note.text),

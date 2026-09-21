@@ -155,11 +155,14 @@ formatting fixes need no update block.
 Under `npm run dev` only, a note can be edited on the page itself, the way a post is edited in
 Ghost. Open the note, click the pencil (**Edit note**) in Astro's dev toolbar at the bottom of
 the window, and click into any paragraph, heading, list item, quote, callout, caption, the title
-or the description. Text is written back into the MDX file when you pause, leave the block or
-press ⌘S. The page updates in place, without a reload, and the caret stays where it was. A pill
-in the top right shows the save state, the word count (or how many of the total are selected),
-and a TK count you can click to jump to the next one. Click the pill for a menu: note settings,
-shortcuts, new note, undo, redo, focus mode, and the file path.
+or the description. Text is written back into the MDX file about a second after you stop typing,
+or right away if you leave the block or press ⌘S. Opening a note lands where you last were in it,
+same block, same height on screen, remembered per note.
+
+A pill sits bottom right, above Astro's own toolbar. While you type it dims and shows only the
+save state; the word count and TK count come back when you stop. Click it for a menu: note
+settings, shortcuts, new note, undo, "Read it back", the file path, and, while any blocks changed
+outside the editor remain unread, "Next changed block".
 
 **Markdown as you type.** `**bold**`, `*italic*`, `` `code` ``, `~~struck~~` and `[text](url)`
 convert the moment you close them. At the start of a block, `## ` and `### ` make a heading,
@@ -183,45 +186,62 @@ a new line after a quote line); Enter in the middle splits it; Enter on an empty
 line leaves the list or quote. ⌘Enter opens a paragraph after whatever the block sits in, which
 is how you get out of a callout. Backspace at the start of a paragraph joins it to the one
 above. Arrow keys move between blocks, including onto cards; ⌘⇧↑ and ⌘⇧↓ move the current block
-(or a selected card) past its neighbour, and ⌘D duplicates it.
+(or a selected card) past its neighbour.
 
 **Cards.** A figure, divider, code block, table, or note to Claude is a card: click it, or arrow
-onto it, to select. Backspace removes any card, Enter opens a paragraph after it, and a figure's
-bar also sets alt text, caption, the wide layout, and Replace, which swaps in another image from
-`src/assets/`. Anything the editor can't edit in place, such as a code block, a table, a note to
-Claude, or a component it doesn't know, is a card too: Enter, or a double-click, opens its source
-in a plain monospace box, a code block's with its language shown. ⌘Enter keeps the change,
-Escape leaves it as it was, and clicking away keeps it too.
+onto it, to select. Backspace removes any card, Enter opens a paragraph after it, Escape moves
+the caret to the block above, and a figure's bar also sets alt text, caption, the wide layout,
+and Replace, which swaps in another image from `src/assets/`. Anything the editor can't edit in
+place, such as a code block, a table, a note to Claude, or a component it doesn't know, is a card
+too: Enter, or a double-click, opens its source in a plain monospace box, a code block's with its
+language shown. ⌘Enter keeps the change, Escape leaves it as it was, and clicking away keeps it
+too.
 
 **Adding things.** In an empty block, type `/` (or click the `+` in the margin) for a menu:
 heading, subheading, bullet list, numbered list, quote, divider, image, callout, and a note to
 Claude. *Image* lists everything under `src/assets/`; dropping or pasting an image file onto
-the page uploads it to `src/assets/<note>/` and adds a figure, with the import written for you.
-Pasted text keeps its markdown and its links, and a pasted passage lands as separate paragraphs.
-A note to Claude is an MDX comment (`{/* … */}`): a small gold card in dev, nothing at all in a
-build.
+the page uploads it to `src/assets/<note>/`, adds a figure with the import written for you, and
+opens the alt-text prompt straight away. Pasted text keeps its markdown and its links, and a
+pasted passage lands as separate paragraphs. A note to Claude is an MDX comment (`{/* … */}`):
+a small gold card in dev, nothing at all in a build.
+
+**Changes from outside the editor**, from Claude Code or another editor, arrive in place: the
+page updates without a reload and the caret stays put. The blocks that changed get a thin gold
+rule at the left, which stays until you have looked at them, across reloads. If you are typing
+when a change comes in, it waits for a pause. ⌘⇧G walks the marked blocks; Escape on a marked
+block accepts it; ⌘⌫ on one puts the earlier text back, when the editor still knows it. The pill
+menu lists "Next changed block" while any remain.
+
+If a block you are typing in is changed outside the editor at the same time, the file's version
+takes the page and your typed version waits in the pill menu as "Reapply my version of the
+block". Nothing is merged silently.
 
 **Undo** (⌘Z) and **redo** (⌘⇧Z) step back and forward through the file's history for as long as
 the dev server keeps running, including over a change Claude made from the terminal; unsaved
-typing in a block still undoes within that block first. ⌘. opens the note's settings: draft and
-featured toggles, published and updated dates, tags, the file path (click to copy), and a
-ready-to-publish checklist: a description is set, every image has alt text, no TK is left, no
-notes to Claude are left, no unused imports remain (a *Tidy* button removes them), and draft is
-off. Publishing itself is still a plain push.
+typing in a block still undoes within that block first. Undo or redo that crosses a change made
+outside the editor says so in the pill. ⌘⇧R, "Read it back", turns editing off and then on again
+with the caret where it was, a quick way to read the page as a reader would.
+
+⌘. opens the note's settings: draft and featured toggles, published and updated dates, tags, the
+file path (click to copy), and a ready-to-publish checklist: a description is set, every image
+has alt text, no TK is left, no notes to Claude are left, no unused imports remain (a *Tidy*
+button removes them), draft is off, and a git row: committed, differs from what is committed, or
+not in git yet. Publishing itself is still a plain push.
 
 ⌘⌥N, or the pencil on any page that isn't a note, asks for a title and creates
 `src/content/writing/<slug>.mdx` with today's date, `draft: true` and a description of `TK`, then
-opens it with its first block ready to type into. ⌘⇧F is focus mode, dimming everything but the
-block the caret is in. ⌘/ lists every shortcut, including a few not mentioned above: ⌘⇧X for
-strikethrough, ⌘⌥0/2/3 for paragraph, heading and subheading, ⌘⇧7/8/9 for numbered list, bullet
-list and quote. Escape steps out of whatever is open one level at a time, then out of the block.
+opens it with its first block ready to type into. ⌘/ lists every shortcut, including a few not
+mentioned above: ⌘⇧X for strikethrough, ⌘⌥0/2/3 for paragraph, heading and subheading. Escape
+steps out of whatever is open one level at a time, then out of the block.
 
 The editor also records which block the cursor is in (`.astro/editor-context.json`), and the
 Claude Code hook in `.claude/settings.json` (and the Codex one in `.codex/hooks.json`) passes
 that along with every prompt, along with the text of any open notes to Claude, listed under
 "Notes left in the file for you". So with the caret in a paragraph, "tighten this" or "add a
-callout after this" needs no further pointing. Claude's edits land in the file, the page reloads
-as before, and the blocks whose text changed flash gold, with the pill saying how many.
+callout after this" needs no further pointing. The context file carries a scope: block, section,
+or selection. When the caret is in a heading, the scope is the section instead, that heading down
+to the next of the same or higher level, written with its line range, and the prompt hook says
+so.
 
 All of it lives in `scripts/editor/` and is inert outside `astro dev`: production HTML carries
 no `data-src` stamps and no editor code, and `npm run verify` checks that. Removing a figure

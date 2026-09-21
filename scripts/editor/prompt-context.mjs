@@ -18,6 +18,11 @@ try {
   if (ctx.block) {
     lines.push(`Cursor is in the block starting at line ${ctx.block.line}: “${ctx.block.text}”`);
   }
+  if (ctx.section) {
+    lines.push(
+      `That block is the heading of the section “${ctx.section.title}”, lines ${ctx.section.from}–${ctx.section.to}; “this section” means those lines.`,
+    );
+  }
   if (ctx.selection) lines.push(`Selected text: “${ctx.selection}”`);
   lines.push('"This" or "here" in the prompt refers to that block unless it says otherwise.');
   // The `{/* … */}` comments in the note: things left for Claude to pick up.

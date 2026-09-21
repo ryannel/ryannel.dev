@@ -40,7 +40,7 @@ const CSS = `
     align-items: center; justify-content: center; cursor: pointer; color: ${GOLD}; border: 1px solid color-mix(in srgb, ${GOLD} 55%, transparent);
     font: 18px/1 system-ui, sans-serif; background: transparent; opacity: .6; }
   .note-editor-plus:hover { opacity: 1; }
-  .note-editor-panel { position: fixed; top: 52px; right: 12px; width: min(340px, calc(100vw - 24px)); max-height: calc(100vh - 70px);
+  .note-editor-panel { position: fixed; bottom: 92px; right: 12px; width: min(340px, calc(100vw - 24px)); max-height: calc(100vh - 110px);
     overflow-y: auto; padding: 14px 16px 16px; z-index: 2147482500; }
   .note-editor-panel h2 { margin: 0 0 10px; font: 600 13px/1 system-ui, sans-serif; color: ${GOLD}; letter-spacing: .04em; text-transform: uppercase; }
   .note-editor-panel h2 + h2, .note-editor-panel .row + h2 { margin-top: 18px; }
