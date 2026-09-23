@@ -2689,6 +2689,10 @@ export default {
               // The block being typed in: only take the file's version when
               // nothing typed here is still waiting to be saved.
               if (dirty.has(oe) || oe.innerHTML === ne.innerHTML) return;
+              // Same markdown means the save only trimmed the block (a space
+              // just typed at the end); swapping the markup in would take that
+              // space from under the caret.
+              if (blockMarkdown(oe) === blockMarkdown(ne)) return;
               const at = caretOffset(oe) ?? 0;
               oe.innerHTML = ne.innerHTML;
               placeCaret(oe, Math.min(at, oe.textContent.length));
