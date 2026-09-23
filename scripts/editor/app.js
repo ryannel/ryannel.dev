@@ -1432,8 +1432,8 @@ export default {
       card.focus({ preventScroll: true });
       const kind = cardKind(card);
       const items = [];
-      if (kind === 'figure' && card.querySelector(':scope > img')) {
-        const img = card.querySelector(':scope > img');
+      if (kind === 'figure' && card.querySelector(':scope img')) {
+        const img = card.querySelector(':scope img');
         items.push(
           {
             label: 'Alt text',
@@ -1446,7 +1446,9 @@ export default {
             active: Boolean(card.querySelector('figcaption')),
             run: () => editCaption(card),
           },
-          {
+          // Figure.astro refuses a wide figure under 1152px; don't offer what would break the page.
+          (card.classList.contains('figure-wide') ||
+            Number(card.querySelector('[data-width]')?.dataset.width) >= 1152) && {
             label: 'Wide',
             active: card.classList.contains('figure-wide'),
             run: () => {
@@ -1477,11 +1479,11 @@ export default {
         { label: '↓', title: 'Move down ⌘⇧↓', run: () => moveBlock(card, 1) },
         { label: 'Remove', danger: true, run: () => removeCard(card) },
       );
-      ui.toolbar.show(card.getBoundingClientRect(), items, { below: true });
+      ui.toolbar.show(card.getBoundingClientRect(), items.filter(Boolean), { below: true });
     };
     /** The alt text, asked for in place; a new figure asks as soon as it lands. */
     const askAlt = (card) => {
-      const img = card.querySelector(':scope > img');
+      const img = card.querySelector(':scope img');
       ui.toolbar.prompt(
         card.getBoundingClientRect(),
         {

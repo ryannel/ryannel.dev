@@ -1,5 +1,5 @@
 ---
-import { Image } from 'astro:assets';
+import { Image, getImage } from 'astro:assets';
 
 /**
  * An image or committed SVG diagram, with space reserved before it loads.
@@ -16,6 +16,18 @@ import { Image } from 'astro:assets';
  *      are required so the browser can reserve the right box:
  *
  *        <Figure src="/diagrams/x.svg" alt="..." width={640} height={280} />
+ *
+ * Two sizes, and nothing in between. The column (624px) is the default: it suits
+ * screenshots, diagrams and anything with text in it, which should read at body
+ * size. `wide` (1152px) is for illustrations where the detail is the point, and
+ * the source has to be at least that wide — a smaller one would sit in the wide
+ * frame at some third size of its own. Either way an image is never upscaled,
+ * and never taller than 85% of the screen: a tall one gets narrower instead.
+ *
+ * Every figure opens in a viewer when there is more of it to see than the page
+ * shows: on a phone that is nearly all of them, on a desktop mostly the wide
+ * ones. The viewer loads the full-size file only when it is opened. Without
+ * JavaScript the same link simply opens that file.
  *
  * Images below the fold load lazily. Pass `eager` for one that genuinely appears
  * in the first viewport, and `priority` only for one that is the largest thing
@@ -64,6 +76,21 @@ if (typeof src === 'string' && (!width || !height)) {
   );
 }
 
+const sourceWidth = typeof src === 'string' ? width! : src.width;
+const sourceHeight = typeof src === 'string' ? height! : src.height;
+const name = typeof src === 'string' ? src : src.src;
+
+/** The wide frame: 72rem at a 16px root. */
+const WIDE_WIDTH = 1152;
+
+if (wide && sourceWidth < WIDE_WIDTH) {
+  throw new Error(
+    `<Figure src="${name}" wide> is ${sourceWidth}px across, and a wide figure ` +
+      `needs at least ${WIDE_WIDTH}px — it is never upscaled, so it would sit in ` +
+      `the wide frame at a size of its own. Drop \`wide\`, or export it larger.`,
+  );
+}
+
 /*
  * The column is 624px at its widest (--measure 39rem + the two 1.5rem gutters),
  * so 1248px covers a 2x display at full width and 1872px covers 3x. Nothing
@@ -91,6 +118,17 @@ const baseWidth =
   typeof src === 'string' ? undefined : Math.min(src.width, widths ? Math.max(...widths) : MAX_WIDTH);
 
 /*
+ * What the viewer opens. It is only fetched when someone asks for it, so it can
+ * be larger than anything the page shows, but it is still bounded: an 8000px
+ * original is not something to send to a phone that tapped a picture.
+ */
+const ZOOM_MAX = 2560;
+const zoomWidth = Math.min(sourceWidth, ZOOM_MAX);
+const zoomHeight = Math.round((sourceHeight * zoomWidth) / sourceWidth);
+const zoomHref =
+  typeof src === 'string' ? src : (await getImage({ src, width: zoomWidth, quality: 85 })).src;
+
+/*
  * Below 42rem (the wrap's own max-width) the image fills the viewport minus the
  * gutters; above it the column stops growing at 624px. Using the desktop width
  * for everything above 40rem overstated it by up to 32px in the 640-672px band.
@@ -99,40 +137,61 @@ const DISPLAY_SIZES = '(min-width: 42rem) 624px, calc(100vw - 3rem)';
 
 const loading = eager || priority ? 'eager' : 'lazy';
 const fetchpriority = priority ? 'high' : 'auto';
+
+// Read by the CSS below: never wider than the source, never taller than the screen.
+const frame = `--figure-width: ${sourceWidth}px; --figure-ratio: ${(sourceWidth / sourceHeight).toFixed(4)}`;
 ---
 
-<figure class:list={{ 'figure-wide': wide }} data-src={dataSrc}>
-  {
-    typeof src === 'string' ? (
-      <img
-        src={src}
-        alt={alt}
-        width={width}
-        height={height}
-        loading={loading}
-        fetchpriority={fetchpriority}
-        decoding="async"
-      />
-    ) : (
-      <Image
-        src={src}
-        alt={alt}
-        width={baseWidth}
-        widths={responsiveWidths}
-        sizes={sizes ?? (wide ? '(min-width: 75rem) 1152px, calc(100vw - 3rem)' : DISPLAY_SIZES)}
-        loading={loading}
-        fetchpriority={fetchpriority}
-        decoding="async"
-        quality={85}
-      />
-    )
-  }
+<figure class:list={{ 'figure-wide': wide }} style={frame} data-src={dataSrc}>
+  <a class="figure-zoom" href={zoomHref} data-width={zoomWidth} data-height={zoomHeight}>
+    {
+      typeof src === 'string' ? (
+        <img
+          src={src}
+          alt={alt}
+          width={width}
+          height={height}
+          loading={loading}
+          fetchpriority={fetchpriority}
+          decoding="async"
+        />
+      ) : (
+        <Image
+          src={src}
+          alt={alt}
+          width={baseWidth}
+          widths={responsiveWidths}
+          sizes={sizes ?? (wide ? '(min-width: 75rem) 1152px, calc(100vw - 3rem)' : DISPLAY_SIZES)}
+          loading={loading}
+          fetchpriority={fetchpriority}
+          decoding="async"
+          quality={85}
+        />
+      )
+    }
+  </a>
   {caption && <figcaption>{caption}</figcaption>}
 </figure>
 
 <style>
+  /*
+   * The link carries the size, so the image's box — and what can be clicked —
+   * is exactly the picture, centred when it is narrower than the frame.
+   */
+  .figure-zoom {
+    display: block;
+    width: min(100%, var(--figure-width), calc(85svh * var(--figure-ratio)));
+    margin-inline: auto;
+    cursor: default;
+  }
+  .figure-zoom[href] {
+    cursor: zoom-in;
+  }
+  .figure-zoom :global(img) {
+    width: 100%;
+  }
   .figure-wide {
-    width: min(72rem, calc(100vw - 3rem));
+    width: min(72rem, calc(100vw - var(--gutter) * 2));
     max-width: none;
     position: relative;
     left: 50%;
@@ -148,5 +207,273 @@ const fetchpriority = priority ? 'high' : 'auto';
       left: auto;
       transform: none;
     }
+    .figure-zoom {
+      width: min(100%, var(--figure-width));
+    }
   }
 </style>
+
+<style is:global>
+  /* The viewer is built by the script below, so its styles cannot be scoped. */
+  .lightbox {
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #e7e5df;
+    overflow: hidden;
+  }
+  .lightbox[open] {
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+  /* Solid: the page behind is no help, and page text showing through the caption is noise. */
+  .lightbox::backdrop {
+    background: #0c0c0b;
+  }
+  html:has(.lightbox[open]) {
+    overflow: hidden;
+  }
+
+  .lightbox-stage {
+    container-type: size;
+    display: flex;
+    overflow: auto;
+    overscroll-behavior: contain;
+    padding: 0;
+  }
+
+  /*
+   * Fitted: as large as the stage allows, never past the file's own pixels.
+   * `margin: auto` rather than centring the flex line, so that when the image is
+   * zoomed past the stage its top and left edges can still be scrolled to.
+   */
+  .lightbox-img {
+    display: block;
+    margin: auto;
+    width: min(100cqw, var(--lightbox-width), calc(100cqh * var(--lightbox-ratio)));
+    height: auto;
+    max-width: none;
+    touch-action: manipulation;
+  }
+  .lightbox.can-zoom .lightbox-img {
+    cursor: zoom-in;
+  }
+  /* Zoomed: one pixel of the file to one CSS pixel. Pan by scrolling. */
+  .lightbox.is-zoomed .lightbox-img {
+    width: var(--lightbox-width);
+    cursor: zoom-out;
+  }
+
+  .lightbox-caption {
+    max-width: 39rem;
+    margin: 0 auto;
+    padding: 0.75rem var(--gutter) max(1rem, env(safe-area-inset-bottom));
+    font-family: var(--font-ui);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    color: #a5a29a;
+    text-align: center;
+  }
+  .lightbox-caption:empty {
+    display: none;
+  }
+
+  .lightbox-close {
+    position: fixed;
+    top: max(0.5rem, env(safe-area-inset-top));
+    right: max(0.5rem, env(safe-area-inset-right));
+    display: grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: rgb(12 12 11 / 0.6);
+    color: #e7e5df;
+    cursor: pointer;
+  }
+  .lightbox-close:hover {
+    background: rgb(12 12 11 / 0.85);
+  }
+  .lightbox-close:focus-visible {
+    outline: 2px solid #8fb8d4;
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .lightbox[open],
+    .lightbox[open]::backdrop {
+      animation: lightbox-in 160ms ease-out;
+    }
+  }
+  @keyframes lightbox-in {
+    from {
+      opacity: 0;
+    }
+  }
+</style>
+
+<script>
+  /*
+   * The viewer. Built on <dialog>, so the browser handles the modal part: the
+   * page behind goes inert, Escape closes it, and focus is trapped inside.
+   * Everything here is an enhancement of a plain link to the full-size file.
+   */
+
+  // Worth opening only when the viewer can show it at least this much larger.
+  const MORE = 1.25;
+
+  const links = () => document.querySelectorAll<HTMLAnchorElement>('a.figure-zoom');
+
+  /**
+   * A link with nothing more to show drops its href, which makes it an inert
+   * placeholder rather than a link that does nothing: no tab stop, no pointer.
+   * Rechecked whenever its size changes, so rotating a phone brings it back.
+   */
+  const refresh = (link: HTMLAnchorElement) => {
+    link.dataset.href ??= link.getAttribute('href') ?? '';
+    const more = Number(link.dataset.width) > link.clientWidth * MORE;
+    if (more) {
+      link.setAttribute('href', link.dataset.href);
+      link.setAttribute('aria-haspopup', 'dialog');
+    } else {
+      link.removeAttribute('href');
+      link.removeAttribute('aria-haspopup');
+    }
+  };
+  const sizes = new ResizeObserver((entries) => {
+    for (const entry of entries) refresh(entry.target as HTMLAnchorElement);
+  });
+  links().forEach((link) => {
+    refresh(link); // now, rather than on the observer's first frame
+    sizes.observe(link);
+  });
+
+  let dialog: HTMLDialogElement | null = null;
+  let stage: HTMLDivElement;
+  let image: HTMLImageElement;
+  let caption: HTMLParagraphElement;
+  let opener: HTMLAnchorElement | null = null;
+  // Whether the entry opening the viewer added is still in history. A flag, not
+  // history.state: a reload keeps the state, and trusting it would send Back off the page.
+  let pushed = false;
+
+  const build = () => {
+    dialog = document.createElement('dialog');
+    dialog.className = 'lightbox';
+    dialog.setAttribute('aria-label', 'Image viewer');
+    dialog.innerHTML = `
+      <div class="lightbox-stage"><img class="lightbox-img" alt="" decoding="async"></div>
+      <p class="lightbox-caption"></p>
+      <button class="lightbox-close" type="button" aria-label="Close" autofocus>
+        <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" fill="none"
+          stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+          <path d="M5 5l10 10M15 5L5 15" />
+        </svg>
+      </button>`;
+    document.body.append(dialog);
+    stage = dialog.querySelector('.lightbox-stage')!;
+    image = dialog.querySelector('.lightbox-img')!;
+    caption = dialog.querySelector('.lightbox-caption')!;
+
+    dialog.querySelector('.lightbox-close')!.addEventListener('click', () => dialog!.close());
+
+    // A click on the picture zooms, or closes one that cannot zoom; anywhere else closes.
+    dialog.addEventListener('click', (e) => {
+      if (e.target !== image) {
+        if (!(e.target as Element).closest('.lightbox-close, .lightbox-caption')) dialog!.close();
+        return;
+      }
+      if (dialog!.classList.contains('can-zoom')) zoom(e);
+      else dialog!.close();
+    });
+
+    dialog.addEventListener('close', () => {
+      // Closed from inside the page: take back the history entry opening it added.
+      if (pushed) {
+        pushed = false;
+        history.back();
+      }
+      dialog!.classList.remove('is-zoomed', 'can-zoom');
+      image.removeAttribute('src');
+      opener?.focus({ preventScroll: true });
+      opener = null;
+    });
+
+    // The back gesture closes the viewer instead of leaving the page.
+    window.addEventListener('popstate', () => {
+      pushed = false;
+      if (dialog!.open) dialog!.close();
+    });
+
+    // A new window size changes whether there is anything to zoom into.
+    new ResizeObserver(() => dialog!.open && fit()).observe(stage);
+  };
+
+  /** Zoom is offered only when the fitted picture is smaller than the file. */
+  const fit = () => {
+    const more = Number(opener!.dataset.width) > image.clientWidth * MORE;
+    const zoomed = dialog!.classList.contains('is-zoomed');
+    dialog!.classList.toggle('can-zoom', more || zoomed);
+  };
+
+  /** Toggle between fitted and one-to-one, keeping the clicked point under the pointer. */
+  const zoom = (e: MouseEvent) => {
+    const before = image.getBoundingClientRect();
+    const fx = (e.clientX - before.left) / before.width;
+    const fy = (e.clientY - before.top) / before.height;
+    const zoomed = dialog!.classList.toggle('is-zoomed');
+    if (!zoomed) return fit();
+    const after = image.getBoundingClientRect();
+    stage.scrollLeft += after.left + fx * after.width - e.clientX;
+    stage.scrollTop += after.top + fy * after.height - e.clientY;
+  };
+
+  const open = (link: HTMLAnchorElement) => {
+    if (!dialog) build();
+    opener = link;
+    const shown = link.querySelector('img')!;
+    const full = link.dataset.href ?? link.href;
+    const width = Number(link.dataset.width);
+    const height = Number(link.dataset.height);
+
+    dialog!.style.setProperty('--lightbox-width', `${width}px`);
+    dialog!.style.setProperty('--lightbox-ratio', String(width / height));
+    image.width = width;
+    image.height = height;
+    image.alt = shown.alt;
+    caption.textContent = link.closest('figure')?.querySelector('figcaption')?.textContent ?? '';
+
+    // Show the copy already on the page at once, and swap in the full one when it has decoded.
+    image.src = shown.currentSrc || shown.src;
+    const loader = new Image();
+    loader.src = full;
+    loader
+      .decode()
+      .then(() => {
+        if (opener === link) image.src = full;
+      })
+      .catch(() => {});
+
+    history.pushState(null, '');
+    pushed = true;
+    dialog!.showModal();
+    fit();
+  };
+
+  document.addEventListener('click', (e) => {
+    // Something else (the dev editor) has claimed this click, or the reader wants a new tab.
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey)
+      return;
+    const link = (e.target as Element).closest?.<HTMLAnchorElement>('a.figure-zoom[href]');
+    if (!link) return;
+    e.preventDefault();
+    open(link);
+  });
+</script>
