@@ -28,26 +28,24 @@ import labelsPair from '../../assets/atlas-experiment/labels-pair.jpg';
 <Figure
   src={world}
   alt="The complete Lantern Sea world map, with a small gold rectangle on the royal capital and an inset in the lower right showing that rectangle at full size: a castle with blue roofs above a walled town, a river and fields."
-  caption="The whole map, with the marked piece at its own pixels. All of it is painted at that detail."
+  caption="A map worth exploring."
   priority
   wide
 />
 
-I’ve always been drawn to maps. Old hand-painted ones with compass stars and sea monsters. The
-hand-drawn ones on the first pages of a fantasy novel. The road atlases my parents would unfold
-across the whole front of the car on family holidays. A good map makes you want to trace a road
-with your finger and wonder what is at the end of it. Now and then I’ve doodled my own, using
-tools like Inkarnate and Dungeondraft, chasing that feeling. There was always a world in my
-head, and what ended up on the page was never it.
+I’ve always been drawn to maps. Old ones with compass stars and sea monsters. The hand-drawn
+ones on the first pages of a fantasy novel. The road atlases my parents would unfold across the
+whole front of the car on family holidays. A good map makes you want to trace a road with your
+finger and wonder what’s at the end of it. Now and then I’ve doodled my own, using tools like
+Inkarnate and Dungeondraft, chasing that feeling, but never quite getting there.
 
 When GPT-6 Astra came out with its new image model, I wanted another go.
 
-Ten days, 433 turns with the agent and 300 million tokens later, I have one.
-12,000 by 8,000 pixels, painted in 81 overlapping pieces, and every one of them is worth
-zooming into.
+Ten days, 433 turns with the agent and 300 million tokens later, and I have one. 12,000 by
+8,000 pixels, painted in 81 overlapping pieces, and every one of them is worth zooming into.
 
 I like it. It isn’t perfect: the cities are a little warped in places, and some of the tiles
-still don’t quite line up. But it is closer to the map in my head than anything I have ever
+still don’t quite line up. But it’s closer to the map in my head than anything I have ever
 managed to get down. Better still, you could make one of your own by the weekend.
 
 Here’s how.
@@ -102,7 +100,7 @@ was after, and by the evening it landed here.
 
 Individual trees. Little settlements with proper roofs, tucked into slopes and shores. Rivers
 you can follow and a sea that glows. This painting became the reference for everything that
-followed, the style and the coastlines both.
+followed.
 
 ## 2. Populate the world
 
@@ -123,10 +121,10 @@ room for all the diversity of that setting.
 
 ## 3. Paint the first tile
 
-Now paint one piece of it, at the size it will be seen. Mine was the tile with the capital in
-it. This is where it either comes together or doesn’t, so re-roll until you’re happy. It is
-also where you decide how places are shown. A town can be a handful of roofs, a marker, or
-something in between. Whatever you choose here, every later tile copies.
+Now paint one piece of it, at full size. This is where it either comes together or doesn’t, so
+re-roll until you’re happy. It is also where you decide how places are shown. A town can be a
+handful of roofs, a marker, or something in between. Whatever you choose here, every later tile
+copies.
 
 I went with cities as landmarks: each painted into the land so it belongs there, but bigger
 and bolder than it should be, so it still reads from a long way out. A castle you can spot
@@ -135,18 +133,18 @@ from the whole-world view, then lean into.
 <Figure
   src={crownmere}
   alt="The capital Crownmere at full resolution: a castle with blue slate roofs on a rise above a river bend, a walled town below it, a bridge, quays with boats, and fields and hedgerows all around."
-  caption="Crownmere. The castle is far too big for the town, on purpose."
+  caption="Oversized castles as map markers."
   wide
 />
 
 ## 4. Paint the rest, one tile at a time
 
 With the first tile right, the rest of the map is the same thing, done eighty more times. The
-world is cut into a grid of tiles, each 1,536 by 1,024 pixels because that is what GPT Image 2
-paints, and each overlapping its neighbours by a couple of hundred pixels. Then the agent
-loops. It draws a rough guide for the next tile and copies in the painted edges of any
-finished neighbours. It paints. It checks that every river and road carries on across the
-joins, and repaints the patch that didn’t.
+world is cut into a grid of tiles, each 1,536 by 1,024 pixels, the maximum size that GPT Image
+2 supports, and each overlapping its neighbours by a couple of hundred pixels. Then the agent
+loops. It draws a rough guide for the next tile and copies in the painted edges of any finished
+neighbours. It paints. It checks that every river and road carries on across the joins, and
+repaints anything that’s broken.
 
 <Figure
   src={tileGrid}
@@ -168,10 +166,7 @@ width and the light it has to match.
   wide
 />
 
-Then you look at the join. Where two tiles overlap, the kit cuts them along the line where
-they differ least, and the agent brings you a strip across it at full size. The question
-isn’t whether the seam shows. It’s whether the river and the road carry on through it. A seam
-can be invisible and still pinch a riverbank or double a row of trees.
+The biggest thing the agent focuses on is ensuring that the roads and rivers all line up.
 
 <Figure
   src={tileJoin}
@@ -201,10 +196,8 @@ Do that eighty times and the map closes up.
 
 ## 5. Labels last
 
-The names go on last, as a separate layer over the painting. You place them from the
-finished painting, not the plan, because the model will happily put a town a couple of
-hundred pixels from where you asked. The painting underneath stays clean. Rename everything
-later, or lift the whole thing into a different setting, and you repaint nothing.
+The names go on last, as a separate layer over the painting, so it’s easy to change as you’d
+like.
 
 <Figure
   src={labelsPair}
@@ -213,8 +206,6 @@ later, or lift the whole thing into a different setting, and you repaint nothing
   wide
 />
 
-## What you end up with
+## Make your own
 
-It took me a while to work the process out, but it is in place now, and a weekend is enough.
-What you get is a map you can zoom into, where every tile is painted at full size and each one
-has something to discover. Somewhere in it is a road you will want to trace with your finger.
+Everything above is in the kit. Clone it, type `$map-director and build your own!`
