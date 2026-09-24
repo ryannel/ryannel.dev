@@ -12,7 +12,7 @@ const CSS = `
   .note-editor-ui { position: absolute; z-index: 2147482000; font: 13px/1.3 system-ui, sans-serif;
     color: #f4f1ea; background: #1c1b19; border-radius: 8px; box-shadow: 0 6px 24px rgba(0,0,0,.28), 0 0 0 1px rgba(255,255,255,.08);
     user-select: none; -webkit-user-select: none; }
-  .note-editor-ui[hidden] { display: none; }
+  .note-editor-ui[hidden], .note-editor-plus[hidden] { display: none; }
   .note-editor-bar { display: flex; align-items: stretch; padding: 3px; gap: 1px; white-space: nowrap; }
   .note-editor-bar button, .note-editor-bar select { all: unset; box-sizing: border-box; min-width: 30px; height: 30px; padding: 0 8px;
     display: inline-flex; align-items: center; justify-content: center; border-radius: 5px; cursor: pointer;
