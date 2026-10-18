@@ -17,8 +17,8 @@ header{padding:15px 24px;gap:16px}.brand{display:flex;align-items:baseline;min-w
 
 /* Embedded artwork sits directly on the article's paper, including its dark grain. */
 html.is-embedded,html.is-embedded body,html:has(body.embedded),body.embedded{background:transparent}
-.embedded .toolbar,.embedded .caption{border:0;padding-inline:0}
-.embedded .toolbar{padding-top:0;padding-bottom:12px}
+.embedded .toolbar,.embedded .caption{border:0;padding-inline:2%}
+.embedded .toolbar{padding-top:0;padding-bottom:8px}
 .embedded .map-credit{display:none}
 button{border-radius:999px}
 .embedded button{font-size:13px;min-height:36px;padding:4px 12px}

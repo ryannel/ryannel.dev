@@ -53,6 +53,10 @@ const { title = 'Explore the Lantern Sea: a zoomable painted world map' } = Astr
     window.addEventListener('message', (event: MessageEvent) => {
       if (event.origin !== location.origin || event.source !== frame.contentWindow) return;
       if (event.data?.type === 'lantern-sea:ready') syncTheme();
+      if (event.data?.type === 'lantern-sea:layout' && Number.isFinite(event.data.height)
+        && event.data.height >= 100 && event.data.height <= 2000) {
+        figure.style.setProperty('--map-height', `${event.data.height}px`);
+      }
       if (event.data?.type === 'lantern-sea:expanded' && typeof event.data.expanded === 'boolean') expand(event.data.expanded);
     });
     document.addEventListener('keydown', (event: KeyboardEvent) => {
@@ -75,7 +79,7 @@ const { title = 'Explore the Lantern Sea: a zoomable painted world map' } = Astr
   iframe {
     display: block;
     width: 100%;
-    height: clamp(26rem, 76svh, 48rem);
+    height: var(--map-height, calc(min(72rem, 100vw - var(--gutter) * 2) * 2 / 3 + 80px));
     border: 0;
     color-scheme: inherit;
     background: transparent;
@@ -102,7 +106,4 @@ const { title = 'Explore the Lantern Sea: a zoomable painted world map' } = Astr
   }
   .map-explorer.is-expanded iframe { height: 100%; min-height: 0; border: 0; }
   .map-explorer.is-expanded figcaption { display: none; }
-  @media (max-width: 40rem) {
-    iframe { height: 72svh; min-height: 25rem; }
-  }
 </style>

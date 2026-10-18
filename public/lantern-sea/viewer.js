@@ -26,7 +26,7 @@
   const view = {cx: 0, cy: 0, scale: 1, fit: true};
   let W = 0, H = 0, DPR = 1, frame = 0, flight = 0, queue = [], wanted = new Set();
   let mode = config.modes.labels ? 'labels' : 'artwork', started = false, lastGesture = null;
-  let detailTimer = 0, detailAfter = 0;
+  let detailTimer = 0, detailAfter = 0, publishedHeight = 0;
   let saveTimer = 0, receivedBytes = 0, receivedTiles = 0;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   $('labels').checked = mode === 'labels';
@@ -215,6 +215,8 @@
         const value = event.data.tokens?.[key];
         if (typeof value === 'string' && value.length < 600) document.documentElement.style.setProperty(key, value);
       }
+      publishedHeight = 0;
+      publishLayout();
     }
     if (event.data?.type === 'lantern-sea:collapse') {
       setExpanded(false);
@@ -277,10 +279,22 @@
       view.fit = false; deferDetail(); constrain(); schedule(); savePosition();
     }
   });
+  function publishLayout() {
+    if (!embedded || parent === window || document.body.classList.contains('expanded')) return;
+    // The article frame follows the painting's aspect ratio plus its actual controls.
+    // It must not use the current frame height, which would create a resize feedback loop.
+    const chrome = document.querySelector('.toolbar').getBoundingClientRect().height
+      + document.querySelector('.caption').getBoundingClientRect().height;
+    const preferred = Math.ceil(stage.clientWidth * height / width + chrome);
+    if (preferred === publishedHeight) return;
+    publishedHeight = preferred;
+    parent.postMessage({type: 'lantern-sea:layout', height: preferred}, location.origin);
+  }
   window.addEventListener('pageshow', event => { if (embedded && event.persisted && started) fit(false); });
   new ResizeObserver(() => {
     W = stage.clientWidth; H = stage.clientHeight;
     if (!W || !H) return;
+    publishLayout();
     DPR = Math.min(2, devicePixelRatio || 1);
     canvas.width = Math.round(W * DPR); canvas.height = Math.round(H * DPR);
     if (!started) {
