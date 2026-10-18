@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Explore the Lantern Sea, a 100-megapixel painted fantasy world. Zoom from continents to individual houses without loading the full image.">
+<title>The Lantern Sea · Map explorer</title>
+<link rel="canonical" href="https://ryannel.dev/lantern-sea/">
+<meta property="og:image" content="https://ryannel.dev/og.png">
+<link rel="stylesheet" href="viewer.css">
+</head>
+<body>
+<header><div class="brand"><h1>The Lantern Sea</h1><p>Terrain · settlements · journeys</p></div><nav aria-label="About this map"><a href="https://ryannel.dev/projects/painting-a-100-megapixel-world/" target="_blank" rel="noopener">About the map</a><a href="https://github.com/ryannel/experiments/tree/main/map_creation" target="_blank" rel="noopener">How it’s built ↗</a></nav></header>
+<main>
+<div class="toolbar" role="group" aria-label="Map controls">
+<button id="fit">Fit map</button><button id="native">Actual detail</button>
+<div class="zoom-controls"><button id="out" aria-label="Zoom out">−</button><output id="zoom" aria-label="Zoom level">…</output><button id="in" aria-label="Zoom in">+</button></div>
+<label class="words"><input id="labels" type="checkbox" checked autocomplete="off"> Place names</label>
+<button id="full" aria-pressed="false">Expand map</button>
+</div>
+<div id="stage" tabindex="0" role="region" aria-label="Zoomable map of the Lantern Sea" aria-describedby="help"><canvas aria-label="Painted map of the Lantern Sea"></canvas><div id="message" role="alert" hidden></div><div class="map-credit" aria-hidden="true">12,276 × 8,184 · painted in 81 pieces</div></div>
+<div class="caption"><span id="help"><span class="desktop-help">Drag to explore · scroll or pinch to zoom · double-click for a closer look</span><span class="touch-help">Drag to pan · pinch to zoom</span></span><span class="load-status"><span id="status" role="status">Loading overview…</span> <button id="retry" hidden>Retry</button></span></div>
+</main>
+<footer><span>100 megapixels. Only the detail you’re looking at is loaded.</span><a href="README.md" target="_blank" rel="noopener">Artwork and provenance ↗</a></footer>
+<noscript><p>Enable JavaScript to explore, or <a href="overview.jpg">view the small overview</a>.</p></noscript>
+<script src="viewer.js" defer></script>
+</body>
+</html>

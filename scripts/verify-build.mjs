@@ -12,6 +12,7 @@
  */
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
+import { createHash } from 'node:crypto';
 
 const DIST = process.argv[2] ?? 'dist';
 const SITE = 'https://ryannel.dev';
@@ -158,6 +159,25 @@ for (const { path, html } of pages) {
 for (const { path, html } of pages) {
   check(!html.includes('data-src='), `${path}: carries editor source stamps`);
   check(!html.includes('note-editor'), `${path}: references the dev-only editor`);
+}
+
+// --- 9. the map viewer is the complete, unchanged upstream delivery -----------
+const mapFolder = join(DIST, 'lantern-sea');
+if (existsSync(mapFolder)) {
+  try {
+    const provenance = JSON.parse(read(join(mapFolder, 'source.json')));
+    const config = JSON.parse(read(join(mapFolder, 'map.json')));
+    const names = walk(mapFolder)
+      .map(file => relative(mapFolder, file).split(sep).join('/'))
+      .filter(name => name !== 'source.json').sort();
+    const digest = createHash('sha256');
+    for (const name of names) digest.update(name + '\0').update(readFileSync(join(mapFolder, name)));
+    check(names.length === provenance.files, 'map explorer: files missing or added after synchronization');
+    check(digest.digest('hex') === provenance.sha256, 'map explorer: delivery differs from the upstream checksum');
+    check(config.revision === provenance.artworkRevision, 'map explorer: stale artwork provenance');
+  } catch (error) {
+    check(false, `map explorer: invalid or missing delivery (${error.message})`);
+  }
 }
 
 if (failures.length) {

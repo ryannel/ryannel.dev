@@ -1,0 +1,25 @@
+{
+  "title": "The Lantern Sea",
+  "width": 12276,
+  "height": 8184,
+  "tileSize": 512,
+  "overlap": 1,
+  "maxLevel": 14,
+  "quality": 90,
+  "modes": {
+    "artwork": {
+      "source_file": "world-artwork-unlabelled-v1.png",
+      "source_sha256": "ce6d3443bc29b8d6d158d35788e080e665fc77ffb980f5216f4514faa4778e5f",
+      "tile_count": 522
+    },
+    "labels": {
+      "source_file": "world-labelled-v1.png",
+      "source_sha256": "840597007ef8705de0bdbdcc8901c72b80cba8397db9bb87e7fb8768252c1fc4",
+      "tile_count": 522
+    }
+  },
+  "revision": "6c9dda2ab5e1",
+  "source_release": "world-atlas-complete-v1",
+  "review_status": "Source record: agent review complete; user review of the eastern expansion pending.",
+  "delivery": "Lossy WebP tiles at native dimensions; original PNG masters remain in the source project."
+}

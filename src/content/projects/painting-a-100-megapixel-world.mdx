@@ -9,7 +9,11 @@ tags: ["experiments", "generative", "world-building"]
 links:
   - label: "The map-making kit on GitHub"
     href: "https://github.com/ryannel/experiments/tree/main/map_creation"
+  - label: "Explore the full map"
+    href: "/lantern-sea/index.html"
 ---
+
+import MapExplorer from '../../components/MapExplorer.astro';
 
 import world from '../../assets/atlas-experiment/world-and-detail.jpg';
 import asterfall from '../../assets/atlas-experiment/asterfall.jpg';
@@ -238,3 +242,16 @@ and the labels.
 
 It took me ten days. With the process already worked out, you could have one of your own by the
 weekend.
+
+
+## Explore the world
+
+Here’s the whole map. Drag to wander, pinch to get closer, or hold Ctrl (⌘ on a Mac) and
+scroll to zoom. “Actual detail” takes you down to the houses, boats and footpaths. Turn off
+“Place names” to see just the painting; “Fit map” brings the whole world back into view.
+
+<MapExplorer />
+
+The explorer loads small pieces as you move, so you can look around without downloading the
+huge original image. The [viewer, tiles and the process behind the map](https://github.com/ryannel/experiments/tree/main/map_creation)
+are together in the experiment repository.

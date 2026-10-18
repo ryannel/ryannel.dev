@@ -581,3 +581,16 @@ with `light-dark()` like everything else.
 correct without JavaScript, but the HTML spec picks the *first* matching `theme-color`, so an
 override cannot simply be appended — `ThemeToggle.astro` removes both and owns a single tag
 instead, and updates it when the OS flips while "system" is selected.
+
+
+## The Lantern Sea explorer
+
+The map article embeds `src/components/MapExplorer.astro`, an iframe using the standalone static viewer in `public/lantern-sea/`. It loads local WebP tiles; it never loads the full 100-megapixel PNG. The iframe is lazy-loaded, and unmodified wheel scrolling passes through to the article; Ctrl/⌘-scroll, pinch, drag and the buttons explore the map.
+
+The authoritative viewer, build recipe and selected-artwork provenance live in the public `experiments/map_creation` repo. The website contains a self-contained delivery copy, with its source revision and combined checksum in `public/lantern-sea/source.json`. To refresh it after reviewing an upstream change:
+
+```sh
+node scripts/sync-map-explorer.mjs /path/to/map_creation/showcase/explorer
+```
+
+The sync copies only the named viewer files and expected tiles. `npm run verify` checks the built delivery against the combined source checksum, catching missing tiles and accidental edits to the copy. Edit the upstream viewer and resync rather than maintaining two implementations. No source checkout is needed to build or serve this site after syncing. The original narrative figures remain in the article; the explorer is at the end for free exploration.

@@ -1,0 +1,91 @@
+---
+interface Props {
+  title?: string;
+}
+const { title = 'Explore the Lantern Sea: a zoomable painted world map' } = Astro.props;
+---
+
+<figure class="map-explorer" data-map-explorer>
+  <iframe
+    src="/lantern-sea/index.html?embed=1"
+    title={title}
+    loading="lazy"
+    allow="fullscreen"
+    allowfullscreen
+  ></iframe>
+  <figcaption>
+    <span>From continents to individual houses.</span>
+    <a href="/lantern-sea/index.html" target="_blank" rel="noopener">Open the full explorer ↗</a>
+  </figcaption>
+  <noscript><p><a href="/lantern-sea/overview.jpg">View the map overview.</a> Interactive exploration needs JavaScript.</p></noscript>
+</figure>
+
+<script>
+  for (const figure of document.querySelectorAll<HTMLElement>('[data-map-explorer]')) {
+    const frame = figure.querySelector<HTMLIFrameElement>('iframe');
+    if (!frame) continue;
+    let previousOverflow: string | undefined;
+    const expand = (expanded: boolean) => {
+      if (expanded === figure.classList.contains('is-expanded')) return;
+      figure.classList.toggle('is-expanded', expanded);
+      if (expanded) {
+        previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+      } else {
+        document.body.style.overflow = previousOverflow ?? '';
+        previousOverflow = undefined;
+      }
+    };
+    window.addEventListener('message', (event: MessageEvent) => {
+      if (event.origin !== location.origin || event.source !== frame.contentWindow) return;
+      if (event.data?.type === 'lantern-sea:expanded' && typeof event.data.expanded === 'boolean') expand(event.data.expanded);
+    });
+    document.addEventListener('keydown', (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && figure.classList.contains('is-expanded')) {
+        frame.contentWindow?.postMessage({type: 'lantern-sea:collapse'}, location.origin);
+        expand(false);
+      }
+    });
+  }
+</script>
+
+<style>
+  .map-explorer {
+    width: min(72rem, calc(100vw - var(--gutter) * 2));
+    max-width: none;
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+  iframe {
+    display: block;
+    width: 100%;
+    height: clamp(26rem, 76svh, 48rem);
+    border: 1px solid var(--rule);
+    background: #f7f5ef;
+  }
+  figcaption {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: .5rem 1.25rem;
+    margin-top: .75rem;
+    font: .8125rem/1.5 var(--font-ui);
+    color: var(--ink-muted);
+  }
+  .map-explorer.is-expanded {
+    position: fixed;
+    inset: 0;
+    left: 0;
+    width: 100vw;
+    height: 100dvh;
+    margin: 0;
+    transform: none;
+    z-index: 100;
+  }
+  .map-explorer.is-expanded iframe { height: 100%; min-height: 0; border: 0; }
+  .map-explorer.is-expanded figcaption { display: none; }
+  @media (max-width: 40rem) {
+    iframe { height: 72svh; min-height: 25rem; }
+  }
+</style>
