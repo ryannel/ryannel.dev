@@ -1,0 +1,230 @@
+---
+title: "A picture wheel for learning to smell"
+description: "I find smell hard to notice and harder to name, so I made a wheel of scents with a photograph for each one. Here’s how it works, and how it was made."
+published: 2026-10-18
+featured: false
+draft: false
+tags: ["experiments", "generative"]
+links:
+  - label: "Source, skill and prompts on GitHub"
+    href: "https://github.com/ryannel/experiments/tree/main/olfactory_taxonomy"
+  - label: "The full atlas, to zoom around"
+    href: "/olfactory-atlas/index.html"
+  - label: "Related project — Experiments"
+    href: "/projects/#experiments"
+---
+
+import AtlasViewer from '../../components/AtlasViewer.astro';
+import atlas from '../../assets/olfactory-atlas/atlas.webp';
+import fragranceWheel from '../../assets/olfactory-atlas/fragrance-wheel.png';
+import wineWheel from '../../assets/olfactory-atlas/wine-aroma-wheel.jpg';
+import citrusFamily from '../../assets/olfactory-atlas/citrus-family.jpg';
+
+<Figure
+  src={atlas}
+  alt="A large circular wheel made of photographs: lemons and herbs, rose petals and fruit, spices and amber, wood and moss, each wedge labelled with a scent family, and the words Olfactory Atlas in a cream circle at the centre."
+  caption="The Olfactory Atlas. 20 families, 82 scents, 318 labels and 130 photographs."
+  priority
+  wide
+/>
+
+Smell isn’t really part of my world. If someone is making coffee in the morning, I don’t
+notice it. If you point it out, I can usually find it, but I have to go looking. And because
+I’ve never paid it much attention, I don’t have the words. I’ve never really thought about how
+an orange smells different from a lemon.
+
+That might be attention, or it might be my nose. I don’t know.
+
+What I do know is that I like perfume, because it pulls that world out in front of me on
+purpose. My wife and I buy tasting flights: small vials of five or six perfumes to try side
+by side. We’ve also started playing with aroma compounds, the raw materials perfumers work with. We sit and smell them, talk about
+what stands out, then look up how other people describe them and compare. It’s the same thing
+we’ve done with wine and whisky for years.
+
+The talking part is where I struggle. I can tell that two things smell different, but I don’t
+have the words for how. So I wanted something to think with. A map of the possibilities, so I can go from “that’s fresh, I think”
+to something more specific.
+
+## Wheels
+
+People have been drawing maps like this for a long time.
+
+The best known in perfume is Michael Edwards’ Fragrance Wheel. In the early eighties Edwards
+noticed that people selling perfume in department stores mostly sold the ones they liked
+themselves. When a customer’s favourite was out of stock, they had no good way to suggest
+something close. So he put fragrance families in a circle, with neighbours next to each other.
+If you like one, try the one beside it.
+
+<Figure
+  src={fragranceWheel}
+  alt="A simple diagram of fourteen coloured circles arranged in a ring, labelled with fragrance families such as Floral, Soft Floral, Oriental, Woody Oriental, Mossy Woods, Dry Woods, Citrus, Green and Water, grouped under Floral, Oriental, Woody and Fresh notes, with Aromatic Fougère in the middle."
+  caption="A simplified drawing of the Fragrance Wheel, from Wikipedia (public domain). Neighbours are meant to be similar."
+/>
+
+Wine has its own. Ann Noble made the Wine Aroma Wheel at UC Davis in 1984, because tasters
+had no shared words beyond “elegant” and “harmonious”. Her wheel starts with broad terms in the
+middle, like “fruity”, and gets more specific as you move out: “citrus”, then “grapefruit”.
+Plenty of versions have followed. This one is on Wikimedia Commons.
+
+<Figure
+  src={wineWheel}
+  alt="A circular wine aroma wheel. The centre splits into aromas and bouquet; the middle ring has groups such as citrus, tree fruits, floral, vegetal, spices and oak aging; the outer ring has specific words such as grapefruit, lemon, honeysuckle, cut grass, clove and vanilla."
+  caption="A wine aroma wheel by Aromaster, CC BY-SA 3.0, via Wikimedia Commons. General in the middle, specific at the edge."
+/>
+
+That second idea is the one I wanted: start somewhere broad and walk outwards until you find
+the word.
+
+I started this a while ago. I looked at wheels like these and at teaching material for
+perfumers, and put together a table of my own. Talking it through with an LLM, I added things
+the wheels don’t usually have: a word for how each scent *feels*, and a real material you can
+buy and smell to learn it. I got as far as a rough chart and stopped. I wanted a picture for
+every scent, and finding or making them was taking far too long.
+
+## One wedge
+
+Let’s follow one path from the middle of the wheel out to the edge, the way you would when
+trying to place a smell. Step through it with the buttons, or drag and zoom around it yourself.
+
+<AtlasViewer
+  alt="The Olfactory Atlas: a wheel of photographs and labels, which zooms from the whole wheel into the Citrus family and out to candied orange peel."
+  path={['FRESH & LIFTED', 'CITRUS', 'Juicy / Sweet', 'Candied orange peel']}
+  tour={[
+    { label: 'Whole wheel', text: '<strong>The whole wheel.</strong> Broad impressions in the middle, more specific scents as you move out. Let’s follow one path.' },
+    { label: 'Realms', text: '<strong>Four realms.</strong> The first question is the broadest one. Is it fresh and bright, floral and fruity, warm and spicy, or earthy and deep?' },
+    { label: 'Fresh & Lifted', text: '<strong>Fresh &amp; Lifted.</strong> Bright and airy. Around it are its families: citrus, green, aromatic, watery and a few more.' },
+    { label: 'Citrus', text: '<strong>Citrus.</strong> Most people get this far without help.' },
+    { label: 'Juicy / Sweet', text: '<strong>Juicy / Sweet.</strong> Citrus splits three ways: zesty, juicy or bitter. This is the step I was missing. A lemon and an orange are both citrus, but one is sharp and fizzy and the other is round and sweet.' },
+    { label: 'Candied orange peel', text: '<strong>Candied orange peel.</strong> Something familiar to compare it to, how it feels (rich, sticky), and a material you can buy and smell to learn it: sweet orange oil, the peel side of it.' },
+  ]}
+/>
+
+Notice how the photographs change as you go. The citrus band has a bit of everything:
+grapefruit, orange, lemon, lime, a few tea leaves. Juicy / Sweet is mostly orange. By the
+edge it’s one thing, glossy candied peel.
+
+Tick “Hide the words” and you can see it’s one continuous photograph along each route, not a
+grid of separate pictures.
+
+*Why photographs? Wouldn’t the words do?*
+
+For me, no. When I smell something and can’t place it, a word gives me nothing to hold on to.
+A picture does. Candied orange peel looks sticky and dark and sugary, and that’s much closer to
+what it smells like than the word “sweet”. The pictures give me somewhere to start.
+
+## Making the pictures
+
+This is the part that stopped me the first time, and the part that’s different now.
+
+I picked it up again with GPT-6 Astra (on High) in Codex. Astra can generate images itself, so
+it could do all of it: plan the wheel, write a prompt for each picture, generate it, check it,
+and fit it into the layout.
+
+Each picture has a prompt behind it. This is part of the one for the citrus family band:
+
+> thick pink grapefruit peel curls with sharply visible bitter white pith… fresh bumpy
+> yellow-green bergamot peel ribbons… thick curled candied orange peel with translucent glossy
+> syrup… crushed vivid green lime peel
+
+and then a few rules that every picture shared: fewer, larger shapes rather than a busy pile,
+about half of each picture quiet so the words can sit on it, daylight, no bowls or tables or
+bottles.
+
+<Figure
+  src={citrusFamily}
+  alt="A close-up photograph of citrus: a curl of pink grapefruit peel with white pith, orange segments and glossy candied peel, bright yellow lemon zest, crushed green lime and a few dark tea leaves."
+  caption="The citrus family picture on its own, before it was cut to fit its curved band."
+/>
+
+The parent pictures were the tricky ones. Each needs to hint at everything beneath it without
+turning into a collage. The outer pictures were easier: one fruit, one texture, close up.
+
+It took about a day. 130 pictures, each kept with its prompt and a checksum so I can trace any
+of them back. The finished wheel is 9,216 pixels across, so the smallest label still reads when
+you zoom in.
+
+## It’s all on GitHub
+
+Everything behind the wheel is in my
+[experiments repository](https://github.com/ryannel/experiments/tree/main/olfactory_taxonomy),
+so you can see exactly how it was made, or take it and change it:
+
+- **The skill** Astra worked from, `olfactory-sunburst`, with its notes on layout, imagery and
+  type.
+- **All 130 image prompts**, one file per picture, with a record that ties each picture to its
+  prompt.
+- **The taxonomy as data**: every realm, family, scent, feel word and reference.
+- **The viewer and its tiles**, which work offline once cloned, and the whole wheel as a single
+  image.
+- **The editable master**, with the full-size original photographs as a separate download.
+
+To get just this folder:
+
+```sh
+git clone --filter=blob:none --sparse https://github.com/ryannel/experiments.git experiments
+cd experiments
+git sparse-checkout set olfactory_taxonomy
+```
+
+Open it in Codex and type `$olfactory-sunburst` to ask for a change: a scent you think is
+missing, a better reference, a picture you’d rather see.
+
+## What a perfumer would say
+
+I should be honest about what this is. It’s a guide for an amateur, made for where I am now.
+Perfumers aren’t trained like this, and the reasons are worth knowing.
+
+At Givaudan’s perfumery school, students start by memorising around 500 raw materials. Every
+day they’re handed one on a smelling strip and have to name it. Much of that training goes back
+to Jean Carles, who set up a school in Grasse in 1946. His method lays about 60 materials out in
+a grid: first you learn the contrasts between families, floral against woody, then the small
+differences between materials within one family.
+
+That broad-to-fine shape isn’t far from my wheel. What you learn is very different.
+
+**The materials are the vocabulary, and on my wheel they’re the last ring.** A student learns
+Hedione by smelling Hedione, and “Hedione” becomes the word for it. On my wheel it sits at the
+very edge, after “delicate jasmine petals”. A perfumer would tell me to start at the edge and
+work inwards.
+
+**Many of the most used materials don’t look like anything.** Hedione, Iso E Super, Galaxolide,
+Calone and the aldehydes are made in a lab, and there’s no object to photograph. So my wheel
+dresses them up as something: Iso E Super as “smooth woody amber”, an aldehyde as soap and
+candle wax. That might be roughly how they come across in a finished perfume, but it isn’t what
+they smell like on a strip. Even the natural ones drift. Lemon oil doesn’t smell quite like a
+cut lemon.
+
+**The same material smells different at different strengths.** Indole is the usual example.
+Strong, it smells faecal. At a trace, it’s part of what makes jasmine smell like jasmine. I’ve
+put it in one slot, under “stable, manure”.
+
+**A smell changes over time.** On a strip, citrus is gone fairly quickly while woods and musks
+last for days, and a single material can smell different an hour later. Perfumers go back to the
+same strip again and again. My wheel is one moment, and I left time out altogether.
+
+**The ideas that matter most to perfumers aren’t on it.** The French perfumers’ society sorts
+perfumes into seven families. Two of them, chypre and fougère, aren’t single smells but
+combinations. A chypre is bright citrus over a mossy, resinous base: bergamot, labdanum,
+oakmoss. A fougère is built on lavender, oakmoss and coumarin, the sweet hay smell in tonka.
+All of those parts are on my wheel, scattered across three realms, with nothing to show they
+belong together.
+
+**The rest is my own judgement.** Lavender is herbal and floral, but it gets one slot. Tobacco
+appears twice. A wedge is wide because it has more entries in it, not because it matters more,
+and neighbours sit together because it seemed right to me, not because anyone measured it. The
+feel words, like “prickly” and “rounded”, are mine. They’re not shared vocabulary.
+
+**Noses differ.** Lots of people can’t smell certain musks at all, and most of us have
+gaps we don’t know about. Which brings me back to the coffee.
+
+## Trying it out
+
+Here’s the whole atlas. Next time you smell something you can’t place, let it ask you the
+questions, one ring at a time. Or press “Whole wheel” and wander: drag to move, and pinch or
+hold Ctrl (⌘ on a Mac) and scroll to zoom.
+
+<AtlasViewer alt="The whole Olfactory Atlas, zoomable, with a guided walk that asks one question per ring and zooms to each answer." />
+
+[Open it on its own page](/olfactory-atlas/index.html) if it’s cramped here, or [get the whole thing on GitHub](https://github.com/ryannel/experiments/tree/main/olfactory_taxonomy).
+
+Next time we open a tasting flight, I’ll have it open beside the vials.

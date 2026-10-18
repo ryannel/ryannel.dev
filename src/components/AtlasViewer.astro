@@ -1,0 +1,789 @@
+---
+import atlas from '../data/olfactory-atlas.json';
+
+/**
+ * The Olfactory Atlas as a zoomable wheel, with a walk through it.
+ *
+ * It reads the deep-zoom tiles in /public/olfactory-atlas (the same files the
+ * standalone viewer uses), so every instance on a page shares one download.
+ * Drag to pan and pinch or Ctrl/⌘-scroll to zoom, always.
+ *
+ * Two kinds of walk:
+ *
+ *   With `path` and `tour`, a fixed one: tour[0] is the whole wheel, tour[1]
+ *   the middle of it (the realms, close enough to read), and tour[i + 2]
+ *   zooms to path[0..i]. For showing one route and talking about it.
+ *
+ *     <AtlasViewer alt="..." path={['FRESH & LIFTED', 'CITRUS']}
+ *       tour={[{ label: 'Whole wheel', ... }, { label: 'Realms', ... }, { label: 'Fresh', ... }, ...]} />
+ *
+ *   Without them, a guided one: it starts on the middle of the wheel and asks
+ *   one question per ring, with the segments of that ring as answers, and
+ *   zooms to each answer.
+ *
+ * Segments come from src/data/olfactory-atlas.json, generated from the atlas's
+ * cells.json: angles clockwise from 12 o'clock, rings in the atlas's 6144-unit
+ * layout. A description segment also covers its feel and reference rings,
+ * which share its angles.
+ */
+interface Stop {
+  label: string;
+  /** May contain <strong>. */
+  text: string;
+}
+
+interface Props {
+  alt: string;
+  path?: string[];
+  tour?: Stop[];
+}
+
+type Segment = (typeof atlas.segments)[number];
+
+const { alt, path = [], tour } = Astro.props;
+const same = (a: string[], b: string[]) => a.length === b.length && a.every((v, i) => v === b[i]);
+
+if (tour && tour.length !== path.length + 2) {
+  throw new Error(`<AtlasViewer> needs tour stops for the whole wheel, the middle, and each path step.`);
+}
+
+// A tour carries only its own route; the guided walk needs the lot.
+const segments: Segment[] = tour
+  ? path.map((_, i) => {
+      const found = atlas.segments.find((s) => same(s.path, path.slice(0, i + 1)));
+      if (!found) throw new Error(`<AtlasViewer> has no segment for ${path.slice(0, i + 1).join(' → ')}`);
+      return found;
+    })
+  : atlas.segments;
+---
+
+<figure
+  class="atlas-viewer"
+  data-segments={JSON.stringify(segments)}
+  data-tour={tour ? JSON.stringify(tour) : undefined}
+  data-size={atlas.size}
+  data-units={atlas.units}
+>
+  <div class="av-stage" tabindex="0" role="img" aria-label={alt}>
+    <div class="av-world">
+      <div class="av-base"></div>
+      <div class="av-detail"></div>
+      <svg class="av-overlay" viewBox={`0 0 ${atlas.units} ${atlas.units}`} aria-hidden="true">
+        <path class="av-dim" fill-rule="evenodd" d="" />
+        <path class="av-edge" d="" vector-effect="non-scaling-stroke" />
+      </svg>
+    </div>
+    <p class="av-hint" aria-hidden="true">Hold Ctrl or ⌘ and scroll to zoom</p>
+  </div>
+
+  <div class="av-panel">
+    <p class="av-text" aria-live="polite"></p>
+    <div class="av-choices"></div>
+    <div class="av-tools">
+      <button type="button" data-act="back">← Back</button>
+      <button type="button" data-act="restart">Start again</button>
+      <span class="av-spacer"></span>
+      <button type="button" data-act="out" aria-label="Zoom out">−</button>
+      <button type="button" data-act="in" aria-label="Zoom in">+</button>
+      <button type="button" data-act="whole">Whole wheel</button>
+      <label class="av-toggle"><input type="checkbox" class="av-hide" autocomplete="off" /> Hide the words</label>
+    </div>
+  </div>
+  <noscript><p class="av-text">The wheel needs JavaScript. <a href="/olfactory-atlas/olfactory-atlas.avif">Open it as one image.</a></p></noscript>
+</figure>
+
+<style>
+  .atlas-viewer {
+    width: min(72rem, calc(100vw - var(--gutter) * 2));
+    max-width: none;
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+  .av-stage {
+    position: relative;
+    height: min(78svh, 46rem);
+    overflow: hidden;
+    background: #f4f2ec;
+    touch-action: none;
+    cursor: grab;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .av-stage:active {
+    cursor: grabbing;
+  }
+  .av-stage:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .av-world {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform-origin: 0 0;
+  }
+  .av-base,
+  .av-detail {
+    position: absolute;
+    inset: 0;
+  }
+  /* The article styles frame every image; tiles have to meet edge to edge. */
+  .av-world :global(img) {
+    position: absolute;
+    display: block;
+    max-width: none;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    pointer-events: none;
+  }
+  .av-overlay {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+  .av-dim {
+    fill: rgb(12 12 11 / 0.78);
+    transition: opacity 300ms;
+  }
+  .av-edge {
+    fill: none;
+    stroke: #fff;
+    stroke-width: 2;
+  }
+  .av-hint {
+    position: absolute;
+    left: 50%;
+    bottom: 1rem;
+    transform: translateX(-50%);
+    margin: 0;
+    padding: 0.375rem 0.75rem;
+    border-radius: 999px;
+    background: rgb(12 12 11 / 0.75);
+    color: #e7e5df;
+    font-family: var(--font-ui);
+    font-size: 0.8125rem;
+    opacity: 0;
+    transition: opacity 200ms;
+    pointer-events: none;
+  }
+  .av-hint.is-shown {
+    opacity: 1;
+  }
+
+  .av-panel {
+    max-width: 39rem;
+    margin-inline: auto;
+    font-family: var(--font-ui);
+    font-size: 0.875rem;
+  }
+  .av-text {
+    margin: 0.875rem 0 0;
+    line-height: 1.55;
+    color: var(--ink-muted);
+  }
+  .av-text :global(strong) {
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .av-choices,
+  .av-tools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.375rem;
+    margin-top: 0.75rem;
+  }
+  .av-choices:empty {
+    display: none;
+  }
+  .av-tools {
+    font-size: 0.8125rem;
+  }
+  .av-spacer {
+    flex: 1;
+  }
+  .atlas-viewer :global(button) {
+    min-height: 2.25rem;
+    padding: 0.25rem 0.75rem;
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--ink);
+    font: inherit;
+    cursor: pointer;
+  }
+  .atlas-viewer :global(button:hover:not(:disabled, [aria-pressed='true'])) {
+    background: var(--surface);
+  }
+  .atlas-viewer :global(button[aria-pressed='true']) {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: var(--paper);
+  }
+  .atlas-viewer :global(button:disabled) {
+    opacity: 0.35;
+    cursor: default;
+  }
+  .av-choices.is-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  }
+  .av-choices :global(.av-choice) {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.125rem;
+    height: 100%;
+    padding: 0.5rem 0.75rem;
+    border-color: var(--ink-muted);
+    border-radius: 0.5rem;
+    text-align: left;
+  }
+  .av-choices :global(.av-choice-title) {
+    font-weight: 600;
+  }
+  .av-choices :global(.av-choice-hint) {
+    color: var(--ink-muted);
+    font-size: 0.8125rem;
+    line-height: 1.4;
+  }
+  .av-choices :global(.av-choice-hint:empty) {
+    display: none;
+  }
+  .av-toggle {
+    color: var(--ink-muted);
+    cursor: pointer;
+    margin-left: 0.25rem;
+  }
+</style>
+
+<script>
+  interface Segment {
+    level: number;
+    path: string[];
+    text: string;
+    from: number;
+    to: number;
+    inner: number;
+    outer: number;
+    feel?: string;
+    reference?: string;
+    hint?: string;
+  }
+  interface Stop {
+    label: string;
+    text: string;
+  }
+  type View = { s: number; tx: number; ty: number };
+
+  const TILE = 512;
+  const TOP = 14; // the full-size level of the pyramid
+  const BASE = 11; // always loaded underneath, so there is never a hole
+  const PREVIEW = 9; // the whole wheel in a single 288px tile, shown while the rest arrives
+  const QUESTIONS = [
+    'Start broad. Which of these is closest to what you’re smelling?',
+    'Which family?',
+    'Narrow it down. Which of these?',
+    'Which is closest?',
+  ];
+
+  const titleCase = (t: string) =>
+    t === t.toUpperCase() ? t.toLowerCase().replace(/(^|[\s(/-])\p{L}/gu, (m) => m.toUpperCase()) : t;
+  const same = (a: string[], b: string[]) => a.length === b.length && a.every((v, i) => v === b[i]);
+  const escape = (t: string) =>
+    t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+
+  document.querySelectorAll<HTMLElement>('.atlas-viewer').forEach((root) => {
+    const segments: Segment[] = JSON.parse(root.dataset.segments!);
+    const tour: Stop[] | null = root.dataset.tour ? JSON.parse(root.dataset.tour) : null;
+    const SIZE = Number(root.dataset.size);
+    const UNITS = Number(root.dataset.units);
+    const PX = SIZE / UNITS; // image pixels per layout unit
+
+    const stage = root.querySelector<HTMLElement>('.av-stage')!;
+    const world = root.querySelector<HTMLElement>('.av-world')!;
+    const base = root.querySelector<HTMLElement>('.av-base')!;
+    const detail = root.querySelector<HTMLElement>('.av-detail')!;
+    const dim = root.querySelector<SVGPathElement>('.av-dim')!;
+    const edge = root.querySelector<SVGPathElement>('.av-edge')!;
+    const hint = root.querySelector<HTMLElement>('.av-hint')!;
+    const text = root.querySelector<HTMLElement>('.av-text')!;
+    const choices = root.querySelector<HTMLElement>('.av-choices')!;
+    const hide = root.querySelector<HTMLInputElement>('.av-hide')!;
+    const button = (act: string) => root.querySelector<HTMLButtonElement>(`[data-act="${act}"]`)!;
+    const still = matchMedia('(prefers-reduced-motion: reduce)');
+
+    world.style.width = world.style.height = `${SIZE}px`;
+
+    // ---- Geometry ------------------------------------------------------------
+
+    const C = UNITS / 2;
+    const at = (deg: number, r: number): [number, number] => {
+      const a = (deg * Math.PI) / 180;
+      return [C + r * Math.sin(a), C - r * Math.cos(a)];
+    };
+    const xy = (p: [number, number]) => `${p[0].toFixed(1)} ${p[1].toFixed(1)}`;
+    const sector = ({ from, to, inner, outer }: Segment) => {
+      const large = to - from > 180 ? 1 : 0;
+      return (
+        `M${xy(at(from, outer))} A${outer} ${outer} 0 ${large} 1 ${xy(at(to, outer))} ` +
+        `L${xy(at(to, inner))} A${inner} ${inner} 0 ${large} 0 ${xy(at(from, inner))} Z`
+      );
+    };
+    /** Bounding box in image pixels: [x0, y0, x1, y1]. */
+    const bounds = ({ from, to, inner, outer }: Segment) => {
+      const xs: number[] = [];
+      const ys: number[] = [];
+      for (let i = 0; i <= 32; i++) {
+        const deg = from + ((to - from) * i) / 32;
+        for (const r of [inner, outer]) {
+          const [x, y] = at(deg, r);
+          xs.push(x * PX);
+          ys.push(y * PX);
+        }
+      }
+      return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+    };
+    const WHOLE = [0, 0, SIZE, SIZE];
+    // The realms and the families around them: the first choice, close enough to read.
+    const middle = Math.min(...segments.filter((s) => s.level === 1).map((s) => s.outer), UNITS / 2) * PX;
+    const MIDDLE = [SIZE / 2 - middle, SIZE / 2 - middle, SIZE / 2 + middle, SIZE / 2 + middle];
+
+    // ---- View ----------------------------------------------------------------
+
+    let view: View = { s: 0.05, tx: 0, ty: 0 };
+    let flight = 0;
+
+    const fit = ([x0, y0, x1, y1]: number[], pad = 0.1): View => {
+      const W = stage.clientWidth;
+      const H = stage.clientHeight;
+      const s = Math.min(W / ((x1 - x0) * (1 + pad * 2)), H / ((y1 - y0) * (1 + pad * 2)), maxScale());
+      return { s, tx: W / 2 - ((x0 + x1) / 2) * s, ty: H / 2 - ((y0 + y1) / 2) * s };
+    };
+    const minScale = () => Math.min(stage.clientWidth, stage.clientHeight) / SIZE / 1.25;
+    const maxScale = () => 2;
+
+    /** Keep the scale in range and the middle of the view somewhere on the wheel. */
+    const clamp = (v: View): View => {
+      const W = stage.clientWidth;
+      const H = stage.clientHeight;
+      const s = Math.min(maxScale(), Math.max(minScale(), v.s));
+      const cx = Math.min(SIZE, Math.max(0, (W / 2 - v.tx) / v.s));
+      const cy = Math.min(SIZE, Math.max(0, (H / 2 - v.ty) / v.s));
+      return { s, tx: W / 2 - cx * s, ty: H / 2 - cy * s };
+    };
+
+    const apply = (v: View) => {
+      view = clamp(v);
+      world.style.transform = `translate(${view.tx}px, ${view.ty}px) scale(${view.s})`;
+      scheduleTiles();
+    };
+
+    /** Fly in centre-and-log-scale space, which reads as a smooth zoom rather than a lurch. */
+    const fly = (to: View) => {
+      cancelAnimationFrame(flight);
+      to = clamp(to);
+      if (still.matches) return apply(to);
+      const W = stage.clientWidth;
+      const H = stage.clientHeight;
+      const centre = (v: View) => [(W / 2 - v.tx) / v.s, (H / 2 - v.ty) / v.s];
+      const [ax, ay] = centre(view);
+      const [bx, by] = centre(to);
+      const as = Math.log(view.s);
+      const bs = Math.log(to.s);
+      const start = performance.now();
+      const tick = (now: number) => {
+        const t = Math.min(1, (now - start) / 900);
+        const e = t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
+        const s = Math.exp(as + (bs - as) * e);
+        const cx = ax + (bx - ax) * e;
+        const cy = ay + (by - ay) * e;
+        apply({ s, tx: W / 2 - cx * s, ty: H / 2 - cy * s });
+        if (t < 1) flight = requestAnimationFrame(tick);
+      };
+      flight = requestAnimationFrame(tick);
+    };
+
+    const zoomAt = (px: number, py: number, factor: number) => {
+      cancelAnimationFrame(flight);
+      const s = Math.min(maxScale(), Math.max(minScale(), view.s * factor));
+      const k = s / view.s;
+      apply({ s, tx: px - (px - view.tx) * k, ty: py - (py - view.ty) * k });
+    };
+
+    // ---- Tiles ---------------------------------------------------------------
+
+    let pyramid = 'labels';
+    let pending = 0;
+    let level = BASE;
+
+    const tile = (L: number, x: number, y: number) => {
+      const f = 2 ** (TOP - L);
+      const span = Math.ceil(SIZE / f);
+      const n = Math.ceil(span / TILE);
+      const size = (i: number) => Math.min(TILE + (i > 0 ? 1 : 0) + (i < n - 1 ? 1 : 0), span - i * TILE + (i > 0 ? 1 : 0));
+      const img = new Image();
+      img.decoding = 'async';
+      img.alt = '';
+      img.draggable = false;
+      img.src = `/olfactory-atlas/${pyramid}_files/${L}/${x}_${y}.webp`;
+      img.dataset.key = `${L}/${x}_${y}`;
+      img.style.left = `${(x * TILE - (x > 0 ? 1 : 0)) * f}px`;
+      img.style.top = `${(y * TILE - (y > 0 ? 1 : 0)) * f}px`;
+      img.style.width = `${size(x) * f}px`;
+      img.style.height = `${size(y) * f}px`;
+      return img;
+    };
+
+    const loadBase = () => {
+      // One small tile of the whole wheel first, so there is something to see at once.
+      base.replaceChildren(tile(PREVIEW, 0, 0));
+      const n = Math.ceil(SIZE / 2 ** (TOP - BASE) / TILE);
+      for (let x = 0; x < n; x++) for (let y = 0; y < n; y++) base.append(tile(BASE, x, y));
+    };
+
+    const updateTiles = () => {
+      const want = Math.ceil(TOP + Math.log2(view.s * devicePixelRatio));
+      level = Math.min(TOP, Math.max(BASE, want));
+      if (level === BASE) return detail.replaceChildren();
+      const f = 2 ** (TOP - level);
+      const n = Math.ceil(SIZE / f / TILE);
+      const span = TILE * f;
+      const x0 = Math.max(0, Math.floor(-view.tx / view.s / span));
+      const y0 = Math.max(0, Math.floor(-view.ty / view.s / span));
+      const x1 = Math.min(n - 1, Math.floor((stage.clientWidth - view.tx) / view.s / span));
+      const y1 = Math.min(n - 1, Math.floor((stage.clientHeight - view.ty) / view.s / span));
+      const have = new Map([...detail.children].map((el) => [(el as HTMLElement).dataset.key!, el as HTMLImageElement]));
+      const loads: Promise<unknown>[] = [];
+      const keep = new Set<string>();
+      for (let x = x0; x <= x1; x++) {
+        for (let y = y0; y <= y1; y++) {
+          const key = `${level}/${x}_${y}`;
+          keep.add(key);
+          if (have.has(key)) continue;
+          const img = tile(level, x, y);
+          detail.append(img);
+          loads.push(img.decode().catch(() => {}));
+        }
+      }
+      // Drop the old level only once the new one has arrived, so zooming never flashes blurry.
+      const ticket = ++pending;
+      Promise.all(loads).then(() => {
+        if (ticket !== pending) return;
+        for (const [key, el] of have) if (!keep.has(key) && !key.startsWith(`${level}/`)) el.remove();
+        // Offscreen tiles of this level are cheap to keep, up to a point.
+        if (detail.childElementCount > 120) for (const [key, el] of have) if (!keep.has(key)) el.remove();
+      });
+    };
+
+    let tilesQueued = false;
+    const scheduleTiles = () => {
+      if (tilesQueued) return;
+      tilesQueued = true;
+      requestAnimationFrame(() => {
+        tilesQueued = false;
+        updateTiles();
+      });
+    };
+
+    // Always start with the words showing; browsers restore checkbox state on reload.
+    const setPyramid = () => {
+      const next = hide.checked ? 'image' : 'labels';
+      if (next === pyramid && base.childElementCount) return;
+      pyramid = next;
+      loadBase();
+      detail.replaceChildren();
+      scheduleTiles();
+    };
+
+    // ---- Highlight -----------------------------------------------------------
+
+    // Dim the wheel itself, not the paper around it.
+    const R = Math.max(...segments.map((s) => s.outer));
+    const frame = `M${C - R} ${C} a${R} ${R} 0 1 0 ${2 * R} 0 a${R} ${R} 0 1 0 ${-2 * R} 0Z`;
+    const highlight = (route: Segment[], outline: Segment | null = route.at(-1) ?? null) => {
+      dim.setAttribute('d', route.length ? `${frame} ${route.map(sector).join(' ')}` : '');
+      edge.setAttribute('d', outline ? sector(outline) : '');
+    };
+
+    // ---- Walks ---------------------------------------------------------------
+
+    const find = (path: string[]) => segments.find((s) => same(s.path, path))!;
+    const children = (path: string[]) =>
+      segments.filter((s) => s.path.length === path.length + 1 && same(s.path.slice(0, path.length), path));
+
+    let chosen: string[] = [];
+    let stop = 0;
+
+    const route = (path: string[]) => path.map((_, i) => find(path.slice(0, i + 1)));
+
+    const describe = (s: Segment) =>
+      `<strong>${escape(s.text)}.</strong> It feels ${escape(s.feel ?? '')}. ` +
+      `To learn it, smell ${escape(s.reference ?? '')}.`;
+
+    // What the walk is showing now. Previews draw on top of it and put it back, and they read it
+    // at the time rather than capturing it: a button removed by a re-render still fires blur and
+    // pointerleave, and would otherwise restore the route from before the click.
+    let shown: Segment[] = [];
+
+    /** The everyday name of a description: "Bergamot: Earl Grey citrus" → "bergamot". */
+    const short = (t: string) => {
+      const head = t.split(/[:,]/)[0].trim();
+      return head.charAt(0).toLowerCase() + head.slice(1);
+    };
+    const list = (items: string[], max: number) => {
+      const unique = [...new Set(items)];
+      const some = unique.slice(0, max);
+      if (unique.length > max) return `${some.join(', ')} and more`;
+      return some.length > 1 ? `${some.slice(0, -1).join(', ')} or ${some.at(-1)}` : some[0] ?? '';
+    };
+    // Examples taken in turn from each branch, so the first few span the range rather than
+    // all coming from one corner of it.
+    const leaves = (path: string[]): Segment[] => {
+      const groups = children(path).map((c) => (c.level === 3 ? [c] : leaves(c.path)));
+      const out: Segment[] = [];
+      for (let i = 0; groups.some((g) => i < g.length); i++) groups.forEach((g) => g[i] && out.push(g[i]));
+      return out;
+    };
+
+    /**
+     * A line under each answer, borrowed from further out on the wheel, because "Hot Spice"
+     * means little until you know it's cinnamon and clove.
+     */
+    const cue = (s: Segment) => {
+      if (s.level === 3) return `Feels ${s.feel}. To learn it: ${s.reference}.`;
+      return `Like ${s.hint ?? list(leaves(s.path).map((l) => short(l.text)), s.level === 1 ? 4 : 3)}`;
+    };
+
+    const renderGuided = () => {
+      // A question with one answer isn't a question: take it and keep going.
+      for (let only = children(chosen); only.length === 1; only = children(chosen)) chosen = only[0].path;
+      const r = route(chosen);
+      shown = r;
+      highlight(r);
+      fly(fit(r.length ? bounds(r.at(-1)!) : MIDDLE, r.length ? 0.12 : 0.02));
+      const options = children(chosen);
+      if (options.length) {
+        const where = r.length ? `<strong>${escape(titleCase(r.at(-1)!.text))}.</strong> ` : '';
+        text.innerHTML = where + QUESTIONS[chosen.length];
+      } else {
+        text.innerHTML = describe(r.at(-1)!);
+      }
+      choices.replaceChildren(
+        ...options.map((s) => {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'av-choice';
+          const title = document.createElement('span');
+          title.className = 'av-choice-title';
+          title.textContent = titleCase(s.text);
+          const more = document.createElement('span');
+          more.className = 'av-choice-hint';
+          more.textContent = cue(s);
+          b.append(title, more);
+          b.addEventListener('click', () => {
+            chosen = s.path;
+            renderGuided();
+          });
+          // Pointing at an answer outlines where it is on the wheel.
+          const preview = () => b.isConnected && highlight(shown, s);
+          const unpreview = () => highlight(shown);
+          b.addEventListener('pointerenter', preview);
+          b.addEventListener('pointerleave', unpreview);
+          b.addEventListener('focus', preview);
+          b.addEventListener('blur', unpreview);
+          return b;
+        }),
+      );
+      button('back').disabled = chosen.length === 0;
+      button('restart').disabled = chosen.length === 0;
+    };
+
+    const renderTour = () => {
+      const r = segments.slice(0, Math.max(0, stop - 1));
+      highlight(r);
+      fly(fit(r.length ? bounds(r.at(-1)!) : stop === 1 ? MIDDLE : WHOLE, r.length ? 0.12 : 0.02));
+      text.innerHTML = tour![stop].text;
+      choices.querySelectorAll('button').forEach((b, i) => b.setAttribute('aria-pressed', String(i === stop)));
+      button('back').disabled = stop === 0;
+      root.querySelector<HTMLButtonElement>('[data-act="next"]')!.disabled = stop === tour!.length - 1;
+    };
+
+    const render = () => (tour ? renderTour() : renderGuided());
+    if (!tour) choices.classList.add('is-cards');
+
+    if (tour) {
+      choices.replaceChildren(
+        ...tour.map((t, i) => {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.textContent = t.label;
+          b.addEventListener('click', () => {
+            stop = i;
+            renderTour();
+          });
+          return b;
+        }),
+      );
+      // A tour steps forward instead of starting again.
+      const restart = button('restart');
+      restart.textContent = 'Next →';
+      restart.dataset.act = 'next';
+    }
+
+    root.querySelector('.av-tools')!.addEventListener('click', (e) => {
+      const act = (e.target as HTMLElement).closest<HTMLElement>('[data-act]')?.dataset.act;
+      const W = stage.clientWidth / 2;
+      const H = stage.clientHeight / 2;
+      if (act === 'in') zoomAt(W, H, 1.6);
+      if (act === 'out') zoomAt(W, H, 1 / 1.6);
+      if (act === 'whole') {
+        highlight([]);
+        fly(fit(WHOLE, 0.02));
+      }
+      if (act === 'back') {
+        if (tour) stop = Math.max(0, stop - 1);
+        else {
+          // Step back past any rings that were taken automatically.
+          do chosen = chosen.slice(0, -1);
+          while (chosen.length && children(chosen).length === 1);
+        }
+        render();
+      }
+      if (act === 'restart') {
+        chosen = [];
+        render();
+      }
+      if (act === 'next') {
+        stop = Math.min(tour!.length - 1, stop + 1);
+        render();
+      }
+    });
+
+    // ---- Pointer, wheel and keys ----------------------------------------------
+
+    const pointers = new Map<number, { x: number; y: number }>();
+    let engaged = false; // after a press inside, plain scrolling zooms until the pointer leaves
+    let hintTimer = 0;
+
+    const local = (e: { clientX: number; clientY: number }) => {
+      const r = stage.getBoundingClientRect();
+      return { x: e.clientX - r.left, y: e.clientY - r.top };
+    };
+
+    stage.addEventListener('pointerdown', (e) => {
+      cancelAnimationFrame(flight);
+      stage.setPointerCapture(e.pointerId);
+      pointers.set(e.pointerId, local(e));
+      engaged = true;
+    });
+    stage.addEventListener('pointermove', (e) => {
+      const before = pointers.get(e.pointerId);
+      if (!before) return;
+      const now = local(e);
+      if (pointers.size === 1) {
+        apply({ s: view.s, tx: view.tx + now.x - before.x, ty: view.ty + now.y - before.y });
+      } else if (pointers.size === 2) {
+        const [other] = [...pointers].filter(([id]) => id !== e.pointerId).map(([, p]) => p);
+        const d0 = Math.hypot(before.x - other.x, before.y - other.y);
+        const d1 = Math.hypot(now.x - other.x, now.y - other.y);
+        const mx = (now.x + other.x) / 2;
+        const my = (now.y + other.y) / 2;
+        const pmx = (before.x + other.x) / 2;
+        const pmy = (before.y + other.y) / 2;
+        apply({ s: view.s, tx: view.tx + mx - pmx, ty: view.ty + my - pmy });
+        if (d0 > 0) zoomAt(mx, my, d1 / d0);
+      }
+      pointers.set(e.pointerId, now);
+    });
+    const lift = (e: PointerEvent) => pointers.delete(e.pointerId);
+    stage.addEventListener('pointerup', lift);
+    stage.addEventListener('pointercancel', lift);
+    stage.addEventListener('pointerleave', () => (engaged = false));
+
+    stage.addEventListener(
+      'wheel',
+      (e) => {
+        if (!(e.ctrlKey || e.metaKey || engaged)) {
+          hint.classList.add('is-shown');
+          clearTimeout(hintTimer);
+          hintTimer = window.setTimeout(() => hint.classList.remove('is-shown'), 1200);
+          return;
+        }
+        e.preventDefault();
+        const p = local(e);
+        const delta = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+        zoomAt(p.x, p.y, Math.exp(-delta * (e.ctrlKey ? 0.01 : 0.002)));
+      },
+      { passive: false },
+    );
+
+    stage.addEventListener('dblclick', (e) => {
+      const p = local(e);
+      zoomAt(p.x, p.y, 2);
+    });
+
+    stage.addEventListener('keydown', (e) => {
+      const W = stage.clientWidth / 2;
+      const H = stage.clientHeight / 2;
+      const step = 80;
+      const moves: Record<string, () => void> = {
+        ArrowLeft: () => apply({ ...view, tx: view.tx + step }),
+        ArrowRight: () => apply({ ...view, tx: view.tx - step }),
+        ArrowUp: () => apply({ ...view, ty: view.ty + step }),
+        ArrowDown: () => apply({ ...view, ty: view.ty - step }),
+        '+': () => zoomAt(W, H, 1.4),
+        '=': () => zoomAt(W, H, 1.4),
+        '-': () => zoomAt(W, H, 1 / 1.4),
+        '0': () => fly(fit(WHOLE, 0.02)),
+      };
+      if (moves[e.key]) {
+        e.preventDefault();
+        moves[e.key]();
+      }
+    });
+
+    hide.addEventListener('change', setPyramid);
+    window.addEventListener('pageshow', () => {
+      hide.checked = false;
+      setPyramid();
+    });
+
+    // ---- Start ----------------------------------------------------------------
+
+    let started = false;
+    const start = () => {
+      if (started) return;
+      started = true;
+      hide.checked = false;
+      setPyramid();
+      apply(fit(WHOLE, 0.02));
+      render();
+    };
+
+    // Keep the same middle and scale when the stage changes size.
+    let last = { w: 0, h: 0 };
+    new ResizeObserver(() => {
+      const w = stage.clientWidth;
+      const h = stage.clientHeight;
+      if (started && last.w) apply({ s: view.s, tx: view.tx + (w - last.w) / 2, ty: view.ty + (h - last.h) / 2 });
+      last = { w, h };
+    }).observe(stage);
+
+    // Nothing loads until the wheel is near the screen.
+    new IntersectionObserver(
+      (entries, observer) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          observer.disconnect();
+          start();
+        }
+      },
+      { rootMargin: '400px' },
+    ).observe(stage);
+  });
+</script>
