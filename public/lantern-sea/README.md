@@ -8,7 +8,7 @@ The tiles are lossy WebP delivery files at native resolution, quality 90, with 5
 
 Source review status remains: **agent review complete; user review of the eastern expansion pending in the source release record**. Viewer checks do not establish new approval of the painting or its geographic accuracy.
 
-Serve this folder over HTTP and open `index.html`. It needs no build, API key, custom font or internet service. Keep `index.html`, `viewer.css`, `viewer.js`, `map.json`, `tiles/`, `overview.jpg` and this README together. `?embed=1` removes the surrounding title and footer for an article embed. The hash remembers position, scale and place-name mode.
+Serve this folder over HTTP and open `index.html`. It needs no build, API key, custom font or internet service. Keep `index.html`, `viewer.css`, `viewer.js`, `map.json`, `tiles/`, `overview.jpg` and this README together. `?embed=1` removes the surrounding title and footer for an article embed. Standalone view hashes remember position, scale and place-name mode. Article embeds always start fully fitted, including reload and back-navigation. The transparent embed follows same-origin site theme messages; the standalone viewer follows the system light/dark preference.
 
 The source masters are intentionally omitted. They are approximately 289 MB and 287 MB. The browser requests the overview and visible detail tiles, never those PNGs.
 

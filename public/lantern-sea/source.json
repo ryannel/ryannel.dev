@@ -4,6 +4,6 @@
   "release": "world-atlas-complete-v1",
   "artworkRevision": "6c9dda2ab5e1",
   "files": 1050,
-  "sha256": "3a20f2663cf2099bea692486385a6ba9a1e0012d437f99f39a793fdbb468726d",
+  "sha256": "594485d9cd15d8d787cd0cc8c9b73e5aa9b1e3db6dc75466c4ea5ea0033086b6",
   "note": "Byte-for-byte copy of the selected public explorer. Edit upstream and resync; no original PNG masters are bundled."
 }

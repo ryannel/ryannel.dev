@@ -24,6 +24,20 @@ const { title = 'Explore the Lantern Sea: a zoomable painted world map' } = Astr
   for (const figure of document.querySelectorAll<HTMLElement>('[data-map-explorer]')) {
     const frame = figure.querySelector<HTMLIFrameElement>('iframe');
     if (!frame) continue;
+    const root = document.documentElement;
+    const syncTheme = () => {
+      const styles = getComputedStyle(root);
+      const tokens: Record<string, string> = {};
+      for (const [local, site] of Object.entries({
+        '--paper': '--paper', '--ink': '--ink', '--muted': '--ink-muted',
+        '--rule': '--rule', '--surface': '--surface', '--accent': '--accent', '--font-ui': '--font-ui'
+      })) tokens[local] = styles.getPropertyValue(site).trim();
+      frame.contentWindow?.postMessage({type: 'lantern-sea:theme', theme: root.dataset.theme || 'system', tokens}, location.origin);
+    };
+    frame.addEventListener('load', syncTheme);
+    new MutationObserver(syncTheme).observe(root, {attributes: true, attributeFilter: ['data-theme']});
+    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', syncTheme);
+    syncTheme();
     let previousOverflow: string | undefined;
     const expand = (expanded: boolean) => {
       if (expanded === figure.classList.contains('is-expanded')) return;
@@ -38,6 +52,7 @@ const { title = 'Explore the Lantern Sea: a zoomable painted world map' } = Astr
     };
     window.addEventListener('message', (event: MessageEvent) => {
       if (event.origin !== location.origin || event.source !== frame.contentWindow) return;
+      if (event.data?.type === 'lantern-sea:ready') syncTheme();
       if (event.data?.type === 'lantern-sea:expanded' && typeof event.data.expanded === 'boolean') expand(event.data.expanded);
     });
     document.addEventListener('keydown', (event: KeyboardEvent) => {
@@ -61,8 +76,9 @@ const { title = 'Explore the Lantern Sea: a zoomable painted world map' } = Astr
     display: block;
     width: 100%;
     height: clamp(26rem, 76svh, 48rem);
-    border: 1px solid var(--rule);
-    background: #f7f5ef;
+    border: 0;
+    color-scheme: inherit;
+    background: transparent;
   }
   figcaption {
     display: flex;
@@ -82,6 +98,7 @@ const { title = 'Explore the Lantern Sea: a zoomable painted world map' } = Astr
     margin: 0;
     transform: none;
     z-index: 100;
+    background: var(--paper);
   }
   .map-explorer.is-expanded iframe { height: 100%; min-height: 0; border: 0; }
   .map-explorer.is-expanded figcaption { display: none; }

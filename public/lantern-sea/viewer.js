@@ -3,7 +3,7 @@
   'use strict';
   const $ = id => document.getElementById(id);
   const stage = $('stage'), canvas = stage.querySelector('canvas');
-  const ctx = canvas.getContext('2d', {alpha: false});
+  const ctx = canvas.getContext('2d', {alpha: true});
   const message = text => { $('message').hidden = false; $('message').textContent = text; };
   if (location.protocol === 'file:') {
     message('To explore, serve the map_creation folder with a local HTTP server. The README has the one-line start command.');
@@ -38,7 +38,7 @@
   }
 
   const fitScale = () => Math.min(W / width, H / height) * .96;
-  const clampScale = s => Math.max(fitScale() * .7, Math.min(2, s));
+  const clampScale = s => Math.max(fitScale(), Math.min(2, s));
   function constrain() {
     const x = Math.max(0, width / 2 - W / (2 * view.scale));
     const y = Math.max(0, height / 2 - H / (2 * view.scale));
@@ -111,7 +111,7 @@
     const start = performance.now();
     wanted = new Set();
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-    ctx.fillStyle = '#e6e8dd'; ctx.fillRect(0, 0, W, H);
+    ctx.clearRect(0, 0, W, H);
     ctx.translate(W / 2 - view.cx * view.scale, H / 2 - view.cy * view.scale);
     ctx.scale(view.scale, view.scale);
     const level = Math.max(baseLevel, Math.min(maxLevel, maxLevel + Math.ceil(Math.log2(view.scale * DPR))));
@@ -198,14 +198,25 @@
     if (document.fullscreenElement) { await document.exitFullscreen(); return; }
     const expanded = !document.body.classList.contains('expanded');
     setExpanded(expanded);
-    // Fullscreen also enlarges an embedded map beyond the article's iframe.
+    // Standalone fullscreen; embedded expansion is handled by the article.
     if (expanded && !embedded && document.documentElement.requestFullscreen) {
       try { await document.documentElement.requestFullscreen(); } catch { /* CSS expansion remains available. */ }
     }
   };
   document.addEventListener('fullscreenchange', () => setExpanded(Boolean(document.fullscreenElement)));
   window.addEventListener('message', event => {
-    if (embedded && event.origin === location.origin && event.source === parent && event.data?.type === 'lantern-sea:collapse') {
+    if (!embedded || event.origin !== location.origin || event.source !== parent) return;
+    if (event.data?.type === 'lantern-sea:theme') {
+      const theme = event.data.theme;
+      if (!['system', 'light', 'dark'].includes(theme)) return;
+      document.documentElement.style.colorScheme = theme === 'system' ? 'light dark' : theme;
+      const allowed = ['--paper', '--ink', '--muted', '--rule', '--surface', '--accent', '--font-ui'];
+      for (const key of allowed) {
+        const value = event.data.tokens?.[key];
+        if (typeof value === 'string' && value.length < 600) document.documentElement.style.setProperty(key, value);
+      }
+    }
+    if (event.data?.type === 'lantern-sea:collapse') {
       setExpanded(false);
       if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
     }
@@ -266,6 +277,7 @@
       view.fit = false; deferDetail(); constrain(); schedule(); savePosition();
     }
   });
+  window.addEventListener('pageshow', event => { if (embedded && event.persisted && started) fit(false); });
   new ResizeObserver(() => {
     W = stage.clientWidth; H = stage.clientHeight;
     if (!W || !H) return;
@@ -275,7 +287,7 @@
       started = true;
       const p = new URLSearchParams(location.hash.slice(1));
       const x = Number(p.get('x')), y = Number(p.get('y')), z = Number(p.get('z'));
-      if (p.has('x') && p.has('y') && x >= 0 && x <= 1 && y >= 0 && y <= 1 && z >= .001 && z <= 2) {
+      if (!embedded && p.has('x') && p.has('y') && x >= 0 && x <= 1 && y >= 0 && y <= 1 && z >= .001 && z <= 2) {
         view.fit = false;
         if (p.get('names') === '0') { mode = 'artwork'; $('labels').checked = false; }
         apply({cx: (x - .5) * width, cy: (y - .5) * height, scale: z});
@@ -283,4 +295,5 @@
     } else if (view.fit) fit(false);
     else { constrain(); schedule(); }
   }).observe(stage);
+  if (embedded && parent !== window) parent.postMessage({type: 'lantern-sea:ready'}, location.origin);
 })();
