@@ -584,6 +584,7 @@ export const newNoteText = (title, today) =>
     '---',
     `title: ${JSON.stringify(String(title ?? '').trim())}`,
     'description: "TK"',
+    'status: "In progress"',
     `published: ${today}`,
     'featured: false',
     'draft: true',

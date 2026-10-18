@@ -1,6 +1,7 @@
 ---
 title: "Fixture — a table in a plain Markdown note"
 description: "The .md half of the table check: no MDX, no components, same wrapper."
+status: "Fixture"
 published: 2026-01-07
 ---
 

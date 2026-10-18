@@ -1,0 +1,30 @@
+---
+import Base from '../../layouts/Base.astro';
+import ProjectList from '../../components/ProjectList.astro';
+import { PROJECTS_PREAMBLE } from '../../consts';
+import { getProjects } from '../../lib/projects';
+
+const projects = await getProjects();
+---
+
+<Base title="Projects" description={PROJECTS_PREAMBLE}>
+  <h1 class="page-title">Projects</h1>
+
+  {
+    /*
+     * The preamble describes a body of work, so it only makes sense once
+     * there is one. Before that it would be introducing an empty page.
+     */
+    projects.length > 0 ? (
+      <>
+        <p class="page-intro">{PROJECTS_PREAMBLE}</p>
+        <ProjectList projects={projects} />
+      </>
+    ) : (
+      <p class="page-intro">
+        Nothing published here yet. The <a href="/rss.xml">feed</a> will carry the first project
+        when it arrives.
+      </p>
+    )
+  }
+</Base>

@@ -54,7 +54,7 @@ const CALLOUT_LABELS = {
 };
 const TK = /\bTK\b/;
 
-const slugOf = () => /^\/writing\/([a-z0-9-]+)\/?$/.exec(location.pathname)?.[1] ?? null;
+const slugOf = () => /^\/projects\/([a-z0-9-]+)\/?$/.exec(location.pathname)?.[1] ?? null;
 const escapeHtml = (s) =>
   s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
@@ -237,7 +237,7 @@ export default {
       sessionStorage.setItem(KEY_ON, '1');
       // Astro learns about the new file a moment after it is written; go
       // once the page actually renders rather than land on a 404.
-      const url = `/writing/${msg.slug}/`;
+      const url = `/projects/${msg.slug}/`;
       for (let i = 0; i < 20; i++) {
         try {
           const res = await fetch(url, { cache: 'no-store' });
@@ -1132,7 +1132,7 @@ export default {
       const el = node && (node.nodeType === 1 ? node : node.parentElement);
       return el?.closest?.('a') ?? null;
     };
-    const noteHref = (n) => `/writing/${n.slug}/`;
+    const noteHref = (n) => `/projects/${n.slug}/`;
     const askLink = (block, rect) => {
       const a = linkAt();
       if (!getSelection().rangeCount) return;

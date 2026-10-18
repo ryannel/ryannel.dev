@@ -146,7 +146,14 @@ export default defineConfig({
     },
   },
   build: {
-    // Emits /writing/slug/index.html — the canonical URLs on this site all end in "/".
+    // Emits /projects/slug/index.html — the canonical URLs on this site all end in "/".
     format: 'directory',
+  },
+  // Notes used to live under /writing/. These two were published there, so
+  // their old addresses keep working.
+  redirects: {
+    '/writing': '/projects/',
+    '/writing/painting-a-100-megapixel-world': '/projects/painting-a-100-megapixel-world/',
+    '/writing/olfactory-atlas': '/projects/olfactory-atlas/',
   },
 });

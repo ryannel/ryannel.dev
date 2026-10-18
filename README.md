@@ -1,6 +1,6 @@
 # ryannel.dev
 
-A small personal site: writing, projects, and a short about page.
+A small personal site: projects, each with a write-up of how it was made, and a short about page.
 
 Astro, static output, Markdown/MDX content, no backend, no database, no CMS.
 The site's own JavaScript is two small inline scripts for the theme toggle — no bundle, nothing
@@ -10,12 +10,11 @@ Hosted on GitHub Pages, so hosting costs nothing.
 
 ```
 src/
-  content/writing/     one .mdx file per note, served at /writing/<slug>/
-  content/projects/    one .md file per project
+  content/projects/    one .mdx file per project, served at /projects/<slug>/
   content.config.ts    frontmatter schemas — the only place fields are defined
-  consts.ts            name, links, taglines, how many notes the home page shows
-  pages/               home, /writing, /writing/<slug>, /projects, /about, /rss.xml, 404
-  components/          head, header, footer, note list, callout, figure, date, theme toggle
+  consts.ts            name, links, taglines, how many projects the home page shows
+  pages/               home, /projects, /projects/<slug>, /about, /rss.xml, 404
+  components/          head, header, footer, project list, callout, figure, date, theme toggle
   layouts/Base.astro   the page shell
   styles/global.css    the whole design — one file, tokens at the top
 public/                CNAME, robots.txt, favicon, og.png, grain.png, fonts/, diagrams/
@@ -49,7 +48,7 @@ Then open <http://localhost:4321>. Drafts and samples are visible in dev and exc
 | `npm run og` | Regenerate `public/og.png` after editing `scripts/generate-og.mjs` |
 | `npm run grain` | Regenerate `public/grain.png`, the dark-mode texture |
 
-Writing a note is: create the file, keep `npm run dev` open, push. CI runs the full set of checks
+Adding a project is: create the file, keep `npm run dev` open, push. CI runs the full set of checks
 on every push and fails the deploy rather than publishing something broken, so there is nothing you
 have to remember to run first.
 
@@ -61,20 +60,22 @@ npm run check && npm run build && npm run verify && npm test
 
 See [Validation](#validation) for what each one catches.
 
-## Writing a new note
+## Adding a project
 
-Everything dated is a Note, whether it is 300 words or 3,000. "Note" describes the stance, not the
-length — there is no separate essay or article type. `featured: true` is the only lever for giving
-a piece more prominence.
+Everything on the site is a project: something built, with the write-up of how it went. There is
+no separate note, essay or article type. `featured: true` is the only lever for giving a piece
+more prominence.
 
-Create one file in `src/content/writing/`. The filename becomes the URL:
-`messy-real-world-context.mdx` → `/writing/messy-real-world-context/`. Pick it carefully, because
-changing it later breaks any link that is already out there.
+Create one file in `src/content/projects/`. The filename becomes the URL:
+`olfactory-atlas.mdx` → `/projects/olfactory-atlas/`. Pick it carefully, because changing it later
+breaks any link that is already out there. (Projects used to be notes under `/writing/`; the two
+that were published there are redirected in `astro.config.mjs`.)
 
 ```mdx
 ---
-title: "What I'm learning about agent context"
-description: "Why giving an agent more tokens isn't the same thing as giving it useful understanding."
+title: "A picture wheel for learning to smell"
+description: "I made a wheel of scents with a photograph for each one. Here’s how it works."
+status: "Completed"
 published: 2026-09-13
 updated:
 featured: false
@@ -84,7 +85,7 @@ draft: false
 Write here.
 ```
 
-Only `title`, `description` and `published` are required, and they have to say something: a blank
+Only `title`, `description`, `status` and `published` are required, and they have to say something: a blank
 or whitespace-only title fails the build, as does a missing or unparseable `published` date, or an
 `updated` date earlier than `published`. Everything else can be left blank or omitted.
 
@@ -92,7 +93,8 @@ or whitespace-only title fails the build, as does a missing or unparseable `publ
 | --- | --- |
 | `title` | Used as the page heading, `<title>` and social preview title |
 | `description` | One sentence. Shown under the title, in lists, in RSS and in social previews |
-| `published` | `YYYY-MM-DD`. The note's date, and its sort order |
+| `status` | Free text shown beside the date, e.g. `Completed`, `In progress` |
+| `published` | `YYYY-MM-DD`. The project's date, and its sort order |
 | `updated` | Only when you add a dated update block. Not for typos or broken links |
 | `featured` | `true` floats it to the top of the home page |
 | `draft` | `true` — unfinished. Kept out of the build; still visible in `npm run dev` |
@@ -100,18 +102,18 @@ or whitespace-only title fails the build, as does a missing or unparseable `publ
 | `tags` | Optional, descriptive only — there are deliberately no tag pages |
 | `image` | Optional path to a social preview image, e.g. `/og/context.png` |
 | `links` | Anything worth pointing at — code, a skill, a project, a discussion elsewhere |
-| `related` | Filenames (without extension) of other notes — rendered at the end |
+| `related` | Filenames (without extension) of other projects — rendered at the end |
 
 Example of the optional end matter:
 
 ```yaml
 links:
   - label: "The code this came from"
-    href: "https://github.com/ryannel/groundwork"
+    href: "https://github.com/ryannel/experiments"
   - label: "Discussion"
     href: "https://example.com/thread"
 related:
-  - coding-agents-context-across-a-large-system
+  - painting-a-100-megapixel-world
 ```
 
 `links` is deliberately generic — no platform is assumed or privileged. Add one when a particular
@@ -119,7 +121,7 @@ piece actually has somewhere worth pointing, and leave it out otherwise.
 
 ### Callouts
 
-Available in any `.mdx` note without importing anything:
+Available in any `.mdx` project without importing anything:
 
 ```mdx
 <Callout type="hypothesis">What I currently think.</Callout>
@@ -128,21 +130,21 @@ Available in any `.mdx` note without importing anything:
 <Callout type="update" label="Update — March 2027">What changed my mind.</Callout>
 ```
 
-### Revising a note
+### Revising a project
 
-Notes are dated snapshots, not living documentation. A note dated September 2026 records what was
+Write-ups are dated snapshots, not living documentation. One dated September 2026 records what was
 built, observed and understood in September 2026. It is not kept in line with a later view.
 
 When the thinking moves materially, in order of preference:
 
-1. write a new note;
+1. write up the new version as a new project;
 2. link it to the earlier one via `related:`;
-3. if it helps a reader, add a short dated update to the old note pointing at the new thinking:
+3. if it helps a reader, add a short dated update to the old one pointing at the new thinking:
 
 ```mdx
 <Callout type="update" label="Update — March 2027">
   I've changed my mind about part of this. I wrote about what changed
-  [here](/writing/the-newer-note/).
+  [here](/projects/the-newer-project/).
 </Callout>
 ```
 
@@ -152,7 +154,7 @@ formatting fixes need no update block.
 
 ### Editing in the browser
 
-Under `npm run dev` only, a note can be edited on the page itself, the way a post is edited in
+Under `npm run dev` only, a project (the editor calls it a note) can be edited on the page itself, the way a post is edited in
 Ghost. Open the note, click the pencil (**Edit note**) in Astro's dev toolbar at the bottom of
 the window, and click into any paragraph, heading, list item, quote, callout, caption, the title
 or the description. Text is written back into the MDX file about a second after you stop typing,
@@ -228,8 +230,8 @@ has alt text, no TK is left, no notes to Claude are left, no unused imports rema
 button removes them), draft is off, and a git row: committed, differs from what is committed, or
 not in git yet. Publishing itself is still a plain push.
 
-⌘⌥N, or the pencil on any page that isn't a note, asks for a title and creates
-`src/content/writing/<slug>.mdx` with today's date, `draft: true` and a description of `TK`, then
+⌘⌥N, or the pencil on any page that isn't a project, asks for a title and creates
+`src/content/projects/<slug>.mdx` with today's date, `status: "In progress"`, `draft: true` and a description of `TK`, then
 opens it with its first block ready to type into. ⌘/ lists every shortcut, including a few not
 mentioned above: ⌘⇧X for strikethrough, ⌘⌥0/2/3 for paragraph, heading and subheading. Escape
 steps out of whatever is open one level at a time, then out of the block.
@@ -313,36 +315,27 @@ Two ways for a file to exist here without being published, and one rule that hid
   deleted.
 
 They mean opposite things about what happens next, which is why they are separate fields; nothing
-else distinguishes them. Either one keeps a note or a project out of production entirely: no route,
+else distinguishes them. Either one keeps a project out of production entirely: no route,
 no listing, no RSS entry, no sitemap entry, and no mention from another page's `related:`. In
 `astro dev` both are visible and badged, so you can read one before publishing.
 
-The rule is `isPublished` in `src/lib/notes.ts`, and it is the only one. Everything that selects or
-resolves content goes through it — the archive, the home page, the feed, the routes the sitemap is
-built from, and the related lists on notes and on projects. `scripts/test-visibility.mjs` builds
+The rule is `isPublished` in `src/lib/projects.ts`, and it is the only one. Everything that selects or
+resolves content goes through it — the index, the home page, the feed, the routes the sitemap is
+built from, and the related lists on project pages. `scripts/test-visibility.mjs` builds
 fixture content designed to slip past it and fails if anything does.
 
 One thing this is not: a public Git repository is not confidential storage. A draft is unpublished,
 not private.
 
 A `related:` reference that matches nothing is still a build error — a typo and an unpublished
-note are different problems, and only one of them should be silent. A reference to something that
+project are different problems, and only one of them should be silent. A reference to something that
 exists but is hidden is neither: it is simply dropped from the rendered list, and if that empties
 the list the whole section goes with it rather than leaving a heading over nothing.
-
-### Adding a project
-
-Same idea, in `src/content/projects/`, with `name`, `description`, `status`, and optional
-`order`, `links`, `related`, `draft` and `sample`. Projects render inline on `/projects` — there
-are no separate project pages, and adding them would make the site bigger without helping a reader.
-
-`description` is what the home page shows, so make it say what the project *is*. The body says why
-it exists, what a visitor can look at, and how finished it is.
 
 ## Publishing
 
 ```bash
-git add . && git commit -m "note: context is the hard part" && git push
+git add . && git commit -m "Publish: a picture wheel for learning to smell" && git push
 ```
 
 Pushing to `main` builds and deploys. Nothing else to do.
@@ -439,17 +432,16 @@ Recorded so these stay decisions rather than oversights, and so the site doesn't
   custom events are deliberately not tracked. (`localStorage` is used for one thing only: the
   theme you picked.)
 - **No tag or category pages.** `tags` is descriptive metadata, not navigation.
-- **No per-project pages.** Projects are short; they render on one page.
 - **No comments, share buttons, newsletter, follower counts or engagement metrics.** The site is
-  the canonical archive. Distribution is per-piece and manual: some notes are worth submitting
+  the canonical archive. Distribution is per-piece and manual: some projects are worth submitting
   somewhere, most are not, and the site does not depend on any of it. No platform is the default,
   and none should get an integration.
-- **No separate essay, article or long-form type.** Everything dated is a Note.
-- **No per-note generated social images.** One static `public/og.png` covers every page. Set
-  `image:` in a note's frontmatter to override it with a committed file.
+- **No separate note, essay or article type.** Everything dated is a project.
+- **No per-project generated social images.** One static `public/og.png` covers every page. Set
+  `image:` in a project's frontmatter to override it with a committed file.
 - **No theme framework.** The toggle is three states and about fifteen lines — see below.
 
-Before adding anything: does it help publish useful writing, or help a reader understand the
+Before adding anything: does it help publish a useful write-up, or help a reader understand the
 work? If not, leave it out.
 
 ## Analytics
@@ -589,22 +581,3 @@ with `light-dark()` like everything else.
 correct without JavaScript, but the HTML spec picks the *first* matching `theme-color`, so an
 override cannot simply be appended — `ThemeToggle.astro` removes both and owns a single tag
 instead, and updates it when the OS flips while "system" is selected.
-
-## Placeholder content
-
-The six notes in `src/content/writing/` are placeholders. Each carries a visible "sample content"
-line and `sample: true`, so **they are not published** — the deployed site has no notes yet. They
-are still there to read in `npm run dev`, which is what they are for: they show what a note looks
-like before there is a real one. Rewrite or delete them; `rm src/content/writing/*.mdx` is a fine
-way to start. Removing `sample: true` publishes one.
-
-The three projects in `src/content/projects/` are **not** placeholders and are published. Two point
-at real repositories; `Experiments` describes real practice but has nothing linkable yet.
-
-If you delete the notes, clear the `related:` lists in the projects too: a reference to a note that
-no longer exists is a build error, deliberately. With no published notes the site still reads as
-intentional — the home page drops its writing section rather than showing a heading over nothing,
-and `/writing/` says so in a sentence and points at the projects and the feed.
-
-The collection is `writing` throughout — folder, URL and schema. "Writing" is the section; a
-"Note" is one piece in it.

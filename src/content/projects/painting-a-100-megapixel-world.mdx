@@ -1,0 +1,240 @@
+---
+title: "Painting a 100-megapixel world"
+description: "A fantasy map 12,000 pixels wide, painted in 81 pieces by a model that can only paint 1,536 pixels at a time. How it works, and how to make your own."
+status: "Completed"
+published: 2026-09-20
+featured: false
+draft: false
+tags: ["experiments", "generative", "world-building"]
+links:
+  - label: "The map-making kit on GitHub"
+    href: "https://github.com/ryannel/experiments/tree/main/map_creation"
+---
+
+import world from '../../assets/atlas-experiment/world-and-detail.jpg';
+import asterfall from '../../assets/atlas-experiment/asterfall.jpg';
+import crownmere from '../../assets/atlas-experiment/crownmere.jpg';
+import styleSearch from '../../assets/atlas-experiment/style-search.jpg';
+import firstMap from '../../assets/atlas-experiment/first-map.jpg';
+import territorial from '../../assets/atlas-experiment/territorial-plan.jpg';
+import tileGrid from '../../assets/atlas-experiment/tile-grid.jpg';
+import tileSteps from '../../assets/atlas-experiment/tile-steps.jpg';
+import tileJoin from '../../assets/atlas-experiment/tile-join.jpg';
+import tileBlock from '../../assets/atlas-experiment/tile-block.jpg';
+import growth from '../../assets/atlas-experiment/growth.jpg';
+import labelsPair from '../../assets/atlas-experiment/labels-pair.jpg';
+
+<Figure
+  src={world}
+  alt="The complete Lantern Sea world map, with a small gold rectangle on the royal capital and an inset in the lower right showing that rectangle at full size: a castle with blue roofs above a walled town, a river and fields."
+  caption="A map worth exploring."
+  priority
+  wide
+/>
+
+I’ve always been drawn to maps. Old ones with compass stars and sea monsters. The hand-drawn
+ones on the first pages of a fantasy novel. The road atlases my parents would unfold across the
+whole front of the car on family holidays. A good map makes you want to trace a road with your
+finger and wonder what’s at the end of it. Now and then I’ve doodled my own, using tools like
+Inkarnate and Dungeondraft, but never quite got there.
+
+When GPT-6 Astra came out with its new image model, I wanted another go.
+
+Ten days, 433 turns with the agent and 300 million tokens later, I have one. It’s 12,000 by
+8,000 pixels, painted in 81 overlapping pieces. It isn’t perfect: a few cities are a little
+warped, and some tiles still don’t quite line up. But it’s closer to the map in my head than
+anything I’ve managed before, and almost every part of it is worth zooming into.
+
+<Figure
+  src={asterfall}
+  alt="The observatory on the northern rim of Asterfall’s crater lake: a domed telescope house and bell tower among cypresses, walled terraces dropping to cliffs, a compass rose faintly drawn in the deep blue water below, and open sea behind."
+  caption="The observatory at Asterfall. On the map it is smaller than a fingernail."
+/>
+
+Most of this page is about one problem. The model that does the painting can only make a
+picture 1,536 pixels wide, and I wanted one nearly eight times wider. We’ll get to that. First,
+the map needs a look.
+
+## Finding the look
+
+Two models share the work. Astra plans, writes the prompts and checks the results. GPT Image 2
+does the painting. The first job is to agree on a style: the agent paints the same small scene a
+few different ways, and you pick one. Everything after follows that choice, so it’s worth
+taking your time.
+
+I spent an afternoon here. The early attempts looked like satellite photographs.
+
+<Figure
+  src={styleSearch}
+  alt="Three early generated continents in a satellite-photograph style: snowy peaks, green lowlands and an ochre desert, with faint road lines and a title reading The Known Lands."
+  caption="An afternoon of continents. Handsome, and about as inviting as elevation data."
+/>
+
+They aren’t bad. The coastlines are sharp and the mountains look real. But look at the roads:
+faint scratches. The towns are smudges. Nothing suggests anyone lives there, so there’s nothing
+to go and look at.
+
+So I talked to Astra about the things I *did* want to look at: roads and rivers, how a town sits
+in the land, the feel of the place. By the evening it had painted this.
+
+<Figure
+  src={firstMap}
+  alt="The first hand-painted Lantern Sea map: two continents, Eldervane and Sarthuun, either side of a central sea, with snowy northern mountains, a desert basin in the southwest, volcanic islands in the southeast and a scattering of labelled cities."
+  caption="The first Lantern Sea, painted in a single generation on the first evening. Two continents, a dozen cities, one enormous castle per people."
+/>
+
+Now there are individual trees. Settlements have proper roofs and sit on slopes and shores. You
+can follow a river from the mountains down to a sea that glows. This painting became the
+reference for everything that followed.
+
+## Who lives here
+
+A map is more fun to explore when the places on it have a reason to be there. So the next step
+is the world itself: the peoples and their realms, where each keeps its capital and its smaller
+towns, how they build, and the roads between them. All of it is laid over the land, so a road
+has somewhere to go and a port has a reason to exist.
+
+Bring as much of this as you like. When you run out of ideas, ask the agent to fill the gaps.
+
+I asked it to take inspiration from Dungeons & Dragons, and to make room for all the variety in
+that setting.
+
+<Figure
+  src={territorial}
+  alt="The painted map overlaid with 28 numbered, colour-coded territory outlines, titled Room for countries, not just landmarks."
+  caption="The world, carved up. Twenty-eight realms, up from a dozen castles."
+/>
+
+## Too big for one picture
+
+Here’s the problem. GPT Image 2 paints at most 1,536 by 1,024 pixels. The first map above, the
+whole world, is one of those pictures.
+
+The finished map is 12,000 by 8,000 pixels. That’s 96 million pixels, about 61 times as many as
+the model can paint in one go.
+
+*Couldn’t you paint it small and scale it up?*
+
+You could, but scaling a picture up makes it bigger, not more detailed. A town that was a smudge
+becomes a larger smudge.
+
+So the map is painted in pieces instead: a nine-by-nine grid of tiles, each one the full 1,536
+by 1,024.
+
+<Figure
+  src={tileGrid}
+  alt="The world map divided by a nine-by-nine grid of tiles. Four tiles in the western kingdom are highlighted in green as painted, four to their north are outlined in gold as next, and the rest are dimmed."
+  caption="The plan, four tiles in. Green is painted, gold is next."
+  wide
+/>
+
+Painting a tile is easy. Getting two tiles to agree is the hard part. Paint them separately and a
+river will leave one tile at a different place, width and colour from where it enters the next.
+
+Two things fix most of that. The tiles overlap their neighbours by a couple of hundred pixels,
+so every join is painted twice. And before a new tile is painted, the agent copies in the
+finished edges of the tiles already beside it, so the model can see what it has to match.
+
+## The first tile
+
+Before the loop starts, one tile is painted at full size. This is where it either comes together
+or doesn’t, so re-roll it until you’re happy. It’s also where you decide how places are drawn: a
+handful of roofs, a marker, or something in between. Every later tile copies what you choose
+here.
+
+I went with cities as landmarks. Each one is painted into the land so it belongs there, but
+bigger and bolder than it should be, so it still reads from a long way out. You can spot the
+castle from the whole-world view, then lean in.
+
+<Figure
+  src={crownmere}
+  alt="The capital Crownmere at full resolution: a castle with blue slate roofs on a rise above a river bend, a walled town below it, a bridge, quays with boats, and fields and hedgerows all around."
+  caption="Oversized castles as map markers."
+  wide
+/>
+
+## The other eighty
+
+From here the agent repeats the same loop for every tile. It draws a rough guide. It copies in
+the painted edges of any finished neighbours. It paints. Then it checks that every river and
+road carries on across the joins, and repaints anything that’s broken.
+
+Let’s look at one.
+
+<Figure
+  src={tileSteps}
+  alt="Two panels. Top: a flat schematic guide with a blue river, pale roads and two numbered settlement markers, with strips of finished painting along its top and left edges. Bottom: the painted tile that came back, with the river, a bridge town, a walled fortress and forested hills."
+  caption="One tile. The guide going in, and the painting that came back."
+  wide
+/>
+
+The top half is what goes in. The guide is deliberately crude: shaded relief, a blue line for
+the river, a pale one for each road, a numbered marker where a settlement goes. The rock, the
+roofs and the folds in the land are left for the model to invent.
+
+Now look along the top and left edges. Those strips aren’t guide, they’re finished painting,
+copied from the tiles already done. They show the model the river at its real width and the
+light it has to match. The bottom half is what came back.
+
+*Does it actually line up?*
+
+Mostly. Here’s a strip across one join, at full size.
+
+<Figure
+  src={tileJoin}
+  alt="A native-resolution strip across the boundary between two tiles, with the shared band marked by two dashed lines. A walled town sits in the tile above, a road runs down through the band into the tile below, and a fortress with red banners stands at the bottom right."
+  caption="At full size. The dashed lines mark the strip both tiles painted; the road and the fields carry straight through."
+  wide
+/>
+
+The two dashed lines mark the band both tiles painted. Follow the road down out of the town: it
+crosses the band and carries on into the tile below without a kink. The fields do the same.
+
+Because the map grows outward from where it started, most tiles have two painted sides to match,
+not one. Here are four together, the way they sit in the finished map.
+
+<Figure
+  src={tileBlock}
+  alt="Four adjacent tiles of the finished map with their outlines drawn in gold, overlapping at the edges. A castle town at the top left, farmland and a river running down through all four, a marsh with a stockade at the bottom left, and a harbour town on a rocky coast at the bottom right."
+  caption="Four tiles, from the capital down to the coast. The gold lines are the tile edges."
+  wide
+/>
+
+Do that eighty times and the map closes up.
+
+<Figure
+  src={growth}
+  alt="Four snapshots of the whole world map with the unpainted part dimmed: a corner of the western continent painted, then the whole western half, then most of the east, then all of it."
+  caption="The map filling in: 20 tiles, 45, 65, all 81. The last 61 in a single day."
+  wide
+/>
+
+## Labels last
+
+The names go on at the very end, as a separate layer over the painting. Keeping them off the
+tiles means you can rename a place, or move a label, without repainting anything.
+
+<Figure
+  src={labelsPair}
+  alt="The same region of the map twice: on the left with no text, on the right with the labels Crownmere, Gatewell, Hammerfall, Dunford, Saint Orrel, Copperstairs and Barleycross laid over it."
+  caption="Crownmere without its labels, and with them."
+  wide
+/>
+
+## Make your own
+
+Everything on this page is in a kit in my experiments repository. To get just that folder:
+
+```sh
+git clone --filter=blob:none --sparse https://github.com/ryannel/experiments.git experiments
+cd experiments
+git sparse-checkout set map_creation
+```
+
+Open it in Codex as its own project. It should default to GPT-6 Astra on High, which gave me the
+best results. Type `$map-director` and describe the world you have in mind. The director skill
+takes you through the same steps as this page: the look, the world, the first tile, the rest,
+and the labels.
+
+It took me ten days. With the process already worked out, you could have one of your own by the
+weekend.

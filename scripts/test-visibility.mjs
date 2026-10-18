@@ -1,16 +1,16 @@
 /**
  * The publication rule, tested end to end.
  *
- * There is one rule — isPublished in src/lib/notes.ts — and several places that
- * have to obey it: the routes, the home page, the archive, the feed, the
- * sitemap, and the related lists on notes and on projects. The related lists are
+ * There is one rule — isPublished in src/lib/projects.ts — and several places that
+ * have to obey it: the routes, the home page, the index, the feed, the
+ * sitemap, and the related lists on project pages. The related lists are
  * the ones that have gone wrong before, because they resolve references rather
  * than query the collection, so they can advertise something the build never
  * made.
  *
  * The fixtures live in tests/fixtures/, outside src/content/, where no build can
  * reach them. This copies the project into a temporary directory, drops them in
- * there, and checks that build — so the fixtures cannot become real articles and
+ * there, and checks that build — so the fixtures cannot become real projects and
  * the real content is never touched.
  *
  * Only the build half of the rule is asserted here. The other half — that hidden
@@ -33,7 +33,6 @@ const check = (ok, message) => {
 const work = mkdtempSync(join(tmpdir(), 'ryannel-fixtures-'));
 try {
   for (const entry of COPY) cpSync(join(ROOT, entry), join(work, entry), { recursive: true });
-  cpSync(join(ROOT, 'tests/fixtures/writing'), join(work, 'src/content/writing'), { recursive: true });
   cpSync(join(ROOT, 'tests/fixtures/projects'), join(work, 'src/content/projects'), { recursive: true });
   symlinkSync(join(ROOT, 'node_modules'), join(work, 'node_modules'));
 
@@ -56,44 +55,41 @@ try {
     check(false, `verify-build failed on the fixture build:\n    ${output.split('\n').join('\n    ')}`);
   }
 
-  // 1. A published note keeps the references it can show and drops the rest.
-  const referencing = read('writing/__fixture-references-hidden/index.html');
-  check(referencing !== null, 'the published note referencing hidden entries was not built');
+  // 1. A published project keeps the references it can show and drops the rest.
+  const referencing = read('projects/__fixture-references-hidden/index.html');
+  check(referencing !== null, 'the published project referencing hidden entries was not built');
   if (referencing) {
     check(
-      referencing.includes('/writing/__fixture-visible-note/'),
+      referencing.includes('/projects/__fixture-visible-note/'),
       'the one visible reference was filtered out along with the hidden ones',
     );
-    check(referencing.includes('Related notes'), 'the related section vanished while it still had an entry');
+    check(referencing.includes('Related projects'), 'the related section vanished while it still had an entry');
     for (const id of hiddenIds) {
-      check(!referencing.includes(id), `${id} is still linked from the note that references it`);
+      check(!referencing.includes(id), `${id} is still linked from the project that references it`);
     }
   }
 
   // 2. When every reference is hidden the section goes, rather than emptying.
-  const allHidden = read('writing/__fixture-all-refs-hidden/index.html');
-  check(allHidden !== null, 'the published note whose references are all hidden was not built');
+  const allHidden = read('projects/__fixture-all-refs-hidden/index.html');
+  check(allHidden !== null, 'the published project whose references are all hidden was not built');
   if (allHidden) {
-    check(!allHidden.includes('Related notes'), 'an empty "Related notes" heading was rendered');
+    check(!allHidden.includes('Related projects'), 'an empty "Related projects" heading was rendered');
   }
 
-  // 3. The same on the projects page, which renders its own list.
-  const projects = read('projects/index.html');
-  check(projects !== null, 'the projects page was not built');
-  if (projects) {
-    check(projects.includes('Fixture project'), 'the fixture project was not rendered at all');
-    check(
-      !projects.includes('project-related-heading'),
-      'the projects page rendered a "Related notes" heading with nothing under it',
-    );
+  // 3. The index lists what is published and nothing that is hidden.
+  const index = read('projects/index.html');
+  check(index !== null, 'the projects index was not built');
+  if (index) {
+    check(index.includes('/projects/__fixture-visible-note/'), 'the visible fixture is missing from the index');
+    for (const id of hiddenIds) check(!index.includes(id), `${id} is listed on the projects index`);
   }
 
   // 4. Tables reach the scroll wrapper from every format that can produce one.
   //     verify-build counts <table> against wrapped <table> on every page; these
   //     assertions are what stop that count being 0 = 0 on a page with no table.
   const tableCases = [
-    ['writing/__fixture-visible-note/index.html', 2, 'a Markdown table and a table written as markup in .mdx'],
-    ['writing/__fixture-markdown-table/index.html', 1, 'a Markdown table in a plain .md note'],
+    ['projects/__fixture-visible-note/index.html', 2, 'a Markdown table and a table written as markup in .mdx'],
+    ['projects/__fixture-markdown-table/index.html', 1, 'a Markdown table in a plain .md project'],
   ];
   for (const [file, expected, what] of tableCases) {
     const html = read(file) ?? '';
@@ -102,7 +98,7 @@ try {
   }
 
   // 5. A figure from /public keeps the dimensions that reserve its space...
-  const figurePage = read('writing/__fixture-visible-note/index.html') ?? '';
+  const figurePage = read('projects/__fixture-visible-note/index.html') ?? '';
   check(
     /<img[^>]+src="\/diagrams\/repo-vs-system-model\.svg"[^>]+width="640"[^>]+height="280"/.test(figurePage),
     'the public-path figure lost its width/height, so the page reflows when it loads',
@@ -110,9 +106,9 @@ try {
 
   // ...and one without them has to stop the build rather than ship a reflow.
   writeFileSync(
-    join(work, 'src/content/writing/__fixture-figure-no-dimensions.mdx'),
+    join(work, 'src/content/projects/__fixture-figure-no-dimensions.mdx'),
     ['---', 'title: "Fixture — a figure missing its dimensions"', 'description: "Must fail the build."',
-     'published: 2026-01-08', '---', '', '<Figure src="/diagrams/repo-vs-system-model.svg" alt="No dimensions." />', ''].join('\n'),
+     'status: "Fixture"', 'published: 2026-01-08', '---', '', '<Figure src="/diagrams/repo-vs-system-model.svg" alt="No dimensions." />', ''].join('\n'),
   );
   let buildFailed = false;
   let buildOutput = '';
@@ -122,7 +118,7 @@ try {
     buildFailed = true;
     buildOutput = String(error.stderr ?? '') + String(error.stdout ?? '');
   }
-  rmSync(join(work, 'src/content/writing/__fixture-figure-no-dimensions.mdx'), { force: true });
+  rmSync(join(work, 'src/content/projects/__fixture-figure-no-dimensions.mdx'), { force: true });
   check(buildFailed, 'a <Figure> from /public with no width or height built successfully');
   check(
     buildOutput.includes('needs width and height'),

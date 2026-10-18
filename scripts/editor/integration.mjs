@@ -40,7 +40,7 @@ import {
   slugify,
 } from './edits.mjs';
 
-const NOTES_DIR = 'src/content/writing';
+const NOTES_DIR = 'src/content/projects';
 const ASSETS_DIR = 'src/assets';
 const CONTEXT_FILE = '.astro/editor-context.json';
 const SLUG = /^[a-z0-9][a-z0-9-]*$/;

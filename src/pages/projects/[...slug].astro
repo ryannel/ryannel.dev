@@ -1,0 +1,78 @@
+---
+import type { GetStaticPaths } from 'astro';
+import { render } from 'astro:content';
+import Base from '../../layouts/Base.astro';
+import Callout from '../../components/Callout.astro';
+import Figure from '../../components/Figure.astro';
+import FormattedDate from '../../components/FormattedDate.astro';
+import { getProjects, projectHref, readingTime, resolveProjects } from '../../lib/projects';
+
+export const getStaticPaths = (async () => {
+  const projects = await getProjects();
+  return projects.map((project) => ({ params: { slug: project.id }, props: { project } }));
+}) satisfies GetStaticPaths;
+
+const { project } = Astro.props;
+const { Content } = await render(project);
+const related = await resolveProjects(project.data.related);
+const links = project.data.links;
+---
+
+<Base
+  title={project.data.title}
+  description={project.data.description}
+  image={project.data.image}
+  type="article"
+  publishedTime={project.data.published}
+  modifiedTime={project.data.updated}
+>
+  <article>
+    {/* "note-header" is also how the dev-only editor knows a new page has rendered. */}
+    <header class="note-header">
+      <h1>{project.data.title}</h1>
+      <p class="description">{project.data.description}</p>
+      <p class="meta">
+        <span>{project.data.status}</span>
+        <FormattedDate date={project.data.published} />
+        {project.data.updated && <FormattedDate date={project.data.updated} prefix="updated" />}
+        <span>{readingTime(project.body)} min read</span>
+        {project.data.tags.length > 0 && <span>{project.data.tags.join(', ')}</span>}
+      </p>
+    </header>
+
+    <div class="prose">
+      {/* Available in any .mdx project without importing them. */}
+      <Content components={{ Callout, Figure }} />
+    </div>
+
+    {
+      links && links.length > 0 && (
+        <section class="endmatter">
+          <h2 class="label">Links</h2>
+          <ul>
+            {links.map((link) => (
+              <li>
+                <a href={link.href}>{link.label}</a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )
+    }
+
+    {
+      related.length > 0 && (
+        <section class="endmatter">
+          <h2 class="label">Related projects</h2>
+          <ul>
+            {related.map((entry) => (
+              <li>
+                <a href={projectHref(entry.id)}>{entry.data.title}</a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )
+    }
+  </article>
+</Base>

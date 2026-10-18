@@ -1,0 +1,38 @@
+---
+import FormattedDate from './FormattedDate.astro';
+import { hiddenReason, projectHref, readingTime, type Project } from '../lib/projects';
+
+interface Props {
+  projects: Project[];
+  /** Show the reading time alongside the date. */
+  showReadingTime?: boolean;
+  /**
+   * Give the first entry the lead treatment: a larger title and a little more
+   * room. Used on the home page, where the selection is an argument about what
+   * to read first. The index is a list, so it stays even.
+   */
+  lead?: boolean;
+}
+
+const { projects, showReadingTime = true, lead = false } = Astro.props;
+---
+
+<ul class="note-list">
+  {
+    projects.map((project, index) => (
+      <li class={lead && index === 0 ? 'is-lead' : undefined}>
+        <a href={projectHref(project.id)}>
+          {project.data.title}
+          {/* Only ever rendered by `astro dev`: a build has no hidden entries. */}
+          {hiddenReason(project) && <span class="hidden-flag">{hiddenReason(project)}</span>}
+        </a>
+        <p class="note-description">{project.data.description}</p>
+        <p class="meta">
+          <span>{project.data.status}</span>
+          <FormattedDate date={project.data.published} />
+          {showReadingTime && <span>{readingTime(project.body)} min read</span>}
+        </p>
+      </li>
+    ))
+  }
+</ul>

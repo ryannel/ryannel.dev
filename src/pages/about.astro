@@ -8,33 +8,39 @@ const linkedin = ELSEWHERE.find((link) => link.label === 'LinkedIn');
 
 <Base
   title="About"
-  description="Ryan Nel — Senior Staff Software Engineer in Gothenburg, working on large software systems and AI engineering."
+  description="Ryan Nel — a software engineer in Gothenburg who learns by building things."
 >
   <h1 class="page-title">About</h1>
 
   <div class="prose page-prose">
+    <p>I’m Ryan. I learn by building.</p>
     <p>
-      I’m Ryan Nel, a Senior Staff Software Engineer in Gothenburg. I work on large-scale software
-      systems, and increasingly on the systems we build <em>with</em> AI rather than around it.
+      Reading about something only gets me so far. I understand it properly once I’ve tried to make
+      it or use it, got it a bit wrong, and had to work out why. So I usually have a few projects on
+      the go.
+      Some are software. Some are closer to art: maps, pictures, small ways of telling a story.
     </p>
     <p>
-      Most of what interests me sits at the boundary between the two: how you give a system enough
-      of the right context to reason well, where agents stop understanding a codebase, how to
-      evaluate any of it honestly, and what architecture looks like when a component can be
-      confidently wrong.
+      I’ve started sharing some of my latest work <a href="/projects/">here</a>. Each project comes
+      with a write-up of how it was made: what I tried, what didn’t work, and how I got around it.
+      If you want to try one out, or make something similar, the code and prompts are usually on
+      GitHub and linked in each write-up.
     </p>
     <p>
-      I learn by building. The notes here are the residue of that — what I tried, what surprised me,
-      what didn’t work, and what I currently think. I’d rather write something specific and
-      provisional than something general and confident.
+      At work I’m a Senior Staff Software Engineer at Volvo Cars, and that’s where I put what I’ve learnt to use. A lot of the job is understanding a problem
+      properly before solving it: how part of the business works, why a team does things a certain
+      way, what people actually need from a system. I spend time with the people who build, run and
+      depend on our systems, and work with the people leading our product, business and engineering
+      on where those systems go next. I still get into the code when that’s the quickest way to move
+      a problem along.
     </p>
     <p>
-      Nothing here reflects or discloses my employer’s work. Where a lesson comes from professional
-      experience, it’s generalised.
+      Nothing here is about my employer’s work. Where something I learnt at work shows up, it’s in
+      general terms.
     </p>
     <p>
-      If any of it is useful, or wrong, I’d like to hear about it —
-      {linkedin ? <a href={linkedin.href} rel="me">LinkedIn</a> : 'get in touch'} is the surest way
+      If any of it is useful, or wrong, I’d like to hear about it.{' '}
+      {linkedin ? <a href={linkedin.href} rel="me">LinkedIn</a> : 'Get in touch'} is the easiest way
       to reach me.
     </p>
   </div>

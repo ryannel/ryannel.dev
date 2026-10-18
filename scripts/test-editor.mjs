@@ -682,7 +682,7 @@ test('slugify stops at 80 characters and never ends on a hyphen', () => {
 test('newNoteText writes front matter, a blank line and no body', () => {
   assert.equal(
     newNoteText('A new note', '2026-09-20'),
-    '---\ntitle: "A new note"\ndescription: "TK"\npublished: 2026-09-20\nfeatured: false\ndraft: true\n---\n\n',
+    '---\ntitle: "A new note"\ndescription: "TK"\nstatus: "In progress"\npublished: 2026-09-20\nfeatured: false\ndraft: true\n---\n\n',
   );
   const front = readFrontmatter(newNoteText('A new note', '2026-09-20'));
   assert.equal(front.title, 'A new note');

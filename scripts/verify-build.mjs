@@ -39,10 +39,13 @@ const urlPath = (f) => {
   return rel === 'index.html' ? '/' : '/' + rel.replace(/index\.html$/, '');
 };
 const pages = htmlFiles.map((file) => ({ file, path: urlPath(file), html: read(file) }));
+// Old addresses that forward to a new one (astro.config.mjs `redirects`). They
+// are not pages: their canonical is the destination, which is the point.
+const isRedirect = (html) => html.includes('http-equiv="refresh"');
 
 // --- 1. nothing hidden reaches production, including via another page's related: ---
-// draft: unfinished. sample: placeholder. One rule, both hidden; see src/lib/notes.ts.
-const contentDirs = ['src/content/writing', 'src/content/projects'].filter(existsSync);
+// draft: unfinished. sample: placeholder. One rule, both hidden; see src/lib/projects.ts.
+const contentDirs = ['src/content/projects'].filter(existsSync);
 const hidden = contentDirs
   .flatMap((dir) => readdirSync(dir).map((n) => join(dir, n)))
   .filter((f) => /\.mdx?$/.test(f))
@@ -50,13 +53,13 @@ const hidden = contentDirs
   .filter(({ front }) => /^(draft|sample):\s*true\s*$/m.test(front))
   .map(({ file, front }) => ({
     id: file.split('/').pop().replace(/\.mdx?$/, ''),
-    title: (front.match(/^title:\s*"?(.+?)"?\s*$/m) ?? front.match(/^name:\s*"?(.+?)"?\s*$/m))?.[1],
+    title: front.match(/^title:\s*"?(.+?)"?\s*$/m)?.[1],
   }));
 
 for (const entry of hidden) {
-  check(!existsSync(join(DIST, 'writing', entry.id)), `hidden "${entry.id}" was built as a route`);
+  check(!existsSync(join(DIST, 'projects', entry.id)), `hidden "${entry.id}" was built as a route`);
   for (const { path, html } of pages) {
-    check(!html.includes(`/writing/${entry.id}/`), `hidden "${entry.id}" is linked from ${path}`);
+    check(!html.includes(`/projects/${entry.id}/`), `hidden "${entry.id}" is linked from ${path}`);
     if (entry.title) {
       check(!html.includes(entry.title), `hidden "${entry.id}" title appears on ${path}`);
     }
@@ -92,6 +95,7 @@ for (const { path, html } of pages) {
 // --- 4. head: canonical, title, description, and a social card that exists ---
 for (const { file, path, html } of pages) {
   const canonical = html.match(/<link rel="canonical" href="([^"]+)"/)?.[1];
+  if (isRedirect(html)) continue;
   if (relative(DIST, file) === '404.html') {
     check(!canonical, '404 has a canonical URL; it is not a page at an address of its own');
     check(html.includes('name="robots" content="noindex"'), '404 is missing noindex');

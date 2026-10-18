@@ -6,7 +6,7 @@ interface Props {
   description?: string;
   /** Absolute path to a social preview image, e.g. "/og.png". */
   image?: string;
-  /** Set for note pages so crawlers see an article rather than a website. */
+  /** Set for project pages so crawlers see an article rather than a website. */
   type?: 'website' | 'article';
   publishedTime?: Date;
   modifiedTime?: Date;
@@ -31,7 +31,7 @@ const {
 const path = Astro.url.pathname.endsWith('/') ? Astro.url.pathname : `${Astro.url.pathname}/`;
 const canonical = new URL(path, SITE.url);
 const socialImage = new URL(image, SITE.url);
-// Dimensions are only asserted for the committed default card; a per-note
+// Dimensions are only asserted for the committed default card; a per-project
 // override is an arbitrary file whose size we do not know here.
 const isDefaultCard = image === DEFAULT_OG.src;
 const fullTitle = title === SITE.title ? title : `${title} — ${SITE.title}`;

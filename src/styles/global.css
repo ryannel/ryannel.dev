@@ -497,7 +497,7 @@ h4 {
 }
 
 /* ---------------------------------------------------------------------------
-   Note lists
+   Project lists
    --------------------------------------------------------------------------- */
 
 .note-list {
@@ -573,16 +573,6 @@ h4 {
   padding: 0.05rem 0.35rem;
   margin-left: 0.5rem;
   vertical-align: 0.12em;
-}
-
-/* Year groups in the notes archive. */
-.year-group + .year-group {
-  margin-top: 3.25rem;
-}
-
-.year-group + .year-group .year-heading {
-  padding-top: 2.25rem;
-  border-top: 1px solid var(--rule);
 }
 
 /* ---------------------------------------------------------------------------
@@ -661,8 +651,7 @@ h4 {
 }
 
 /* Deep links land with room above them. */
-.prose :is(h2, h3)[id],
-.project[id] {
+.prose :is(h2, h3)[id] {
   scroll-margin-top: 2rem;
 }
 
@@ -857,7 +846,7 @@ pre.astro-code {
 }
 
 /* ---------------------------------------------------------------------------
-   End matter: related links, related notes
+   End matter: related links, related projects
    --------------------------------------------------------------------------- */
 
 .endmatter {
@@ -912,7 +901,7 @@ pre.astro-code {
   margin-bottom: 0;
 }
 
-/* The second line says what the writing is about; muted, so the first line
+/* The second line says what the site is about; muted, so the first line
    stays the sentence a reader lands on. */
 .lede-sub {
   color: var(--ink-muted);
@@ -930,62 +919,6 @@ pre.astro-code {
   font-family: var(--font-ui);
   font-size: 0.875rem;
   margin-top: 1.75rem;
-}
-
-.project {
-  padding-top: 2.25rem;
-  margin-top: 2.25rem;
-  border-top: 1px solid var(--rule);
-}
-
-.project:first-of-type {
-  padding-top: 0;
-  margin-top: 0;
-  border-top: 0;
-}
-
-.project h2 {
-  font-size: 1.1875rem;
-  margin-bottom: 0.3rem;
-}
-
-.project .status {
-  font-family: var(--font-ui);
-  font-size: 0.75rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--ink-muted);
-  margin: 0 0 0.75rem;
-}
-
-/* Sits tighter than a section .label: it heads a row, not a page section. */
-.project .project-related-heading {
-  margin: 1.5rem 0 0.5rem;
-}
-
-.project-related {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  font-family: var(--font-ui);
-  font-size: 0.875rem;
-}
-
-/*
- * A wrapping row of links. It used to put a middot between them with a ::before,
- * which left the separator stranded at the end of a line as soon as the row
- * wrapped — at 320px, or at large text sizes. A gap cannot be orphaned.
- */
-.project .links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem 1.25rem;
-  font-family: var(--font-ui);
-  font-size: 0.875rem;
-  margin-top: 1rem;
 }
 
 /* ---------------------------------------------------------------------------

@@ -12,10 +12,9 @@ Each file exists to reproduce one thing that was once wrong, or could be:
 | `__fixture-visible-note` | The reference that must survive filtering. |
 | `__fixture-hidden-draft` | `draft: true` — must not be built, linked or advertised. |
 | `__fixture-hidden-sample` | `sample: true` — the same rule by the other flag. |
-| `__fixture-references-hidden` | Published, references one visible and both hidden notes. Renders the visible one only. |
-| `__fixture-all-refs-hidden` | Published, references only hidden notes. The whole section must disappear. |
-| `__fixture-project` | The same case on the projects page, where the list is rendered separately. |
-| `__fixture-markdown-table` | A `.md` note: same table wrapper without MDX in the picture. |
+| `__fixture-references-hidden` | Published, references one visible and both hidden projects. Renders the visible one only. |
+| `__fixture-all-refs-hidden` | Published, references only hidden projects. The whole section must disappear. |
+| `__fixture-markdown-table` | A `.md` project: same table wrapper without MDX in the picture. |
 
 `__fixture-visible-note` also carries a Markdown table, a table written as markup
 (which reaches the processor as JSX, not as a Markdown node) and a `/public` figure

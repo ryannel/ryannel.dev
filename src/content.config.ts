@@ -14,7 +14,7 @@ const text = z.string().trim().min(1);
 
 /**
  * A date that must actually be one. Without the preprocess, `published:` left
- * empty is null, `z.coerce.date()` reads that as epoch zero, and the note
+ * empty is null, `z.coerce.date()` reads that as epoch zero, and the page
  * publishes itself on 1 January 1970 — sorted last, dated absurdly, no error.
  */
 const requiredDate = z.preprocess(
@@ -48,24 +48,30 @@ const links = optional(
  * The two ways a file can exist in the repository without being published.
  *
  * `draft` is "not finished yet". `sample` is "demonstration content" — the
- * placeholder notes that show what the reading experience looks like before
+ * placeholder pages that show what the reading experience looks like before
  * there is anything real to put here. They are kept apart because they mean
  * opposite things about what happens next: a draft is waiting to be finished,
  * a sample is waiting to be deleted.
  *
- * Both are hidden by exactly the same rule; see isPublished in src/lib/notes.ts.
+ * Both are hidden by exactly the same rule; see isPublished in src/lib/projects.ts.
  */
 const visibility = {
   draft: optional(z.boolean().default(false)),
   sample: optional(z.boolean().default(false)),
 };
 
-const writing = defineCollection({
-  loader: glob({ base: './src/content/writing', pattern: '**/*.{md,mdx}' }),
+/**
+ * Everything on the site is a project: something I built, with the write-up of
+ * how it went. Each one has its own page at /projects/<slug>/.
+ */
+const projects = defineCollection({
+  loader: glob({ base: './src/content/projects', pattern: '**/*.{md,mdx}' }),
   schema: z
     .object({
       title: text,
       description: text,
+      /** Free text, e.g. "Completed", "In progress". */
+      status: text,
       published: requiredDate,
       updated: optional(z.coerce.date().optional()),
       featured: optional(z.boolean().default(false)),
@@ -74,10 +80,10 @@ const writing = defineCollection({
       tags: optional(z.array(text).default([])),
       /** Optional social preview image, relative to /public (e.g. "/og/context.png"). */
       image: optional(z.string().startsWith('/').optional()),
-      /** "Related code / skill / project / discussion" links, rendered after the article. */
+      /** Code, repositories and anything else worth pointing at, rendered after the write-up. */
       links,
-      /** Filenames of other notes, without the extension. */
-      related: optional(z.array(reference('writing')).default([])),
+      /** Filenames of other projects, without the extension. */
+      related: optional(z.array(reference('projects')).default([])),
     })
     .refine((data) => !data.updated || data.updated >= data.published, {
       message: 'updated: is before published: — one of the two dates is wrong',
@@ -85,19 +91,4 @@ const writing = defineCollection({
     }),
 });
 
-const projects = defineCollection({
-  loader: glob({ base: './src/content/projects', pattern: '**/*.{md,mdx}' }),
-  schema: z.object({
-    name: text,
-    description: text,
-    /** Free text, e.g. "Active", "Ongoing", "Occasional". */
-    status: text,
-    /** Lower sorts first. */
-    order: optional(z.number().default(100)),
-    ...visibility,
-    links,
-    related: optional(z.array(reference('writing')).default([])),
-  }),
-});
-
-export const collections = { writing, projects };
+export const collections = { projects };
