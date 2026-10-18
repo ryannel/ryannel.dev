@@ -16,11 +16,12 @@ links:
 import AtlasViewer from '../../components/AtlasViewer.astro';
 import atlas from '../../assets/olfactory-atlas/atlas.webp';
 import fragranceWheel from '../../assets/olfactory-atlas/fragrance-wheel.png';
-import wineWheel from '../../assets/olfactory-atlas/wine-aroma-wheel.jpg';
+import wineWheel from '../../assets/olfactory-atlas/wine-aroma-wheel.webp';
 import citrusFamily from '../../assets/olfactory-atlas/citrus-family.jpg';
 
 <Figure
   src={atlas}
+  cutout
   alt="A large circular wheel made of photographs: lemons and herbs, rose petals and fruit, spices and amber, wood and moss, each wedge labelled with a scent family, and the words Olfactory Atlas in a cream circle at the centre."
   caption="The Olfactory Atlas. 20 families, 82 scents, 318 labels and 130 photographs."
   priority
@@ -56,6 +57,7 @@ If you like one, try the one beside it.
 
 <Figure
   src={fragranceWheel}
+  cutout
   alt="A simple diagram of fourteen coloured circles arranged in a ring, labelled with fragrance families such as Floral, Soft Floral, Oriental, Woody Oriental, Mossy Woods, Dry Woods, Citrus, Green and Water, grouped under Floral, Oriental, Woody and Fresh notes, with Aromatic Fougère in the middle."
   caption="A simplified drawing of the Fragrance Wheel, from Wikipedia (public domain). Neighbours are meant to be similar."
 />
@@ -67,8 +69,9 @@ Plenty of versions have followed. This one is on Wikimedia Commons.
 
 <Figure
   src={wineWheel}
+  cutout
   alt="A circular wine aroma wheel. The centre splits into aromas and bouquet; the middle ring has groups such as citrus, tree fruits, floral, vegetal, spices and oak aging; the outer ring has specific words such as grapefruit, lemon, honeysuckle, cut grass, clove and vanilla."
-  caption="A wine aroma wheel by Aromaster, CC BY-SA 3.0, via Wikimedia Commons. General in the middle, specific at the edge."
+  caption="A wine aroma wheel by Aromaster, CC BY-SA 3.0, via Wikimedia Commons, with its white background removed. General in the middle, specific at the edge."
 />
 
 That second idea is the one I wanted: start somewhere broad and walk outwards until you find

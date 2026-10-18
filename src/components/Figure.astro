@@ -50,6 +50,8 @@ interface Props {
   sizes?: string;
   /** Let a large illustration extend beyond the reading column. */
   wide?: boolean;
+  /** The image has a transparent background (a wheel, a cut-out): no frame around it. */
+  cutout?: boolean;
   'data-src'?: string;
 }
 
@@ -64,6 +66,7 @@ const {
   widths,
   sizes,
   wide = false,
+  cutout = false,
   // Set only by the dev-only editor (scripts/editor/stamp.mjs); never in a build.
   'data-src': dataSrc,
 } = Astro.props;
@@ -142,7 +145,7 @@ const fetchpriority = priority ? 'high' : 'auto';
 const frame = `--figure-width: ${sourceWidth}px; --figure-ratio: ${(sourceWidth / sourceHeight).toFixed(4)}`;
 ---
 
-<figure class:list={{ 'figure-wide': wide }} style={frame} data-src={dataSrc}>
+<figure class:list={{ 'figure-wide': wide, 'figure-cutout': cutout }} style={frame} data-src={dataSrc}>
   <a class="figure-zoom" href={zoomHref} data-width={zoomWidth} data-height={zoomHeight}>
     {
       typeof src === 'string' ? (

@@ -673,6 +673,12 @@ h4 {
   border-radius: 2px;
 }
 
+/* A transparent image sits on the page itself; a frame would draw a box it doesn't have. */
+.prose .figure-cutout img {
+  border: 0;
+  border-radius: 0;
+}
+
 .prose table {
   width: 100%;
   border-collapse: collapse;

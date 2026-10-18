@@ -104,7 +104,6 @@ const segments: Segment[] = tour
     position: relative;
     height: min(78svh, 46rem);
     overflow: hidden;
-    background: #f4f2ec;
     touch-action: none;
     cursor: grab;
     user-select: none;
@@ -123,10 +122,13 @@ const segments: Segment[] = tour
     left: 0;
     transform-origin: 0 0;
   }
+  /* The tiles carry the exhibit's cream paper around the wheel. Cut it away so the wheel sits on
+     the page, light or dark: radius 2880 of 6144 layout units, in 9216 image pixels. */
   .av-base,
   .av-detail {
     position: absolute;
     inset: 0;
+    clip-path: circle(4320px at 4608px 4608px);
   }
   /* The article styles frame every image; tiles have to meet edge to edge. */
   .av-world :global(img) {
