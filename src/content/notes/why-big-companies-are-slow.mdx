@@ -1,0 +1,131 @@
+---
+title: "Why big companies are slow"
+description: "Following one line on a product page to see where the time goes."
+published: 2026-11-02
+draft: false
+tags: ["ways of working"]
+links:
+  - label: "John Cutler, TBM 370: Dependencies aren’t your problem"
+    href: "https://cutlefish.substack.com/p/tbm-370-dependencies-arent-your-problem"
+  - label: "Sean Goedecke, Why are big tech companies so slow?"
+    href: "https://www.seangoedecke.com/difficulty-in-big-tech/"
+  - label: "Melvin Conway, How Do Committees Invent? (1968)"
+    href: "https://www.melconway.com/Home/Committees_Paper.html"
+---
+
+import SlowProduct from '../../components/slow/SlowProduct.astro';
+import SlowAvailability from '../../components/slow/SlowAvailability.astro';
+import SlowEscalate from '../../components/slow/SlowEscalate.astro';
+import SlowQueues from '../../components/slow/SlowQueues.astro';
+
+In a small company, change can happen in an afternoon. In a big one it can take months.
+
+That’s a common frustration for people who’ve moved from a startup to a big company: “we were
+much better at this at my last place.” And they’re often right. Big companies are usually
+messy, especially ones that have been around for a while. Years of growth and change leave
+their mark: old systems, processes that made sense once, decisions nobody quite remembers
+making.
+
+But the mess doesn’t explain all of it. Sometimes the work itself is different. We’ll follow
+one small change: showing a delivery date for a kettle, the “Arrives in 3–5 days” line you see
+when you shop online.
+
+<SlowProduct />
+
+## The small shop
+
+For a small shop this is easy. The owner knows what’s on the shelf, what’s been put aside for
+someone else, and how long the local post usually takes. For their local customers, they have
+what they need to give a delivery estimate.
+
+The owner can add the line in an afternoon.
+
+## The big company
+
+The big company has many factories and a complex logistics network carrying goods to its
+warehouses around the world. So “do we have it?” is no longer a simple check with one place to
+look. There might be plenty of kettles in one warehouse and none in the one near the customer.
+Some of that stock may already be promised to online customers or retailers before it even
+arrives.
+
+The date on the page needs to change as stock moves through this network. If the local warehouse
+runs out, can another one supply the order? Or will the customer have to wait for a shipment
+to clear customs? This is what we want the website to be able to work out.
+
+<SlowAvailability />
+
+## Who knows the answer
+
+The warehouse knows what’s on its shelves. The order system records online sales. The sales
+team knows which stock it has allocated to retailers, and logistics knows how long delivery
+from each warehouse takes.
+
+Those teams have their own systems and ways of working. Turning what they know
+into a date the website can use means agreeing how the pieces fit together. When does stock
+become reserved? Can an online order use stock held for retailers? Which warehouses can serve
+this customer? The website needs the answers to estimate a date, and checkout needs them to
+reserve the kettle before another order claims it.
+
+## Not worth it at first
+
+That’s a lot of work for one line on a product page. For now, the company decides it has more
+important things to build. The website puts up a rough estimate and gets by.
+
+But the website isn’t the only thing that needs the answer. Sales teams need to know what they
+can offer retailers. Warehouses need to know which orders have a claim on their stock. Customer
+care needs to know what to tell someone whose kettle is late. Each of them works it out with
+spreadsheets, phone calls and best guesses. Slowly the pressure grows, until someone can say
+it’s worth fixing. And then it isn’t a date on a website they’re asking for, but a system that
+can tell them which stock they can promise to a customer and how long it will take to get
+there.
+
+## Making the case
+
+Even with that pressure, building it isn’t simple. Every team already has a prioritised list
+of valuable work lined up. Making room for this means putting some of that work on hold.
+
+The bigger the project, the more teams it affects and the more plans need to change. Someone
+has to work out what each team would need to do, how much time and money it would take, and
+what would have to wait. Getting those teams to agree on a plan takes time in itself.
+
+Small changes can be decided within a team. This one needs time from several teams, and no
+single team lead can decide what the others should put on hold. The decision goes up to senior
+leaders who have the context to weigh those priorities together. They need to decide whether
+the delivery system is worth delaying the work it would displace.
+
+Those people are busy. Changing direction too often also makes it hard for teams to finish
+anything, so decisions at this level might be gathered into a quarterly planning round.
+
+If other work takes priority, it waits for the next session, or even the one after. Several
+quarters can go into planning, discussion and waiting before the teams start building.
+
+<SlowEscalate />
+
+## Building it
+
+Once the work is chosen, it takes its place in the teams’ plans. The warehouse team needs to
+share available stock, the order team needs to reserve it, logistics needs to supply delivery
+times, and the website needs to put those answers on the page.
+
+That doesn’t mean every team drops what it’s doing. One can start now, another needs to finish
+a release, and another has work that still comes first. Some of the delivery work can happen
+in parallel. The website team can
+prepare the page with sample data while the other teams build the systems it will use.
+
+<SlowQueues />
+
+Then the pieces have to be connected and tested together. The page may be ready long before
+it can show a real delivery estimate, backed by stock that checkout can reserve. Finishing one
+team’s part doesn’t finish the feature.
+
+## The same line on the page
+
+The line on the product page may still take an afternoon. Behind it, the big company has had
+to build something the shop owner could keep in their head.
+
+That is real work, and it takes time. But the calendar also includes the time spent making
+the case, agreeing what can wait, and waiting for each team to be ready. Throughout that time,
+the teams are busy with the work they’ve been asked to put first.
+
+The delivery work is important. So is the work ahead of it. Everyone can be busy with their
+most important job, while the change the customer is waiting for barely moves.

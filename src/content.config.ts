@@ -91,4 +91,28 @@ const projects = defineCollection({
     }),
 });
 
-export const collections = { projects };
+/**
+ * A note is writing that isn't attached to something built: how I'm thinking
+ * about a subject at the time of writing. Each one has its own page at
+ * /notes/<slug>/. No status, no related list; a note is revised in place.
+ */
+const notes = defineCollection({
+  loader: glob({ base: './src/content/notes', pattern: '**/*.{md,mdx}' }),
+  schema: z
+    .object({
+      title: text,
+      description: text,
+      published: requiredDate,
+      updated: optional(z.coerce.date().optional()),
+      ...visibility,
+      tags: optional(z.array(text).default([])),
+      image: optional(z.string().startsWith('/').optional()),
+      links,
+    })
+    .refine((data) => !data.updated || data.updated >= data.published, {
+      message: 'updated: is before published: — one of the two dates is wrong',
+      path: ['updated'],
+    }),
+});
+
+export const collections = { projects, notes };

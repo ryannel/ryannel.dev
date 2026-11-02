@@ -1,0 +1,9 @@
+.slow-loop .hitl-stage { padding: 0; overflow: hidden; }
+.slow-loop canvas { display: block; width: 100%; }
+.hitl button.loop-pause {
+  position: absolute; top: 0.55rem; right: 0.55rem; z-index: 2;
+  width: 2rem; min-height: 2rem; padding: 0; border: 0;
+  font-size: 0.75rem; color: var(--ink-muted); background: transparent;
+}
+.hitl button.loop-pause[hidden] { display: none; }
+.hitl button.loop-pause[aria-pressed='true'] { background: var(--surface); color: var(--ink); }

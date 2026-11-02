@@ -46,21 +46,23 @@ const isRedirect = (html) => html.includes('http-equiv="refresh"');
 
 // --- 1. nothing hidden reaches production, including via another page's related: ---
 // draft: unfinished. sample: placeholder. One rule, both hidden; see src/lib/projects.ts.
-const contentDirs = ['src/content/projects'].filter(existsSync);
+// Each collection is served under a route of the same name: src/content/notes -> /notes/.
+const contentDirs = ['src/content/projects', 'src/content/notes'].filter(existsSync);
 const hidden = contentDirs
-  .flatMap((dir) => readdirSync(dir).map((n) => join(dir, n)))
-  .filter((f) => /\.mdx?$/.test(f))
-  .map((f) => ({ file: f, front: read(f).split('---')[1] ?? '' }))
+  .flatMap((dir) => readdirSync(dir).map((n) => ({ file: join(dir, n), route: dir.split('/').pop() })))
+  .filter(({ file }) => /\.mdx?$/.test(file))
+  .map(({ file, route }) => ({ file, route, front: read(file).split('---')[1] ?? '' }))
   .filter(({ front }) => /^(draft|sample):\s*true\s*$/m.test(front))
-  .map(({ file, front }) => ({
+  .map(({ file, route, front }) => ({
     id: file.split('/').pop().replace(/\.mdx?$/, ''),
+    route,
     title: front.match(/^title:\s*"?(.+?)"?\s*$/m)?.[1],
   }));
 
 for (const entry of hidden) {
-  check(!existsSync(join(DIST, 'projects', entry.id)), `hidden "${entry.id}" was built as a route`);
+  check(!existsSync(join(DIST, entry.route, entry.id)), `hidden "${entry.id}" was built as a route`);
   for (const { path, html } of pages) {
-    check(!html.includes(`/projects/${entry.id}/`), `hidden "${entry.id}" is linked from ${path}`);
+    check(!html.includes(`/${entry.route}/${entry.id}/`), `hidden "${entry.id}" is linked from ${path}`);
     if (entry.title) {
       check(!html.includes(entry.title), `hidden "${entry.id}" title appears on ${path}`);
     }

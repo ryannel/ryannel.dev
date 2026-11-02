@@ -29,6 +29,7 @@ export const ELSEWHERE = [
 ] as const;
 
 export const NAV = [
+  { label: 'Notes', href: '/notes/' },
   { label: 'Projects', href: '/projects/' },
   { label: 'About', href: '/about/' },
 ] as const;
@@ -36,6 +37,10 @@ export const NAV = [
 /** Shown once at the top of the projects index. */
 export const PROJECTS_PREAMBLE =
   'Things I’ve built, mostly to understand something better. Each one comes with a write-up: how it works, how it was made, and what went wrong on the way.';
+
+/** Shown once at the top of the notes index. */
+export const NOTES_PREAMBLE =
+  'Writing that isn’t attached to a project: how I’m thinking about something at the time of writing. Likely to be revised as my thinking changes.';
 
 /**
  * How many projects the home page shows: one lead and up to two behind it.

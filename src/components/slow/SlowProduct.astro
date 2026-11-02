@@ -1,0 +1,162 @@
+---
+/**
+ * The opening of notes/why-big-companies-are-slow: a product card with the
+ * line the note follows, "Arrives in 3–5 days", picked out in the orange the
+ * figures use for it. Decoration only; nothing on it works.
+ */
+---
+
+<figure class="slow-product" aria-label="A product card for a kettle, with the line “Arrives in 3–5 days” under the price.">
+  <div class="card" aria-hidden="true">
+    <div class="shot">
+      <svg viewBox="0 0 160 140" role="presentation">
+        <defs>
+          <linearGradient id="kettle-body" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="var(--k-light)" />
+            <stop offset="0.45" stop-color="var(--k-mid)" />
+            <stop offset="1" stop-color="var(--k-dark)" />
+          </linearGradient>
+        </defs>
+        <ellipse cx="80" cy="124" rx="50" ry="6" class="shadow" />
+        <!-- Handle -->
+        <path d="M52 44 C 52 22, 108 22, 108 44" class="handle" />
+        <!-- Spout -->
+        <path d="M44 88 C 30 82, 24 66, 18 54 L 26 52 C 32 62, 40 72, 52 76 Z" fill="var(--k-mid)" />
+        <!-- Body -->
+        <path d="M48 50 Q 80 40 112 50 L 122 112 Q 80 124 38 112 Z" fill="url(#kettle-body)" />
+        <path d="M58 58 Q 54 84 52 104" class="shine" />
+        <!-- Lid -->
+        <ellipse cx="80" cy="49" rx="30" ry="6" fill="var(--k-dark)" />
+        <circle cx="80" cy="42" r="5" fill="var(--k-dark)" />
+        <!-- Base band -->
+        <path d="M38 112 Q 80 124 122 112 L 123 117 Q 80 129 37 117 Z" fill="var(--k-band)" />
+      </svg>
+    </div>
+    <div class="info">
+      <p class="name">Kettle, 1.7 litres</p>
+      <p class="stars"><span>★★★★</span><span class="dim">★</span></p>
+      <p class="price">£39</p>
+      <p class="promise">
+        <svg viewBox="0 0 24 24" class="van">
+          <path d="M2 6h11v9H2zM13 9h4l3 3v3h-7z" />
+          <circle cx="6" cy="17" r="2" />
+          <circle cx="16" cy="17" r="2" />
+        </svg>
+        Arrives in 3–5 days
+      </p>
+      <p class="buy">Add to basket</p>
+    </div>
+  </div>
+</figure>
+
+<style>
+  .slow-product {
+    margin: 2rem auto;
+    max-width: 26rem;
+    --k-light: light-dark(#a9d8cf, #8cc9bd);
+    --k-mid: light-dark(#5fa8a0, #5aa79c);
+    --k-dark: light-dark(#3f7f78, #3a7a71);
+    --k-band: light-dark(#2f625c, #2c5f58);
+    --orange: light-dark(#ec8a3c, #f4a35e);
+  }
+  .card {
+    display: grid;
+    grid-template-columns: 9.5rem 1fr;
+    gap: 1.25rem;
+    align-items: center;
+    padding: 1rem;
+    border: 1px solid var(--rule);
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--paper) 92%, var(--ink) 8%);
+    box-shadow: 0 1px 0 color-mix(in srgb, var(--ink) 6%, transparent),
+      0 12px 30px -18px color-mix(in srgb, var(--ink) 45%, transparent);
+    font-family: var(--font-ui);
+  }
+  .shot {
+    aspect-ratio: 1;
+    border-radius: 10px;
+    background: radial-gradient(circle at 40% 35%, light-dark(#ffffff, #2c2f31), light-dark(#eef1ee, #1f2224));
+    display: grid;
+    place-items: center;
+  }
+  .shot svg {
+    width: 82%;
+  }
+  .shadow {
+    fill: light-dark(rgb(0 0 0 / 0.1), rgb(0 0 0 / 0.35));
+  }
+  .handle {
+    fill: none;
+    stroke: var(--k-dark);
+    stroke-width: 7;
+    stroke-linecap: round;
+  }
+  .shine {
+    fill: none;
+    stroke: rgb(255 255 255 / 0.45);
+    stroke-width: 5;
+    stroke-linecap: round;
+  }
+  .info p {
+    margin: 0;
+  }
+  .name {
+    font-weight: 600;
+    color: var(--ink);
+    font-size: 1rem;
+  }
+  .stars {
+    color: var(--orange);
+    font-size: 0.8rem;
+    letter-spacing: 0.08em;
+    margin-top: 0.15rem !important;
+  }
+  .stars .dim {
+    opacity: 0.3;
+  }
+  .price {
+    font-size: 1.35rem;
+    font-weight: 600;
+    color: var(--ink);
+    margin-top: 0.35rem !important;
+  }
+  .promise {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.5rem !important;
+    padding: 0.25rem 0.65rem 0.25rem 0.5rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--orange) 18%, transparent);
+    box-shadow: inset 0 0 0 1.5px var(--orange);
+    color: var(--ink);
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+  .van {
+    width: 1.05rem;
+    fill: var(--orange);
+  }
+  .buy {
+    margin-top: 0.75rem !important;
+    display: inline-block;
+    padding: 0.4rem 0.9rem;
+    border-radius: 999px;
+    background: var(--ink);
+    color: var(--paper);
+    font-size: 0.8rem;
+    font-weight: 600;
+    opacity: 0.85;
+  }
+  .info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  @media (max-width: 30rem) {
+    .card {
+      grid-template-columns: 7rem 1fr;
+      gap: 0.9rem;
+    }
+  }
+</style>

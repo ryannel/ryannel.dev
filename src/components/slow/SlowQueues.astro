@@ -1,0 +1,130 @@
+---
+import '../../styles/hitl.css';
+import './loop.css';
+---
+<figure class="hitl slow-loop" data-queues>
+  <div class="hitl-stage">
+    <canvas role="img" aria-label="Four teams work through separate queues. The website layout is ready first, while the other teams finish work ahead of their orange delivery tasks. All four orange parts then come together for connection and testing. Only after that does the delivery estimate appear."></canvas>
+    <button class="loop-pause" data-pause-loop type="button" aria-label="Pause animation" aria-pressed="false">Ⅱ</button>
+    <noscript><p>The teams finish their delivery tasks at different times. Preparing the website layout comes first in this example; the feature can go live only after all four parts are connected and tested.</p></noscript>
+  </div>
+  <figcaption>The website layout is ready first, using sample data. The orange pieces wait for one another, then come together for testing before the date can go live. An illustrative schedule.</figcaption>
+</figure>
+<script>
+  import { theme, fit, ball, HUES, isDark } from './canvas';
+  import { loop, ease, clamp } from './loop';
+  const teams = [
+    { name: 'Warehouse', ahead: 1 },
+    { name: 'Orders', ahead: 3 },
+    { name: 'Logistics', ahead: 2 },
+    { name: 'Website', ahead: 0 },
+  ];
+  for (const figure of document.querySelectorAll<HTMLElement>('[data-queues]')) {
+    let time = 0;
+    let draw = () => {};
+    const c = theme(figure, () => draw());
+    const { ctx, view, clear } = fit(figure.querySelector('canvas')!, (width) => ({ W: width, H: 420 }), () => draw());
+    draw = () => {
+      clear(c.paper);
+      const w = view.W;
+      const narrow = w < 560;
+      const orange = HUES.ours[isDark(c) ? 1 : 0];
+      const grey = isDark(c) ? '#919ca9' : '#8995a4';
+      const worker = narrow ? w * 0.64 : w * 0.59;
+      const end = w - (narrow ? 35 : 62);
+      const gap = narrow ? Math.min(21, (worker - 98) / 5) : 29;
+      const step = 1350;
+      const run = time - 650;
+      const finish = 650 + 4 * step + 500;
+      const merge = ease((time - 6800) / 1000);
+      const tested = clamp((time - 7800) / 1800);
+      const released = time >= 9800;
+      const joinedX = w / 2;
+      const joinedY = 330;
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'left';
+      ctx.font = `12px ${c.font}`;
+      ball(ctx, 24, 25, 5, orange);
+      ctx.fillStyle = c.muted;
+      ctx.fillText('Delivery dates', 36, 25);
+      ball(ctx, 146, 25, 5, grey);
+      ctx.fillText('Other work', 158, 25);
+      ctx.textAlign = 'center';
+      ctx.font = `12px ${c.font}`;
+      ctx.fillText('Waiting', worker - gap * 2.5, 63);
+      ctx.fillText('Working', worker, 63);
+      ctx.fillText('Part ready', end, 63);
+      teams.forEach((team, i) => {
+        const y = 105 + i * 52;
+        ctx.strokeStyle = c.rule; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(narrow ? 93 : 125, y + 12); ctx.lineTo(end + 14, y + 12); ctx.stroke();
+        ctx.fillStyle = c.ink; ctx.font = `500 ${narrow ? 11 : 13}px ${c.font}`; ctx.textAlign = 'left';
+        ctx.fillText(team.name, 16, y);
+        const slot = Math.max(0, Math.floor(run / step));
+        const fraction = clamp((run - slot * step - 250) / 900);
+        ctx.lineWidth = 2; ctx.strokeStyle = c.rule;
+        ctx.beginPath(); ctx.arc(worker, y, 16, 0, Math.PI * 2); ctx.stroke();
+        if (run > 0 && slot < 5) {
+          ctx.strokeStyle = slot === team.ahead ? orange : grey;
+          ctx.beginPath(); ctx.arc(worker, y, 16, -Math.PI / 2, -Math.PI / 2 + fraction * Math.PI * 2); ctx.stroke();
+        }
+        for (let j = 0; j < 5; j++) {
+          const ours = j === team.ahead;
+          const begin = j * step;
+          const arrival = ease((run - begin) / 300);
+          const departure = ease((run - begin - step + 100) / 500);
+          const shifts = Math.min(j, Math.max(0, run / step));
+          let x = worker - (j - shifts + 1) * gap;
+          let hop = 0;
+          if (run >= begin) {
+            x = worker - gap + gap * arrival;
+            hop = Math.sin(arrival * Math.PI) * 8;
+          }
+          if (departure > 0) {
+            x = worker + ((ours ? end : w + 20) - worker) * departure;
+            hop = Math.sin(departure * Math.PI) * (ours ? 17 : 8);
+          }
+          if (!ours && departure >= 1) continue;
+          let ballY = y - hop;
+          if (ours && merge > 0) {
+            const offsetX = [-7, 7, -7, 7][i];
+            const offsetY = [-7, -7, 7, 7][i];
+            x += (joinedX + offsetX - x) * merge;
+            ballY += (joinedY + offsetY - ballY) * merge;
+          }
+          const land = run - begin - step - 400;
+          const squash = ours && land >= 0 ? 1 - 0.18 * Math.exp(-land / 170) * Math.cos(land / 60) : 1;
+          ctx.globalAlpha = clamp((11600 - time) / 450) * (ours ? 1 - ease((time - 9600) / 250) : 1);
+          ctx.fillStyle = c.rule;
+          ctx.beginPath(); ctx.ellipse(x, ballY + 12, 8, 2, 0, 0, Math.PI * 2); ctx.fill();
+          ball(ctx, x, ballY + 9 * (1 - squash), 9, ours ? orange : grey, squash);
+          ctx.globalAlpha = 1;
+        }
+      });
+      ctx.strokeStyle = time >= finish ? orange : c.rule; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(end + 18, 91); ctx.lineTo(end + 23, 91); ctx.lineTo(end + 23, 275); ctx.lineTo(end + 18, 275); ctx.stroke();
+      // Individual parts are not a released feature: join them, then test.
+      ctx.strokeStyle = c.rule;
+      ctx.beginPath(); ctx.arc(joinedX, joinedY, 27, 0, Math.PI * 2); ctx.stroke();
+      if (tested > 0) {
+        ctx.strokeStyle = orange; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.arc(joinedX, joinedY, 27, -Math.PI / 2, -Math.PI / 2 + tested * Math.PI * 2); ctx.stroke();
+      }
+      if (released) {
+        ctx.fillStyle = c.paper; ctx.fillRect(joinedX - 110, joinedY - 29, 220, 58);
+        ctx.strokeStyle = orange; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.roundRect(joinedX - 106, joinedY - 22, 212, 44, 12); ctx.stroke();
+        ctx.font = `600 16px ${c.font}`; ctx.fillStyle = c.ink; ctx.textAlign = 'center';
+        ctx.fillText('Arrives in 3–5 days', joinedX, joinedY);
+      }
+      ctx.font = `12px ${c.font}`; ctx.fillStyle = c.muted; ctx.textAlign = 'center';
+      const status = released ? 'Connected, tested, ready to go live.'
+        : time >= 6800 ? 'Connect the parts and test them together.'
+        : time >= 2500 ? 'Layout ready. Waiting for the other parts.'
+        : 'Each team starts when it reaches this work.';
+      ctx.font = `${narrow ? 11 : 12}px ${c.font}`;
+      ctx.fillText(status, w / 2, 385);
+    };
+    loop(figure, 11600, 5200, (t) => { time = t; draw(); });
+  }
+</script>

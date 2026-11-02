@@ -1,0 +1,26 @@
+---
+import Base from '../../layouts/Base.astro';
+import ProjectList from '../../components/ProjectList.astro';
+import { NOTES_PREAMBLE } from '../../consts';
+import { getNotes, noteHref } from '../../lib/notes';
+
+const notes = await getNotes();
+---
+
+<Base title="Notes" description={NOTES_PREAMBLE}>
+  <h1 class="page-title">Notes</h1>
+
+  {
+    notes.length > 0 ? (
+      <>
+        <p class="page-intro">{NOTES_PREAMBLE}</p>
+        <ProjectList projects={notes} href={noteHref} />
+      </>
+    ) : (
+      <p class="page-intro">
+        Nothing published here yet. The <a href="/rss.xml">feed</a> will carry the first note when
+        it arrives.
+      </p>
+    )
+  }
+</Base>
