@@ -646,6 +646,7 @@ import './loop.css';
     // Use the shared offscreen, pause and reduced-motion behaviour. The simulation
     // keeps its own cycle; this clock only supplies elapsed time to its fixed steps.
     const CLOCK = 60000;
+    const SPEED = 0.8; // A full cycle takes about 34 seconds.
     let previous = 0;
     let wasStill = false;
     loop(figure, CLOCK, 7000, clock => {
@@ -654,7 +655,7 @@ import './loop.css';
         reset();
         pending = 7000 * 1.6;
       } else if (!wasStill) {
-        pending += ((clock - previous + CLOCK) % CLOCK) * 1.6;
+        pending += ((clock - previous + CLOCK) % CLOCK) * SPEED;
       }
       wasStill = still;
       previous = clock;
