@@ -1,0 +1,45 @@
+<div class="atlas-invite">
+  <a href="#trying-it-out">Try the full atlas <span aria-hidden="true">↓</span></a>
+  <p>Follow a scent from the centre outwards, or zoom around on your own.</p>
+</div>
+
+<style>
+  .atlas-invite {
+    margin: -0.5rem 0 3rem;
+    padding: 1.5rem;
+    border: 1px solid var(--rule);
+    border-radius: 0.75rem;
+    background: var(--surface);
+    text-align: center;
+    font-family: var(--font-ui);
+  }
+  .atlas-invite a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.8rem;
+    min-height: 3rem;
+    padding: 0.65rem 1.35rem;
+    box-sizing: border-box;
+    border-radius: 999px;
+    background: var(--accent);
+    color: var(--paper);
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.4;
+    text-decoration: none;
+  }
+  .atlas-invite a:hover { background: var(--accent-strong); }
+  .atlas-invite a:focus-visible { outline-offset: 4px; }
+  .atlas-invite p {
+    max-width: 25rem;
+    margin: 0.85rem auto 0;
+    color: var(--ink-muted);
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+  @media (max-width: 30rem) {
+    .atlas-invite { padding: 1.25rem; }
+    .atlas-invite a { width: 100%; }
+  }
+</style>

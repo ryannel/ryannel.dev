@@ -14,13 +14,11 @@ links:
 ---
 
 import AtlasViewer from '../../components/AtlasViewer.astro';
+import AtlasInvite from '../../components/AtlasInvite.astro';
 import atlas from '../../assets/olfactory-atlas/atlas.webp';
 import fragranceWheel from '../../assets/olfactory-atlas/fragrance-wheel.png';
 import wineWheel from '../../assets/olfactory-atlas/wine-aroma-wheel.webp';
 import citrusFamily from '../../assets/olfactory-atlas/citrus-family.jpg';
-
-[Try the full atlas](#trying-it-out). Follow a scent from the centre of the wheel outwards,
-or zoom around on your own.
 
 <Figure
   src={atlas}
@@ -30,6 +28,8 @@ or zoom around on your own.
   priority
   wide
 />
+
+<AtlasInvite />
 
 Smell isn’t really part of my world. If someone is making coffee in the morning, I don’t
 notice it. If you point it out, I can usually find it, but I have to go looking. And because
