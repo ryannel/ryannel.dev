@@ -19,6 +19,9 @@ import fragranceWheel from '../../assets/olfactory-atlas/fragrance-wheel.png';
 import wineWheel from '../../assets/olfactory-atlas/wine-aroma-wheel.webp';
 import citrusFamily from '../../assets/olfactory-atlas/citrus-family.jpg';
 
+[Try the full atlas](#trying-it-out). Follow a scent from the centre of the wheel outwards,
+or zoom around on your own.
+
 <Figure
   src={atlas}
   cutout
@@ -143,32 +146,6 @@ It took about a day. 130 pictures, each kept with its prompt and a checksum so I
 of them back. The finished wheel is 9,216 pixels across, so the smallest label still reads when
 you zoom in.
 
-## It’s all on GitHub
-
-Everything behind the wheel is in my
-[experiments repository](https://github.com/ryannel/experiments/tree/main/olfactory_taxonomy),
-so you can see exactly how it was made, or take it and change it:
-
-- **The skill** Astra worked from, `olfactory-sunburst`, with its notes on layout, imagery and
-  type.
-- **All 130 image prompts**, one file per picture, with a record that ties each picture to its
-  prompt.
-- **The taxonomy as data**: every realm, family, scent, feel word and reference.
-- **The viewer and its tiles**, which work offline once cloned, and the whole wheel as a single
-  image.
-- **The editable master**, with the full-size original photographs as a separate download.
-
-To get just this folder:
-
-```sh
-git clone --filter=blob:none --sparse https://github.com/ryannel/experiments.git experiments
-cd experiments
-git sparse-checkout set olfactory_taxonomy
-```
-
-Open it in Codex and type `$olfactory-sunburst` to ask for a change: a scent you think is
-missing, a better reference, a picture you’d rather see.
-
 ## What a perfumer would say
 
 I should be honest about what this is. It’s a guide for an amateur, made for where I am now.
@@ -225,6 +202,32 @@ hold Ctrl (⌘ on a Mac) and scroll to zoom.
 
 <AtlasViewer alt="The whole Olfactory Atlas, zoomable, with a guided walk that asks one question per ring and zooms to each answer." />
 
-[Open it on its own page](/olfactory-atlas/index.html) if it’s cramped here, or [get the whole thing on GitHub](https://github.com/ryannel/experiments/tree/main/olfactory_taxonomy).
+[Open it on its own page](/olfactory-atlas/index.html) if it’s cramped here.
 
 Next time we open a tasting flight, I’ll have it open beside the vials.
+
+## It’s all on GitHub
+
+Everything behind the wheel is in my
+[experiments repository](https://github.com/ryannel/experiments/tree/main/olfactory_taxonomy),
+so you can see exactly how it was made, or take it and change it:
+
+- **The skill** Astra worked from, `olfactory-sunburst`, with its notes on layout, imagery and
+  type.
+- **All 130 image prompts**, one file per picture, with a record that ties each picture to its
+  prompt.
+- **The taxonomy as data**: every realm, family, scent, feel word and reference.
+- **The viewer and its tiles**, which work offline once cloned, and the whole wheel as a single
+  image.
+- **The editable master**, with the full-size original photographs as a separate download.
+
+To get just this folder:
+
+```sh
+git clone --filter=blob:none --sparse https://github.com/ryannel/experiments.git experiments
+cd experiments
+git sparse-checkout set olfactory_taxonomy
+```
+
+Open it in Codex and type `$olfactory-sunburst` to ask for a change: a scent you think is
+missing, a better reference, a picture you’d rather see.
