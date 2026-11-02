@@ -1,0 +1,52 @@
+---
+import artwork from '../../assets/atlas-experiment/labels-off.jpg';
+import labelled from '../../assets/atlas-experiment/labels-on.jpg';
+---
+
+<figure class="map-labels" data-map-labels>
+  <div class="label-stage">
+    <img src={artwork.src} alt="The Crownmere region with its castle, river, roads and farms, without place names." width="929" height="618" loading="lazy" />
+    <img class="label-layer" src={labelled.src} alt="" width="929" height="618" loading="lazy" />
+  </div>
+  <div class="label-controls">
+    <span data-state>Painting only</span>
+    <button type="button" aria-pressed="false">Show place names</button>
+  </div>
+  <figcaption>Same painting, with a separate layer of names. Turn the names on and off without changing the artwork.</figcaption>
+</figure>
+
+<style>
+  .map-labels { width: min(58rem, calc(100vw - var(--gutter) * 2)); max-width: none; position: relative; left: 50%; transform: translateX(-50%); margin: 2.5rem 0; }
+  .label-stage { position: relative; aspect-ratio: 929 / 618; overflow: hidden; border: 1px solid var(--rule); border-radius: 0.75rem; background: var(--surface); }
+  .label-stage img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .label-stage .label-layer { position: absolute; inset: 0; opacity: 0; transition: opacity 750ms ease; }
+  .map-labels.is-labelled .label-layer { opacity: 1; }
+  .label-controls { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding-top: 0.7rem; font: 0.8rem var(--font-ui); color: var(--ink-muted); }
+  .label-controls button { border: 1px solid var(--rule); border-radius: 0.35rem; padding: 0.35rem 0.65rem; background: var(--surface); color: var(--ink); cursor: pointer; font: inherit; }
+  .label-controls button:hover { border-color: var(--accent); }
+  .label-controls button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  figcaption { margin-top: 0.6rem; color: var(--ink-muted); font-size: 0.85rem; line-height: 1.5; }
+  @media (prefers-reduced-motion: reduce) { .label-stage .label-layer { transition: none; } }
+</style>
+
+<script>
+  for (const figure of document.querySelectorAll<HTMLElement>('[data-map-labels]')) {
+    const button = figure.querySelector('button')!;
+    const state = figure.querySelector<HTMLElement>('[data-state]')!;
+    let shown = false;
+    const set = (value: boolean) => {
+      shown = value;
+      figure.classList.toggle('is-labelled', shown);
+      state.textContent = shown ? 'Place names on' : 'Painting only';
+      button.textContent = shown ? 'Hide place names' : 'Show place names';
+      button.setAttribute('aria-pressed', String(shown));
+    };
+    button.addEventListener('click', () => set(!shown));
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting) return;
+      observer.disconnect();
+      if (!matchMedia('(prefers-reduced-motion: reduce)').matches) window.setTimeout(() => set(true), 500);
+    }, {threshold: 0.4});
+    observer.observe(figure);
+  }
+</script>

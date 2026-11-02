@@ -1,0 +1,97 @@
+---
+import reference from '../../assets/atlas-experiment/production-reference.jpg';
+---
+
+<figure class="map-assembly" data-map-assembly data-finished="/lantern-sea/overview.jpg">
+  <div class="assembly-stage">
+    <img src={reference.src} alt="A later whole-world reference map, showing the planned coasts and regions before the full-resolution tile painting." width="1600" height="1067" loading="lazy" />
+    <canvas width="1600" height="1067" role="img" aria-label="Illustration of the completed map appearing in 81 tiles over a later whole-world reference map. This is a reconstruction of the assembly, not a recording of the production order."></canvas>
+    <span class="assembly-count" aria-live="off"><strong data-count>0</strong> / 81 tiles</span>
+  </div>
+  <div class="assembly-controls">
+    <button type="button" data-play aria-label="Pause tile animation">Pause</button>
+    <label for="map-assembly-progress">Tiles laid down</label>
+    <input id="map-assembly-progress" data-progress type="range" min="0" max="81" value="0" aria-label="Tiles laid down" />
+  </div>
+  <figcaption>A later whole-world reference stays underneath as the finished painting appears, tile by tile. This uses the finished overview to illustrate the assembly; it does not show the original render order or every intermediate version.</figcaption>
+</figure>
+
+<style>
+  .map-assembly { width: min(72rem, calc(100vw - var(--gutter) * 2)); max-width: none; position: relative; left: 50%; transform: translateX(-50%); margin: 2.5rem 0; }
+  .assembly-stage { position: relative; aspect-ratio: 1600 / 1067; overflow: hidden; border: 1px solid var(--rule); border-radius: 0.75rem; background: var(--surface); }
+  .assembly-stage img, .assembly-stage canvas { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .assembly-stage canvas { position: absolute; inset: 0; }
+  .assembly-count { position: absolute; right: 0.8rem; bottom: 0.8rem; padding: 0.35rem 0.65rem; border-radius: 0.35rem; background: rgb(22 29 29 / 0.86); color: #fff; font: 600 0.78rem var(--font-ui); font-variant-numeric: tabular-nums; }
+  .assembly-controls { display: flex; gap: 0.8rem; align-items: center; padding: 0.7rem 0.1rem 0; font: 0.8rem var(--font-ui); color: var(--ink-muted); }
+  .assembly-controls button { min-width: 4.7rem; border: 1px solid var(--rule); border-radius: 0.35rem; padding: 0.35rem 0.6rem; background: var(--surface); color: var(--ink); cursor: pointer; font: inherit; }
+  .assembly-controls button:hover { border-color: var(--accent); }
+  .assembly-controls button:focus-visible, .assembly-controls input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .assembly-controls input { flex: 1; min-width: 0; accent-color: var(--accent); }
+  figcaption { margin-top: 0.6rem; color: var(--ink-muted); font-size: 0.85rem; line-height: 1.5; }
+  @media (max-width: 35rem) { .assembly-controls label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); } .assembly-count { right: 0.4rem; bottom: 0.4rem; font-size: 0.68rem; } }
+</style>
+
+<script>
+  const load = (src: string) => new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image(); image.onload = () => resolve(image); image.onerror = reject; image.src = src;
+  });
+  for (const figure of document.querySelectorAll<HTMLElement>('[data-map-assembly]')) {
+    const canvas = figure.querySelector('canvas')!;
+    const context = canvas.getContext('2d')!;
+    const progress = figure.querySelector<HTMLInputElement>('[data-progress]')!;
+    const count = figure.querySelector<HTMLElement>('[data-count]')!;
+    const button = figure.querySelector<HTMLButtonElement>('[data-play]')!;
+    const motion = matchMedia('(prefers-reduced-motion: reduce)');
+    let current = 0, running = false, visible = false, last = 0, frame = 0;
+    const order = Array.from({length: 81}, (_, i) => ({row: i % 9, col: Math.floor(i / 9)}));
+    const render = (finished: HTMLImageElement) => {
+      const w = canvas.width, h = canvas.height, tileW = w / 9, tileH = h / 9;
+      context.clearRect(0, 0, w, h);
+      for (let i = 0; i < Math.ceil(current); i++) {
+        const {row, col} = order[i];
+        const x = col * tileW, y = row * tileH;
+        if (i >= Math.floor(current)) context.globalAlpha = current % 1;
+        context.drawImage(finished, x, y, tileW, tileH, x, y, tileW, tileH);
+        context.globalAlpha = 1;
+        if (current < 81) {
+          context.strokeStyle = 'rgba(255, 235, 192, 0.48)'; context.lineWidth = 1.5;
+          context.strokeRect(x + 0.75, y + 0.75, tileW - 1.5, tileH - 1.5);
+        }
+        if (i === Math.floor(current) && current < 81) {
+          context.strokeStyle = '#f2cf82'; context.lineWidth = 5;
+          context.strokeRect(x + 2.5, y + 2.5, tileW - 5, tileH - 5);
+        }
+      }
+      if (current < 81) {
+        context.strokeStyle = 'rgba(255, 245, 218, 0.42)'; context.lineWidth = 1;
+        context.beginPath();
+        for (let i = 1; i < 9; i++) {
+          context.moveTo(i * tileW, 0); context.lineTo(i * tileW, h);
+          context.moveTo(0, i * tileH); context.lineTo(w, i * tileH);
+        }
+        context.stroke();
+      }
+      progress.value = String(Math.floor(current));
+      count.textContent = String(Math.floor(current));
+    };
+    const stop = () => { running = false; cancelAnimationFrame(frame); frame = 0; last = 0; button.textContent = current >= 81 ? 'Replay' : 'Play'; button.setAttribute('aria-label', current >= 81 ? 'Replay tile animation' : 'Play tile animation'); };
+    load(figure.dataset.finished!).then((finished) => {
+      const tick = (now: number) => {
+        if (!running || !visible || document.hidden) { last = 0; return; }
+        if (last) current = Math.min(81, current + Math.min(64, now - last) * 81 / 12000);
+        last = now;
+        render(finished);
+        if (current >= 81) stop(); else frame = requestAnimationFrame(tick);
+      };
+      const start = () => { if (motion.matches || running || current >= 81 || !visible || document.hidden) return; running = true; button.textContent = 'Pause'; button.setAttribute('aria-label', 'Pause tile animation'); frame = requestAnimationFrame(tick); };
+      const observer = new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; if (visible) { if (running) frame = requestAnimationFrame(tick); else start(); } else { cancelAnimationFrame(frame); frame = 0; last = 0; } }, {threshold: 0.15});
+      observer.observe(figure);
+      button.addEventListener('click', () => { if (running) stop(); else { if (current >= 81) current = 0; render(finished); start(); } });
+      progress.addEventListener('input', () => { stop(); current = Number(progress.value); render(finished); });
+      motion.addEventListener('change', () => { button.hidden = motion.matches; if (motion.matches) { stop(); current = 81; render(finished); } });
+      document.addEventListener('visibilitychange', () => { if (document.hidden) { cancelAnimationFrame(frame); frame = 0; last = 0; } else if (running) frame = requestAnimationFrame(tick); });
+      if (motion.matches) { current = 81; button.hidden = true; }
+      render(finished);
+    }).catch(() => { canvas.hidden = true; button.disabled = true; progress.disabled = true; });
+  }
+</script>

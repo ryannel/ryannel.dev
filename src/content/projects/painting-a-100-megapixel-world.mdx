@@ -14,6 +14,8 @@ links:
 ---
 
 import MapExplorer from '../../components/MapExplorer.astro';
+import MapAssembly from '../../components/atlas/MapAssembly.astro';
+import MapLabels from '../../components/atlas/MapLabels.astro';
 
 import world from '../../assets/atlas-experiment/world-and-detail.jpg';
 import asterfall from '../../assets/atlas-experiment/asterfall.jpg';
@@ -25,8 +27,6 @@ import tileGrid from '../../assets/atlas-experiment/tile-grid.jpg';
 import tileSteps from '../../assets/atlas-experiment/tile-steps.jpg';
 import tileJoin from '../../assets/atlas-experiment/tile-join.jpg';
 import tileBlock from '../../assets/atlas-experiment/tile-block.jpg';
-import growth from '../../assets/atlas-experiment/growth.jpg';
-import labelsPair from '../../assets/atlas-experiment/labels-pair.jpg';
 
 <Callout label="Explore the map">
 Want to look around first? [Jump to the full map](#explore-the-world) and zoom from continents
@@ -49,8 +49,8 @@ Inkarnate and Dungeondraft, but never quite got there.
 
 When GPT-6 Astra came out with its new image model, I wanted another go.
 
-Ten days, 433 turns with the agent and 300 million tokens later, I have one. It’s 12,000 by
-8,000 pixels, painted in 81 overlapping pieces. It isn’t perfect: a few cities are a little
+Ten days, 433 turns with the agent and 300 million tokens later, I have one. It’s 12,276 by
+8,184 pixels, painted in 81 overlapping pieces. It isn’t perfect: a few cities are a little
 warped, and some tiles still don’t quite line up. But it’s closer to the kind of map in my head than
 anything I’ve managed before, and almost every part of it is worth zooming into.
 
@@ -94,7 +94,7 @@ in the land, the feel of the place. By the evening it had painted this.
 
 Now there are individual trees. Settlements have proper roofs and sit on slopes and shores. You
 can follow a river from the mountains down to a sea that glows. This painting became the
-reference for everything that followed.
+reference for the look of everything that followed.
 
 ## Who lives here
 
@@ -119,7 +119,7 @@ that setting.
 Here’s the problem. GPT Image 2 paints at most 1,536 by 1,024 pixels. The first map above, the
 whole world, is one of those pictures.
 
-The finished map is 12,000 by 8,000 pixels. That’s 96 million pixels, about 61 times as many as
+The finished map is 12,276 by 8,184 pixels. That’s just over 100 million pixels, about 64 times as many as
 the model can paint in one go.
 
 *Couldn’t you paint it small and scale it up?*
@@ -211,24 +211,17 @@ not one. Here are four together, the way they sit in the finished map.
 
 Do that eighty times and the map closes up.
 
-<Figure
-  src={growth}
-  alt="Four snapshots of the whole world map with the unpainted part dimmed: a corner of the western continent painted, then the whole western half, then most of the east, then all of it."
-  caption="The map filling in: 20 tiles, 45, 65, all 81. The last 61 in a single day."
-  wide
-/>
+The whole-world layout changed after the first evening's painting. Here is the later reference
+beneath the finished map, with each of its 81 tiles revealed in turn.
+
+<MapAssembly />
 
 ## Labels last
 
 The names go on at the very end, as a separate layer over the painting. Keeping them off the
 tiles means you can rename a place, or move a label, without repainting anything.
 
-<Figure
-  src={labelsPair}
-  alt="The same region of the map twice: on the left with no text, on the right with the labels Crownmere, Gatewell, Hammerfall, Dunford, Saint Orrel, Copperstairs and Barleycross laid over it."
-  caption="Crownmere without its labels, and with them."
-  wide
-/>
+<MapLabels />
 
 ## Make your own
 
