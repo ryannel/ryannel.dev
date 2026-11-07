@@ -1,0 +1,547 @@
+---
+import '../../styles/hitl.css';
+
+/**
+ * The small shop and the big company, each as a row of boxes holding stock,
+ * against the same promise. Kettles move box to box towards the customer;
+ * orders arrive at the customer and take a kettle from the nearest box. When
+ * that box is empty the order waits (a hollow ring) until stock comes in.
+ * Each delivered kettle then drops onto the day it arrived.
+ *
+ *  shop: buys a few kettles from its supplier whenever the shelf runs low,
+ *        and they come the next day, so it's rarely out for long.
+ *  big:  the factory makes kettles steadily, a ship takes them every ten days,
+ *        then customs, then the local warehouse. When the warehouse runs dry,
+ *        orders wait for the next ship.
+ *
+ * Orders that arrive after the promise turn coral. "Promise 2 weeks"
+ * stretches the big company's promise until nearly everything fits.
+ *
+ * Every rate and time is invented; it's a sketch of the shape.
+ */
+---
+
+<figure class="hitl slow-spread" data-slow-spread>
+  <div class="hitl-stage">
+    <canvas
+      class="slow-canvas"
+      aria-label="Stock moving towards the customer. The small shop restocks its shelf from a supplier the next day, so orders arrive inside the promised 3 to 5 days. The big company’s kettles go from the factory by ship, through customs, to a local warehouse; when the warehouse runs out, orders wait for the next ship and arrive late."
+    ></canvas>
+    <noscript><p class="hitl-note">The figure is drawn with JavaScript.</p></noscript>
+  </div>
+  <div class="hitl-controls">
+    <button type="button" data-safe aria-pressed="false">Promise 2 weeks</button>
+  </div>
+  <p class="hitl-readout" aria-live="polite"></p>
+  <figcaption>
+    Each ball is a kettle and each box holds stock. A hollow ring is an order waiting for stock.
+    Delivered kettles drop onto the day they arrived; coral ones arrived after the promise. A sketch
+    with invented times.
+  </figcaption>
+</figure>
+
+<style>
+  .slow-spread .hitl-stage {
+    padding: 0;
+    overflow: hidden;
+  }
+  .slow-canvas {
+    display: block;
+    width: 100%;
+  }
+</style>
+
+<script>
+  import { mulberry, exp, theme, fit, animate, label, reducedMotion, NARROW } from './canvas';
+
+  type Kettle = {
+    x: number;
+    y: number;
+    vx: number;
+    vy: number;
+    tx: number;
+    ty: number;
+    grow: number;
+    // Delivery, in days: when it was ordered, left the last box, and arrives.
+    placed: number;
+    depart: number;
+    arrive: number;
+    day: number; // on the pile; 0 before
+    slot: number;
+    mix: number; // 0 kettle colour, 1 coral
+    fade: number;
+    acc: number;
+  };
+  type Transit = { kettles: Kettle[]; from: number; to: number; start: number; end: number };
+  type Panel = {
+    title: string;
+    boxes: string[]; // the last is the customer
+    shortBoxes: string[];
+    stock: Kettle[][];
+    transit: Transit[];
+    waiting: number[]; // when each waiting order was placed
+    delivering: Kettle[];
+    pile: Kettle[];
+    counts: number[];
+    timers: Record<string, number>;
+    labelY: number;
+    boxY: number;
+    boxH: number;
+    top: number;
+    floor: number;
+    titleY: number;
+    cap: number;
+  };
+
+  const DAYS = 14;
+  const MS_PER_DAY = 800;
+  const KETTLE: [string, string] = ['#5fa8a0', '#6fc2b8'];
+  const CORAL: [string, string] = ['#e2725b', '#f08f7a'];
+  const K = 200;
+  const D = 13;
+
+  for (const figure of document.querySelectorAll<HTMLElement>('[data-slow-spread]')) {
+    const canvas = figure.querySelector<HTMLCanvasElement>('.slow-canvas')!;
+    const safeButton = figure.querySelector<HTMLButtonElement>('[data-safe]')!;
+    const readout = figure.querySelector<HTMLElement>('.hitl-readout')!;
+    const reduced = reducedMotion();
+    let narrow = false;
+
+    const layout = (w: number) => {
+      narrow = w < NARROW;
+      const W = narrow ? 600 : 1000;
+      return { W, H: (W / w) * 600 };
+    };
+
+    let draw = () => {};
+    const c = theme(figure, () => draw());
+    const { ctx, view, clear } = fit(canvas, layout, () => draw());
+    const dark = () => {
+      const m = c.paper.match(/\d+/g);
+      return m ? Number(m[0]) + Number(m[1]) + Number(m[2]) < 300 : false;
+    };
+
+    const rand = mulberry(11);
+    let now = 0; // days
+    let safe = false;
+    let bigHi = 5; // the big company's promise, as drawn: days 3–5, eased out to 1–14
+    const lo = (hi: number) => 3 - ((hi - 5) / (DAYS - 5)) * 2;
+
+    const px = (n: number) => n * view.px;
+    const r = () => px(narrow ? 4 : 5); // a kettle in a box
+    const R = () => px(narrow ? 6.5 : 8); // a kettle on the pile
+    const margin = () => px(narrow ? 12 : 24);
+    const colW = () => (view.W - 2 * margin()) / DAYS;
+    const dayX = (d: number) => margin() + d * colW();
+    const colX = (d: number) => dayX(d - 0.5);
+
+    const panel = (title: string, boxes: string[], shortBoxes: string[], titleY: number, boxH: number, top: number, floor: number, cap: number): Panel => ({
+      title,
+      boxes,
+      shortBoxes,
+      stock: boxes.map(() => []),
+      transit: [],
+      waiting: [],
+      delivering: [],
+      pile: [],
+      counts: new Array(DAYS + 1).fill(0),
+      timers: {},
+      titleY,
+      labelY: titleY + 26,
+      boxY: titleY + 38,
+      boxH,
+      top,
+      floor,
+      cap,
+    });
+    const shop = panel('Small shop', ['Supplier', 'Shop', 'Customer'], ['Supplier', 'Shop', 'Customer'], 16, 62, 152, 238, 5);
+    const big = panel(
+      'Big company',
+      ['Factory', 'Ship', 'Customs', 'Local warehouse', 'Customer'],
+      ['Factory', 'Ship', 'Customs', 'Warehouse', 'Customer'],
+      282,
+      84,
+      442,
+      560,
+      6,
+    );
+    const PANELS = [shop, big];
+
+    /** Box i of a panel, in drawing units. */
+    const box = (p: Panel, i: number) => {
+      const gap = px(narrow ? 14 : 28);
+      const w = (view.W - 2 * margin() - gap * (p.boxes.length - 1)) / p.boxes.length;
+      return { x: margin() + i * (w + gap), y: px(p.boxY), w, h: px(p.boxH), gap };
+    };
+    /** Where the n-th thing in a box sits: a grid filling from the bottom left. */
+    const slot = (p: Panel, i: number, n: number) => {
+      const b = box(p, i);
+      const pitch = 2 * r() + px(2);
+      const cols = Math.max(1, Math.floor((b.w - px(8)) / pitch));
+      const col = n % cols;
+      const row = Math.floor(n / cols);
+      return { x: b.x + px(4) + r() + col * pitch + px(1), y: b.y + b.h - px(4) - r() - row * pitch };
+    };
+    const slotY = (p: Panel, s: number) => px(p.floor) - R() - s * (2 * R() + px(2));
+    const hiOf = (p: Panel) => (p === big && safe ? DAYS : 5);
+
+    const kettle = (x: number, y: number): Kettle => ({
+      x,
+      y,
+      vx: 0,
+      vy: 0,
+      tx: x,
+      ty: y,
+      grow: 0.001,
+      placed: 0,
+      depart: 0,
+      arrive: 0,
+      day: 0,
+      slot: 0,
+      mix: 0,
+      fade: 1,
+      acc: 0,
+    });
+    const make = (p: Panel, i: number) => {
+      const s = slot(p, i, p.stock[i].length);
+      const k = kettle(s.x, s.y);
+      p.stock[i].push(k);
+      return k;
+    };
+    const move = (p: Panel, from: number, to: number, n = Infinity) => {
+      const batch = p.stock[from].splice(0, Math.min(n, p.stock[from].length));
+      p.stock[to].push(...batch);
+      return batch.length;
+    };
+
+    /** Sends a kettle from the last stock box to the customer. */
+    const deliver = (p: Panel, k: Kettle, placed: number, days: number) => {
+      k.placed = placed;
+      k.depart = now;
+      k.arrive = now + days;
+      p.delivering.push(k);
+    };
+    const order = (p: Panel, days: () => number) => {
+      const shelf = p.stock[p.boxes.length - 2];
+      if (shelf.length && !p.waiting.length) deliver(p, shelf.shift()!, now, days());
+      else p.waiting.push(now);
+    };
+    /** Serves waiting orders, oldest first, from whatever stock has come in. */
+    const serve = (p: Panel, days: () => number) => {
+      const shelf = p.stock[p.boxes.length - 2];
+      while (p.waiting.length && shelf.length) deliver(p, shelf.shift()!, p.waiting.shift()!, days());
+    };
+
+    const post = () => 2.2 + rand() * 1.6;
+    const van = () => 2.4 + rand() * 1.6;
+
+    const tickShop = () => {
+      const t = shop.timers;
+      // The supplier always has some in.
+      if (shop.stock[0].length < 8 && now >= (t.supplier ?? 0)) {
+        make(shop, 0);
+        t.supplier = now + 0.3;
+      }
+      // When the shelf runs low, the owner buys a few; they come the next day.
+      if (shop.stock[1].length <= 2 && !shop.transit.length) {
+        const kettles = shop.stock[0].splice(0, 6);
+        shop.transit.push({ kettles, from: 0, to: 1, start: now, end: now + 1 });
+      }
+      if (now >= (t.order ?? 0)) {
+        order(shop, post);
+        t.order = now + exp(rand, 1.2);
+      }
+      serve(shop, post);
+    };
+
+    const tickBig = () => {
+      const t = big.timers;
+      // The factory makes enough to keep the pipeline topped up.
+      const pipeline = big.stock.slice(0, 4).reduce((s, x) => s + x.length, 0) - big.waiting.length;
+      if (now >= (t.make ?? 0) && pipeline < 17) {
+        make(big, 0);
+        t.make = now + 0.4;
+      }
+      // Every ten days a ship takes everything the factory has made.
+      if (now >= (t.ship ?? 0) && !big.stock[1].length) {
+        move(big, 0, 1);
+        t.ship = now + 10;
+        t.landed = now + 5;
+      }
+      if (t.landed && now >= t.landed) {
+        move(big, 1, 2);
+        t.landed = 0;
+        t.cleared = now + 1.5;
+      }
+      if (t.cleared && now >= t.cleared) {
+        move(big, 2, 3);
+        t.cleared = 0;
+      }
+      if (now >= (t.order ?? 0)) {
+        order(big, van);
+        // Demand comes in waves: busy weeks and quiet ones.
+        t.order = now + exp(rand, Math.sin((now / 9) * Math.PI * 2) > 0 ? 0.4 : 0.84);
+      }
+      serve(big, van);
+    };
+
+    /** Puts a delivered kettle on its day's pile. */
+    const land = (p: Panel, k: Kettle) => {
+      k.day = Math.max(1, Math.min(DAYS, Math.ceil(k.arrive - k.placed)));
+      if (p.counts[k.day] >= p.cap) {
+        const old = p.pile.find((x) => x.day === k.day && x.fade === 1);
+        if (old) {
+          old.fade = 0.999;
+          for (const x of p.pile) if (x.day === k.day && x.slot > old.slot) x.slot--;
+          p.counts[k.day]--;
+        }
+      }
+      k.slot = p.counts[k.day]++;
+      // It drops straight into its own day's column, from just above the chart.
+      k.x = colX(k.day);
+      k.y = px(p.top) - px(4);
+      k.vx = 0;
+      k.vy = 0;
+      p.pile.push(k);
+    };
+
+    const step = (dt: number) => {
+      const days = dt / MS_PER_DAY;
+      now += days;
+      tickShop();
+      tickBig();
+      const steps = Math.ceil(dt / 8);
+      const h = dt / steps / 1000;
+
+      for (const p of PANELS) {
+        // Batches on the road arrive.
+        for (const tr of p.transit) if (now >= tr.end) p.stock[tr.to].push(...tr.kettles);
+        p.transit = p.transit.filter((tr) => now < tr.end);
+        // Deliveries reach the customer and drop to the pile.
+        for (const k of p.delivering) if (now >= k.arrive) land(p, k);
+        p.delivering = p.delivering.filter((k) => now < k.arrive);
+
+        const spring = (k: Kettle) => {
+          for (let s = 0; s < steps; s++) {
+            const ax = K * (k.tx - k.x) - D * k.vx;
+            const ay = K * (k.ty - k.y) - D * k.vy;
+            k.vx += ax * h;
+            k.vy += ay * h;
+            k.x += k.vx * h;
+            k.y += k.vy * h;
+            k.acc = ay;
+          }
+          if (k.grow < 1) k.grow = Math.min(1, k.grow + dt / 250);
+        };
+        p.stock.forEach((list, i) =>
+          list.forEach((k, n) => {
+            const s = slot(p, i, n);
+            k.tx = s.x;
+            k.ty = s.y;
+            spring(k);
+          }),
+        );
+        for (const tr of p.transit) {
+          const a = box(p, tr.from);
+          const b = box(p, tr.to);
+          const f = (now - tr.start) / (tr.end - tr.start);
+          tr.kettles.forEach((k, n) => {
+            k.tx = a.x + a.w + (b.x - a.x - a.w) * f + (n % 3) * px(6) - px(6);
+            k.ty = a.y + a.h / 2 + Math.floor(n / 3) * px(10) - px(5);
+            spring(k);
+          });
+        }
+        const last = box(p, p.boxes.length - 2);
+        const cust = box(p, p.boxes.length - 1);
+        for (const k of p.delivering) {
+          const f = Math.min(1, (now - k.depart) / (k.arrive - k.depart));
+          k.tx = last.x + last.w - r() + (cust.x + cust.w / 2 - last.x - last.w + r()) * f;
+          k.ty = last.y + last.h / 2;
+          spring(k);
+        }
+        for (const k of p.pile) {
+          k.tx = colX(k.day);
+          k.ty = slotY(p, k.slot);
+          spring(k);
+          const want = k.day > hiOf(p) ? 1 : 0;
+          k.mix = want; // on time or late: no in-between tint
+          if (k.fade < 1) k.fade -= dt / 300;
+        }
+        p.pile = p.pile.filter((k) => k.fade > 0);
+      }
+      bigHi += ((safe ? DAYS : 5) - bigHi) * Math.min(1, dt / 160);
+    };
+
+    const describe = () => {
+      readout.textContent = safe
+        ? 'Promising “within 2 weeks”, nearly every order makes it. But the promise now tells the customer much less.'
+        : 'The shop restocks overnight, so it’s rarely out for long. When the big company’s warehouse runs dry, orders wait for the next ship, and they arrive late.';
+    };
+
+    const rgb = (hex: string, amt: number) => {
+      const n = parseInt(hex.slice(1), 16);
+      const f = (v: number) => Math.max(0, Math.min(255, Math.round(v + amt * 255)));
+      return [f(n >> 16), f((n >> 8) & 255), f(n & 255)];
+    };
+    const mix = (a: number[], b: number[], k: number) =>
+      `rgb(${a.map((v, i) => Math.round(v + (b[i] - v) * k)).join(', ')})`;
+
+    const drawKettle = (k: Kettle, rr: number, dk: number) => {
+      const scale = k.grow < 1 ? 1 - Math.pow(1 - k.grow, 3) + Math.sin(k.grow * Math.PI) * 0.2 : 1;
+      const s = Math.max(0.8, Math.min(1.18, 1 + k.acc / 240000));
+      const w = (rr * scale) / Math.sqrt(s);
+      const h = rr * scale * s;
+      ctx.save();
+      ctx.globalAlpha = k.fade;
+      const g = ctx.createRadialGradient(k.x - w * 0.35, k.y - h * 0.4, rr * 0.1, k.x, k.y, rr * 1.1);
+      g.addColorStop(0, mix(rgb(KETTLE[dk], 0.2), rgb(CORAL[dk], 0.2), k.mix));
+      g.addColorStop(1, mix(rgb(KETTLE[dk], -0.06), rgb(CORAL[dk], -0.06), k.mix));
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.ellipse(k.x, k.y, w, h, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    };
+
+    /** A progress bar along the bottom of a box: a ship at sea, or customs. */
+    const progress = (p: Panel, i: number, f: number, words: string) => {
+      const b = box(p, i);
+      ctx.fillStyle = c.accent;
+      ctx.globalAlpha = 0.7;
+      ctx.fillRect(b.x + px(6), b.y + b.h + px(5), (b.w - px(12)) * Math.max(0, Math.min(1, f)), px(3));
+      ctx.globalAlpha = 1;
+      ctx.font = `500 ${px(10.5)}px ${c.font}`;
+      label(ctx, c, view.px, words, b.x + b.w / 2, b.y + px(13), c.muted);
+    };
+
+    draw = () => {
+      clear(c.paper);
+      const dk = dark() ? 1 : 0;
+      ctx.textBaseline = 'middle';
+
+      for (const p of PANELS) {
+        ctx.font = `600 ${px(13)}px ${c.font}`;
+        label(ctx, c, view.px, p.title, margin(), px(p.titleY), c.ink, 'left');
+
+        // The boxes, with arrows towards the customer.
+        p.boxes.forEach((name, i) => {
+          const b = box(p, i);
+          const customer = i === p.boxes.length - 1;
+          ctx.strokeStyle = customer ? c.muted : c.rule;
+          ctx.lineWidth = px(1.5);
+          if (customer) ctx.setLineDash([px(4), px(4)]);
+          ctx.beginPath();
+          ctx.roundRect(b.x, b.y, b.w, b.h, px(8));
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.font = `500 ${px(narrow ? 11 : 12)}px ${c.font}`;
+          label(ctx, c, view.px, narrow ? p.shortBoxes[i] : name, b.x + b.w / 2, px(p.labelY), c.ink);
+          if (i > 0) {
+            const x = b.x - b.gap / 2;
+            const y = b.y + b.h / 2;
+            ctx.strokeStyle = c.muted;
+            ctx.beginPath();
+            ctx.moveTo(x - px(4), y - px(4));
+            ctx.lineTo(x + px(1), y);
+            ctx.lineTo(x - px(4), y + px(4));
+            ctx.stroke();
+          }
+        });
+
+        // Orders waiting for stock, as hollow rings at the customer.
+        if (p.waiting.length) {
+          const cb = box(p, p.boxes.length - 1);
+          ctx.font = `500 ${px(10.5)}px ${c.font}`;
+          label(ctx, c, view.px, narrow ? 'waiting' : 'orders waiting', cb.x + px(6), cb.y + px(13), c.muted, 'left');
+        }
+        p.waiting.slice(0, 40).forEach((_, n) => {
+          const s = slot(p, p.boxes.length - 1, n);
+          ctx.strokeStyle = c.muted;
+          ctx.lineWidth = px(1.5);
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, r() - px(0.5), 0, Math.PI * 2);
+          ctx.stroke();
+        });
+
+        // The promise, over the days it covers.
+        const hi = p === big ? bigHi : 5;
+        const top = px(p.top);
+        ctx.fillStyle = dk ? 'rgba(143, 184, 212, 0.10)' : 'rgba(45, 95, 128, 0.07)';
+        ctx.beginPath();
+        ctx.roundRect(dayX(lo(hi) - 1), top, dayX(hi) - dayX(lo(hi) - 1), px(p.floor) - top, px(6));
+        ctx.fill();
+        if (p === big && bigHi > 5.2) {
+          ctx.save();
+          ctx.setLineDash([px(4), px(4)]);
+          ctx.strokeStyle = c.muted;
+          ctx.lineWidth = px(1);
+          ctx.beginPath();
+          ctx.roundRect(dayX(2), top, dayX(5) - dayX(2), px(p.floor) - top, px(6));
+          ctx.stroke();
+          ctx.restore();
+          ctx.font = `500 ${px(10.5)}px ${c.font}`;
+          label(ctx, c, view.px, 'was 3–5 days', (dayX(2) + dayX(5)) / 2, top + px(12), c.muted);
+        }
+
+        // Floor and day numbers.
+        ctx.strokeStyle = c.rule;
+        ctx.lineWidth = px(1.5);
+        ctx.beginPath();
+        ctx.moveTo(margin(), px(p.floor));
+        ctx.lineTo(view.W - margin(), px(p.floor));
+        ctx.stroke();
+        ctx.font = `${px(11)}px ${c.font}`;
+        for (let d = 1; d <= DAYS; d++) {
+          if (narrow && d % 2) continue;
+          label(ctx, c, view.px, String(d), colX(d), px(p.floor) + px(12), c.muted);
+        }
+      }
+      label(ctx, c, view.px, 'days from order to arrival', view.W - margin(), px(big.floor) + px(30), c.muted, 'right');
+
+      // The ship at sea and customs, as progress under their boxes.
+      if (big.timers.landed) progress(big, 1, 1 - (big.timers.landed - now) / 5, 'at sea');
+      if (big.timers.cleared) progress(big, 2, 1 - (big.timers.cleared - now) / 1.5, 'clearing customs');
+
+      for (const p of PANELS) {
+        for (const list of p.stock) for (const k of list) drawKettle(k, r(), dk);
+        for (const tr of p.transit) for (const k of tr.kettles) drawKettle(k, r(), dk);
+        for (const k of p.delivering) drawKettle(k, r(), dk);
+        for (const k of p.pile) drawKettle(k, R(), dk);
+      }
+
+      // The promise's words go last, so nothing hides them.
+      for (const p of PANELS) {
+        const hi = p === big ? bigHi : 5;
+        ctx.font = `600 ${px(12)}px ${c.font}`;
+        const text = hi > 5.5 ? 'Arrives within 2 weeks' : 'Arrives in 3–5 days';
+        label(ctx, c, view.px, text, (dayX(lo(hi) - 1) + dayX(hi)) / 2, px(p.top) - px(10), c.accent);
+      }
+    };
+
+    safeButton.addEventListener('click', () => {
+      safe = !safe;
+      safeButton.setAttribute('aria-pressed', String(safe));
+      safeButton.textContent = safe ? 'Promise 3–5 days' : 'Promise 2 weeks';
+      if (reduced) {
+        bigHi = safe ? DAYS : 5;
+        for (const k of big.pile) k.mix = k.day > hiOf(big) ? 1 : 0;
+      }
+      describe();
+      draw();
+    });
+
+    // Start part-way through: stock in every box and the piles formed.
+    for (let n = 0; n < 6; n++) make(shop, 1);
+    for (let n = 0; n < 6; n++) make(big, 3);
+    for (let n = 0; n < 10; n++) make(big, 1);
+    big.timers.ship = 7;
+    big.timers.landed = 2;
+    for (let n = 0; n < 2400; n++) step(16);
+    animate(figure, (dt) => {
+      step(dt);
+      draw();
+    });
+    describe();
+    draw();
+  }
+</script>

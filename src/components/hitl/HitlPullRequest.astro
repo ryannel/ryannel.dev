@@ -1,0 +1,183 @@
+---
+import '../../styles/hitl.css';
+import SystemMap from './SystemMap.astro';
+import { pullRequest, serviceById } from '../../data/human-in-the-loop';
+import { tint } from '../../lib/hitl';
+
+/**
+ * One pull request against the plan: a line replaced, a deployment step moved
+ * earlier, and the comment that says why. Before and after on the map.
+ */
+const pr = pullRequest;
+const author = serviceById[pr.author];
+const name = (id: string) => serviceById[id].name;
+---
+
+<figure class="hitl hitl-pr" data-hitl-pr data-before={JSON.stringify(pr.orderBefore)} data-after={JSON.stringify(pr.orderAfter)} data-author={pr.author}>
+  <div class="hitl-stage">
+    <div class="pr-layout">
+      <div class="pr-card">
+        <p class="pr-title"><span class="hitl-swatch" style={`--tint: ${tint(author.hue)}`}></span>{pr.title}</p>
+        <p class="hitl-note">Opened by the {author.name} team against <code>plan/delivery-date</code></p>
+        <div class="pr-diff" style={`--tint: ${tint(author.hue)}`}>
+          {pr.removed.map((l) => <p class="hitl-line pr-removed"><span class="pr-sign">−</span>{l.text}</p>)}
+          {pr.added.map((l) => <p class="hitl-line pr-added"><span class="pr-sign">+</span>{l.text}</p>)}
+        </div>
+        <p class="hitl-note pr-order-label">Deployment order</p>
+        <ol class="pr-order">
+          {pr.orderBefore.map((id) => <li data-s={id} style={`--tint: ${tint(serviceById[id].hue)}`}>{name(id)}</li>)}
+        </ol>
+        <blockquote class="pr-comment">{pr.comment}</blockquote>
+      </div>
+      <div class="pr-side">
+        <SystemMap />
+      </div>
+    </div>
+  </div>
+  <div class="hitl-controls" role="group" aria-label="Before or after the pull request">
+    <button type="button" data-state="before" aria-pressed="true">Before</button>
+    <button type="button" data-state="after">After</button>
+    <span class="hitl-spacer"></span>
+    <span class="hitl-note">One line, one step moved, one comment.</span>
+  </div>
+  <p class="hitl-readout" aria-live="polite"></p>
+  <figcaption>
+    A pull request against the plan from the warehouse team. Press <em>After</em> to see what it changes: one line, one deployment step moved earlier, and a comment that says what the model could not have known.
+  </figcaption>
+</figure>
+
+<style>
+  .pr-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+    gap: 1rem;
+    align-items: start;
+  }
+  @media (max-width: 40rem) {
+    .pr-layout {
+      grid-template-columns: 1fr;
+    }
+  }
+  .pr-title {
+    margin: 0 0 0.2rem;
+    font-weight: 600;
+    font-size: 0.9375rem;
+  }
+  .pr-title .hitl-swatch,
+  .hitl-pr .hitl-swatch {
+    display: inline-block;
+    width: 0.7em;
+    height: 0.7em;
+    margin-right: 0.35em;
+    border-radius: 2px;
+    vertical-align: -0.05em;
+    background: var(--tint);
+  }
+  .pr-card code {
+    font: 0.9em var(--font-mono);
+  }
+  .pr-diff {
+    margin: 0.75rem 0;
+  }
+  .hitl .pr-diff .hitl-line {
+    padding-left: 1.6rem;
+  }
+  .pr-sign {
+    position: absolute;
+    left: 0.55rem;
+    font-family: var(--font-mono);
+  }
+  .hitl .pr-removed {
+    text-decoration: line-through;
+    text-decoration-color: var(--ink-muted);
+    color: var(--ink-muted);
+    background: color-mix(in oklab, var(--tint) 6%, transparent);
+  }
+  .hitl .pr-added {
+    background: color-mix(in oklab, var(--tint) 22%, transparent);
+  }
+  .hitl-pr[data-state='before'] .pr-added,
+  .hitl-pr[data-state='after'] .pr-removed {
+    display: none;
+  }
+  .pr-order-label {
+    margin: 0.75rem 0 0.25rem;
+  }
+  .pr-order {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: step;
+  }
+  .pr-order li {
+    counter-increment: step;
+    margin: 0;
+    padding: 0.2rem 0.5rem 0.2rem 0.4rem;
+    border-left: 3px solid var(--tint);
+    border-radius: 3px;
+    background: color-mix(in oklab, var(--tint) 14%, transparent);
+    font-size: 0.75rem;
+    transition: outline 0.2s;
+  }
+  .pr-order li::before {
+    content: counter(step) ' ';
+    color: var(--ink-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .pr-order li.is-moved {
+    outline: 2px solid var(--ink);
+    outline-offset: -2px;
+  }
+  .pr-comment {
+    margin: 0.75rem 0 0;
+    padding: 0.5rem 0.75rem;
+    border-left: 2px solid var(--rule);
+    font: italic 0.8125rem/1.45 var(--font-prose);
+    color: var(--ink-muted);
+  }
+</style>
+
+<script>
+  import { clearStates, mark } from '../../lib/hitl';
+
+  for (const figure of document.querySelectorAll<HTMLElement>('[data-hitl-pr]')) {
+    const before: string[] = JSON.parse(figure.dataset.before!);
+    const after: string[] = JSON.parse(figure.dataset.after!);
+    const author = figure.dataset.author!;
+    const list = figure.querySelector<HTMLOListElement>('.pr-order')!;
+    const items = new Map([...list.querySelectorAll('li')].map((li) => [li.dataset.s!, li]));
+    const map = figure.querySelector<SVGSVGElement>('.hitl-map')!;
+    const readout = figure.querySelector<HTMLElement>('.hitl-readout')!;
+    const buttons = figure.querySelectorAll<HTMLButtonElement>('[data-state]');
+    const name = (id: string) => map.querySelector(`[data-service="${id}"] text`)?.textContent ?? id;
+
+    const show = (state: 'before' | 'after') => {
+      figure.dataset.state = state;
+      buttons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.state === state)));
+      const order = state === 'before' ? before : after;
+      for (const id of order) list.append(items.get(id)!);
+      items.forEach((li) => li.classList.toggle('is-moved', li.dataset.s === author));
+      clearStates(map);
+      mark(map, '[data-service]', 'is-dim', true);
+      mark(map, `[data-service="${author}"]`, 'is-dim', false);
+      mark(map, `[data-service="${author}"]`, 'is-lit', true);
+      // The contracts the correction is about: what warehouse tells orders, and what checkout writes.
+      for (const c of ['ord-wh', 'co-ord']) {
+        mark(map, `[data-contract="${c}"]`, 'is-lit', true);
+        const path = map.querySelector<SVGPathElement>(`[data-contract="${c}"]`)!;
+        mark(map, `[data-service="${path.dataset.from}"]`, 'is-dim', false);
+        mark(map, `[data-service="${path.dataset.to}"]`, 'is-dim', false);
+      }
+      const ordinal = ['', 'first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth'][order.indexOf(author) + 1];
+      readout.textContent =
+        state === 'before'
+          ? `Before: ${name(author)} sends a dispatch date when an order is picked, and deploys ${ordinal}, after Checkout has started writing dates.`
+          : `After: ${name(author)} sends the date when the order is allocated to a site, and deploys ${ordinal}, before Checkout. The rest of the plan is untouched.`;
+    };
+    buttons.forEach((b) => b.addEventListener('click', () => show(b.dataset.state as 'before' | 'after')));
+    show('before');
+  }
+</script>

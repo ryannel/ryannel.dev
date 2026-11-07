@@ -1,0 +1,225 @@
+---
+import '../../styles/hitl.css';
+import SystemMap from './SystemMap.astro';
+import { plan, services, contracts, serviceById } from '../../data/human-in-the-loop';
+import { tint } from '../../lib/hitl';
+
+/**
+ * The same plan as a tree, one branch per service, beside the map. Opening a
+ * branch lights that service and the contracts its lines touch. Clicking a
+ * lit contract opens the branch on the other end and marks the lines on both
+ * sides that mention it: the check the map exists for.
+ */
+const branches = services
+  .map((s) => ({ service: s, lines: plan.map((l, n) => ({ ...l, n })).filter((l) => l.s === s.id) }))
+  .filter((b) => b.lines.some((l) => l.text !== 'No change.'));
+const labels = Object.fromEntries(contracts.map((c) => [c.id, `${serviceById[c.from].name} → ${serviceById[c.to].name}: ${c.label}`]));
+---
+
+<figure class="hitl hitl-tree" data-hitl-tree data-labels={JSON.stringify(labels)}>
+  <div class="hitl-stage">
+    <div class="tree-layout">
+      <div class="tree-branches">
+        {
+          branches.map((b) => (
+            <details class="tree-branch" data-s={b.service.id} style={`--tint: ${tint(b.service.hue)}`}>
+              <summary>
+                <span class="hitl-swatch"></span>{b.service.name}
+                <span class="hitl-note"> {b.lines.length} line{b.lines.length === 1 ? '' : 's'}</span>
+              </summary>
+              <div class="tree-lines">
+                {b.lines.map((l) => (
+                  <p
+                    class:list={['hitl-line', { 'is-decision': l.decision }]}
+                    data-line={l.n}
+                    data-touches={(l.touches ?? []).join(' ')}
+                  >
+                    {l.text}
+                  </p>
+                ))}
+              </div>
+            </details>
+          ))
+        }
+      </div>
+      <div class="tree-side">
+        <SystemMap />
+        <p class="hitl-readout" aria-live="polite">Open a branch.</p>
+      </div>
+    </div>
+  </div>
+  <figcaption>
+    The plan as a tree with a branch per service, beside the system map. Opening a branch lights its service and the contracts its lines touch. Click a lit contract to see which lines mention it, and click it again to cross to the branch at the other end.
+  </figcaption>
+</figure>
+
+<style>
+  .tree-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+    gap: 1rem;
+    align-items: start;
+  }
+  @media (max-width: 40rem) {
+    .tree-layout {
+      grid-template-columns: 1fr;
+    }
+    .tree-side {
+      order: -1;
+    }
+  }
+  .tree-branches {
+    max-height: 26rem;
+    overflow-y: auto;
+  }
+  .tree-branch {
+    border-left: 4px solid var(--tint);
+    margin: 0 0 2px;
+  }
+  .tree-branch summary {
+    padding: 0.35rem 0.6rem;
+    font-size: 0.8125rem;
+    cursor: pointer;
+    list-style: none;
+    background: color-mix(in oklab, var(--tint) 14%, transparent);
+  }
+  .tree-branch summary::-webkit-details-marker {
+    display: none;
+  }
+  .tree-branch summary::before {
+    content: '▸';
+    display: inline-block;
+    width: 1em;
+    color: var(--ink-muted);
+    transition: transform 0.15s;
+  }
+  .tree-branch[open] summary::before {
+    transform: rotate(90deg);
+  }
+  .tree-branch .hitl-swatch {
+    display: inline-block;
+    width: 0.7em;
+    height: 0.7em;
+    margin-right: 0.35em;
+    border-radius: 2px;
+    vertical-align: -0.05em;
+    background: var(--tint);
+  }
+  .tree-lines {
+    padding: 2px 0 0.5rem 0.75rem;
+  }
+  .hitl .tree-lines .hitl-line {
+    border-left-width: 2px;
+    background: transparent;
+  }
+  .tree-side {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .tree-side .hitl-readout {
+    margin: 0;
+    font-size: 0.8125rem;
+    color: var(--ink-muted);
+  }
+</style>
+
+<script>
+  import { clearStates, mark } from '../../lib/hitl';
+
+  for (const figure of document.querySelectorAll<HTMLElement>('[data-hitl-tree]')) {
+    const labels: Record<string, string> = JSON.parse(figure.dataset.labels!);
+    const map = figure.querySelector<SVGSVGElement>('.hitl-map')!;
+    const readout = figure.querySelector<HTMLElement>('.hitl-readout')!;
+    const branches = [...figure.querySelectorAll<HTMLDetailsElement>('.tree-branch')];
+    const name = (id: string) => map.querySelector(`[data-service="${id}"] text`)?.textContent ?? id;
+
+    const touched = (branch: HTMLDetailsElement) => {
+      const set = new Set<string>();
+      for (const l of branch.querySelectorAll<HTMLElement>('.hitl-line')) for (const t of (l.dataset.touches ?? '').split(' ').filter(Boolean)) set.add(t);
+      return set;
+    };
+
+    const light = (branch: HTMLDetailsElement, contract?: string) => {
+      clearStates(map);
+      figure.querySelectorAll('.hitl-line.is-active').forEach((el) => el.classList.remove('is-active'));
+      const id = branch.dataset.s!;
+      const set = touched(branch);
+      mark(map, '[data-service]', 'is-dim', true);
+      mark(map, '[data-contract]', 'is-dim', true);
+      mark(map, `[data-service="${id}"]`, 'is-dim', false);
+      mark(map, `[data-service="${id}"]`, 'is-lit', true);
+      for (const c of set) {
+        const path = map.querySelector<SVGPathElement>(`[data-contract="${c}"]`);
+        if (!path) continue;
+        path.classList.remove('is-dim');
+        path.classList.add('is-lit', 'is-clickable');
+        const other = path.dataset.from === id ? path.dataset.to! : path.dataset.from!;
+        mark(map, `[data-service="${other}"]`, 'is-dim', false);
+      }
+      if (contract) {
+        mark(map, `[data-contract="${contract}"]`, 'is-active', true);
+        for (const l of branch.querySelectorAll<HTMLElement>('.hitl-line')) {
+          if ((l.dataset.touches ?? '').split(' ').includes(contract)) l.classList.add('is-active');
+        }
+        const marked = branch.querySelectorAll('.hitl-line.is-active').length;
+        readout.textContent = `${labels[contract]}. ${marked} line${marked === 1 ? '' : 's'} in the ${name(id)} branch mention${marked === 1 ? 's' : ''} it. Click the contract again to cross to the other side.`;
+      } else {
+        readout.textContent = `${name(id)}: ${branch.querySelectorAll('.hitl-line').length} lines, touching ${set.size} contract${set.size === 1 ? '' : 's'}. Click a lit contract to see which lines mention it.`;
+      }
+    };
+
+    let current: HTMLDetailsElement | null = null;
+    let currentContract: string | undefined;
+    const open = (branch: HTMLDetailsElement, contract?: string) => {
+      for (const b of branches) if (b !== branch) b.open = false;
+      branch.open = true;
+      current = branch;
+      currentContract = contract;
+      light(branch, contract);
+    };
+
+    for (const b of branches) {
+      b.addEventListener('toggle', () => {
+        if (b.open && current !== b) open(b);
+        else if (!b.open && current === b) {
+          current = null;
+          clearStates(map);
+          readout.textContent = 'Open a branch.';
+        }
+      });
+    }
+
+    for (const path of map.querySelectorAll<SVGPathElement>('[data-contract]')) {
+      path.addEventListener('click', () => {
+        if (!current || !path.classList.contains('is-lit')) return;
+        const id = path.dataset.contract!;
+        const here = current.dataset.s!;
+        if (currentContract === id) {
+          // Second click: cross to the branch at the other end.
+          const other = path.dataset.from === here ? path.dataset.to! : path.dataset.from!;
+          const branch = branches.find((b) => b.dataset.s === other);
+          if (branch) {
+            open(branch, id);
+            branch.querySelector('.hitl-line.is-active')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          } else {
+            readout.textContent = `${labels[id]}. ${name(other)} has no lines in the plan.`;
+          }
+        } else {
+          open(current, id);
+        }
+      });
+    }
+
+    for (const g of map.querySelectorAll<SVGGElement>('[data-service]')) {
+      g.classList.add('is-clickable');
+      g.addEventListener('click', () => {
+        const branch = branches.find((b) => b.dataset.s === g.dataset.service);
+        if (branch) {
+          open(branch);
+          branch.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        } else readout.textContent = `${name(g.dataset.service!)}: no change in the plan.`;
+      });
+    }
+  }
+</script>

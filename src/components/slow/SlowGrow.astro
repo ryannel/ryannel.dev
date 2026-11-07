@@ -1,0 +1,628 @@
+---
+import '../../styles/hitl.css';
+
+/**
+ * The big company's chain, for "Growing" and "Who knows the answer" in
+ * notes/why-big-companies-are-slow. Kettles hop box to box towards the
+ * customer the whole time.
+ *
+ * - grow: starts as the shop's two boxes (stock, customer) and adds what the
+ *   company grew into, one box at a time, upstream; the last step copies the
+ *   right-hand half for a second country. Replay after.
+ * - ask: the whole chain, and "When will it arrive?" drops a question onto
+ *   every box that holds part of the answer, on a loop.
+ *
+ * Boxes take the owning team's colour; hollow ones are other companies.
+ * Timings are invented; it's a sketch.
+ */
+interface Props {
+  mode?: 'grow' | 'ask';
+}
+const { mode = 'grow' } = Astro.props;
+
+const aria =
+  mode === 'grow'
+    ? 'A chain of boxes kettles hop along to reach the customer. It starts as a warehouse and a customer, then grows upstream: retailer, sales company, customs, freight, a warehouse by the factory, the factory, suppliers. Last, a second country copies the right-hand half.'
+    : 'The whole chain, from suppliers to customers in two countries. A question, when will it arrive, drops onto every box, because each holds part of the answer. The suppliers, freight, customs and retailers are other companies.';
+const caption =
+  mode === 'grow'
+    ? 'Each ball is a kettle on its way to a customer. Box colours are the teams that run them; hollow boxes are other companies. A sketch.'
+    : 'Each question lands on a box that holds part of the answer. Hollow boxes are other companies. A sketch.';
+---
+
+<figure class="hitl slow-grow" data-slow-grow data-mode={mode}>
+  <div class="hitl-stage">
+    <canvas class="slow-canvas" aria-label={aria}></canvas>
+    <noscript><p class="hitl-note">The figure is drawn with JavaScript.</p></noscript>
+  </div>
+  {
+    mode === 'grow' && (
+      <div class="hitl-controls">
+        <button type="button" data-replay hidden>Replay</button>
+      </div>
+    )
+  }
+  <p class="hitl-readout" aria-live="polite"></p>
+  <figcaption>{caption}</figcaption>
+</figure>
+
+<style>
+  .slow-grow .hitl-stage {
+    padding: 0;
+    overflow: hidden;
+  }
+  .slow-canvas {
+    display: block;
+    width: 100%;
+  }
+</style>
+
+<script>
+  import { mulberry, theme, fit, animate, label, reducedMotion, NARROW, ball, HUES, isDark } from './canvas';
+  import type { Hue } from './canvas';
+
+  type Box = {
+    id: string;
+    name: string;
+    short: string;
+    hue: Hue | null; // null: the customer
+    outside: boolean;
+    col: number;
+    row: 0 | 1;
+    up: boolean; // the sales company, sitting above its row
+    born: number; // ms since it appeared, or -1 while it isn't there
+  };
+  type Kettle = {
+    route: string[];
+    at: number; // index into route
+    ox: number; // place along the box floor, -1..1
+    sit: number; // ms left before hopping on
+    hop: number; // 0..1 through a hop, or -1
+    from: { x: number; y: number };
+    land: number; // ms since landing, for the squash
+    life: number; // ms left once at the customer
+  };
+  type Question = { box: string; delay: number; t: number; land: number };
+
+  const PARTS: [string, string, string, Hue | null, boolean, number][] = [
+    // id, name, short name, owner, another company?, column
+    ['supplier', 'Suppliers', 'Suppliers', 'purchasing', true, 0],
+    ['factory', 'Factory', 'Factory', 'factory', false, 1],
+    ['origin', 'Export warehouse', 'Export', 'warehouses', false, 2],
+    ['freight', 'Freight', 'Freight', 'logistics', true, 3],
+    ['customs', 'Customs', 'Customs', 'logistics', true, 4],
+    ['local', 'Local warehouse', 'Local', 'warehouses', false, 5],
+    ['retailer', 'Retailer', 'Retailer', 'sales', true, 6],
+    ['customer', 'Customer', 'Customer', null, true, 7],
+  ];
+  const ABROAD = ['freight', 'customs', 'local', 'retailer', 'customer'];
+  const ROUTE = PARTS.map((p) => p[0]);
+  const ROUTE_2 = ROUTE.map((id) => (ABROAD.includes(id) ? id + '2' : id));
+  const KETTLE = ['#5fa8a0', '#6fc2b8'];
+
+  // The order the chain grows in, upstream from the shop's two boxes.
+  const GROWTH: [string[], string][] = [
+    [['local', 'customer'], 'Like the shop: stock in a warehouse, sent to the customer.'],
+    [['retailer'], 'Retailers sell it in their shops too.'],
+    [['sales'], 'A sales company sells to them.'],
+    [['customs'], 'The kettles are made abroad, so they come through customs.'],
+    [['freight'], 'A freight company ships them over.'],
+    [['origin'], 'From a warehouse by the factory.'],
+    [['factory'], 'The company makes its own kettles.'],
+    [['supplier'], 'From parts bought from suppliers.'],
+    [['freight2', 'customs2', 'local2', 'retailer2', 'customer2', 'sales2'], 'A second country copies the right-hand half.'],
+  ];
+  const LEAD = 900; // ms on screen before growing
+  const EVERY = 1300; // ms between growth steps
+  const SPAWN = 300; // ms between kettles
+  const HOP = 520; // ms a hop takes
+  const LOOP = 6600; // ms per round of questions
+
+  for (const figure of document.querySelectorAll<HTMLElement>('[data-slow-grow]')) {
+    const ask = figure.dataset.mode === 'ask';
+    const canvas = figure.querySelector<HTMLCanvasElement>('.slow-canvas')!;
+    const replay = figure.querySelector<HTMLButtonElement>('[data-replay]');
+    const readout = figure.querySelector<HTMLElement>('.hitl-readout')!;
+    let narrow = false;
+
+    const layout = (w: number) => {
+      narrow = w < NARROW;
+      const W = narrow ? 600 : 1000;
+      return { W, H: (W / w) * (narrow ? 372 : 344) };
+    };
+    let draw = () => {};
+    const c = theme(figure, () => draw());
+    const { ctx, view, clear } = fit(canvas, layout, () => draw());
+    const px = (n: number) => n * view.px;
+
+    const boxes = new Map<string, Box>();
+    const add = (id: string, name: string, short: string, hue: Hue | null, outside: boolean, col: number, row: 0 | 1, up = false) =>
+      boxes.set(id, { id, name, short, hue, outside, col, row, up, born: -1 });
+    for (const [id, name, short, hue, outside, col] of PARTS) {
+      add(id, name, short, hue, outside, col, 0);
+      if (ABROAD.includes(id)) add(id + '2', name, short, hue, outside, col, 1);
+    }
+    add('sales', 'Sales company', 'Sales co', 'sales', false, 5.5, 0, true);
+    add('sales2', 'Sales company', 'Sales co', 'sales', false, 5.5, 1, true);
+
+    let rand = mulberry(11);
+    let kettles: Kettle[] = [];
+    let questions: Question[] = [];
+    let shown = 0;
+    let grown = 0; // growth steps taken
+    let spawn = 0;
+    let round = 0; // ms into the current round of questions
+
+    // Geometry, in drawing units.
+    const boxW = () => (view.W / 8) * (narrow ? 0.8 : 0.72);
+    const boxH = () => px(narrow ? 32 : 40);
+    const rowY = (row: number) => px(row ? 262 : 124);
+    const place = (b: Box) => ({
+      x: (view.W / 8) * (b.col + 0.5),
+      y: b.up ? rowY(b.row) - px(64) : rowY(b.row),
+      w: b.up ? boxW() * 1.15 : boxW(),
+      h: b.up ? boxH() * 0.82 : boxH(),
+    });
+    const kr = () => px(narrow ? 3.6 : 4.6);
+    const pill = () => {
+      const w = px(narrow ? 150 : 170);
+      const cust = (view.W / 8) * 7.5;
+      return { x: Math.min(view.W - w / 2 - px(8), cust), y: px(26), w, h: px(26) };
+    };
+
+    const there = (id: string) => (boxes.get(id)?.born ?? -1) >= 0;
+    const nextOn = (k: Kettle) => {
+      for (let i = k.at + 1; i < k.route.length; i++) if (there(k.route[i])) return i;
+      return -1;
+    };
+    const seat = (k: Kettle) => {
+      const p = place(boxes.get(k.route[k.at])!);
+      return { x: p.x + k.ox * (p.w / 2 - kr() * 1.6), y: p.y + p.h / 2 - kr() - px(3) };
+    };
+
+    const grow = () => {
+      const [ids, words] = GROWTH[grown];
+      // A group pops in one box after another: negative ages count up to zero.
+      ids.forEach((id, n) => (boxes.get(id)!.born = -n * 110 - 0.001));
+      grown++;
+      readout.textContent = words;
+    };
+
+    const reset = () => {
+      rand = mulberry(11);
+      for (const b of boxes.values()) b.born = ask ? 1e6 : -1;
+      kettles = [];
+      questions = [];
+      grown = ask ? GROWTH.length : 0;
+      shown = 0;
+      spawn = 0;
+      round = 0;
+      if (!ask) {
+        // Start as the shop: two boxes, already there.
+        boxes.get('local')!.born = 1e6;
+        boxes.get('customer')!.born = 1e6;
+        grown = 1;
+        readout.textContent = GROWTH[0][1];
+      } else {
+        readout.textContent = 'Every box holds part of the answer. The hollow ones are other companies.';
+      }
+      if (replay) replay.hidden = true;
+      // Fill the chain with kettles already on their way.
+      for (let n = 0; n < 900; n++) move(16);
+    };
+
+    const spawnKettle = () => {
+      const second = there('freight2') && rand() < 0.5;
+      const route = second ? ROUTE_2 : ROUTE;
+      const first = route.findIndex((id) => there(id));
+      if (first < 0) return;
+      kettles.push({
+        route,
+        at: first,
+        ox: rand() * 2 - 1,
+        sit: 200 + rand() * 900,
+        hop: -1,
+        from: { x: 0, y: 0 },
+        land: 999,
+        life: 900,
+      });
+    };
+
+    /** Kettles sit a while in each box, then hop to the next one there. */
+    const move = (dt: number) => {
+      spawn -= dt;
+      if (spawn <= 0) {
+        spawnKettle();
+        spawn += SPAWN * (there('freight2') ? 0.7 : 1);
+      }
+      for (const k of kettles) {
+        k.land += dt;
+        if (k.hop >= 0) {
+          k.hop += dt / HOP;
+          if (k.hop >= 1) {
+            k.hop = -1;
+            k.land = 0;
+            k.sit = (k.route[k.at].startsWith('customs') ? 1200 : 300) + rand() * 1300;
+          }
+          continue;
+        }
+        if (k.route[k.at].startsWith('customer')) {
+          k.life -= dt;
+          continue;
+        }
+        k.sit -= dt;
+        if (k.sit <= 0) {
+          if (k.route[k.at] === 'origin') k.route = there('freight2') && rand() < 0.5 ? ROUTE_2 : ROUTE;
+          const next = nextOn(k);
+          if (next < 0) continue;
+          k.from = seat(k);
+          k.at = next;
+          k.ox = rand() * 2 - 1;
+          k.hop = 0;
+        }
+      }
+      kettles = kettles.filter((k) => k.life > 0);
+    };
+
+    const askRound = (dt: number) => {
+      round += dt;
+      if (round >= LOOP) {
+        round = 0;
+        questions = [];
+      }
+      if (questions.length === 0 && round > 500) {
+        // Everything on this customer's side of the chain.
+        const ids = [...boxes.values()].filter((b) => b.hue && b.row === 0).map((b) => b.id);
+        ids.sort(() => rand() - 0.5);
+        questions = ids.map((id, n) => ({ box: id, delay: n * 150, t: 0, land: -1 }));
+      }
+      for (const q of questions) {
+        if (q.delay > 0) q.delay -= dt;
+        else if (q.land < 0) {
+          q.t += dt / 700;
+          if (q.t >= 1) q.land = 0;
+        } else q.land += dt;
+      }
+    };
+
+    // Drawing.
+    const rounded = (x: number, y: number, w: number, h: number, r: number) => {
+      ctx.beginPath();
+      ctx.roundRect(x, y, w, h, r);
+    };
+    const pop = (born: number) => {
+      if (born < 0) return 0;
+      const t = Math.min(1, born / 420);
+      const k = 1.9;
+      return 1 + (k + 1) * Math.pow(t - 1, 3) + k * Math.pow(t - 1, 2); // ease out, overshooting
+    };
+
+    const edge = (a: Box, b: Box, alpha: number, dk: number) => {
+      const p = place(a);
+      const q = place(b);
+      ctx.save();
+      ctx.globalAlpha = alpha * 0.9;
+      ctx.strokeStyle = c.rule;
+      ctx.lineWidth = px(2);
+      ctx.beginPath();
+      let ex: number, ey: number, ang: number;
+      if (a.row === b.row) {
+        ctx.moveTo(p.x + p.w / 2 + px(3), p.y);
+        ex = q.x - q.w / 2 - px(4);
+        ey = q.y;
+        ctx.lineTo(ex, ey);
+        ang = 0;
+      } else {
+        const sx = p.x;
+        const sy = p.y + p.h / 2 + px(3);
+        ex = q.x - q.w / 2 - px(4);
+        ey = q.y;
+        ctx.moveTo(sx, sy);
+        ctx.bezierCurveTo(sx, ey, sx + (ex - sx) * 0.4, ey, ex, ey);
+        ang = 0;
+      }
+      ctx.stroke();
+      ctx.fillStyle = c.rule;
+      ctx.translate(ex, ey);
+      ctx.rotate(ang);
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(-px(7), -px(4.5));
+      ctx.lineTo(-px(7), px(4.5));
+      ctx.fill();
+      ctx.restore();
+      void dk;
+    };
+
+    const drawBox = (b: Box, dk: number) => {
+      const s = pop(b.born);
+      if (s <= 0) return;
+      const p = place(b);
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.scale(s, s);
+      const r = px(8);
+      rounded(-p.w / 2, -p.h / 2, p.w, p.h, r);
+      if (!b.hue) {
+        ctx.setLineDash([px(4), px(4)]);
+        ctx.strokeStyle = c.muted;
+        ctx.lineWidth = px(1.5);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      } else {
+        const hex = HUES[b.hue][dk];
+        if (b.outside) {
+          ctx.fillStyle = c.paper;
+          ctx.fill();
+          ctx.strokeStyle = c.muted;
+          ctx.lineWidth = px(1.8);
+          ctx.stroke();
+        } else {
+          const g = ctx.createLinearGradient(0, -p.h / 2, 0, p.h / 2);
+          g.addColorStop(0, hex);
+          g.addColorStop(1, dk ? hex : hex);
+          ctx.globalAlpha = dk ? 0.85 : 0.9;
+          ctx.fillStyle = g;
+          ctx.fill();
+          ctx.globalAlpha = 1;
+        }
+      }
+      ctx.restore();
+
+      // The name: under the box, or inside it for the sales company.
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, Math.max(0, s));
+      ctx.font = `500 ${px(narrow ? 11 : 12)}px ${c.font}`;
+      ctx.textBaseline = 'middle';
+      const name = narrow ? b.short : b.name;
+      if (b.up) {
+        ctx.textAlign = 'center';
+        ctx.fillStyle = dk ? '#16210f' : '#16210f';
+        const fit = Math.min(1, (p.w - px(8)) / ctx.measureText(name).width);
+        ctx.translate(p.x, p.y + px(0.5));
+        ctx.scale(fit, fit);
+        ctx.fillText(name, 0, 0);
+      } else {
+        // Staggered on a phone, and kept inside the frame.
+        const drop = narrow && Math.round(b.col) % 2 === 1 ? px(15) : 0;
+        const half = ctx.measureText(name).width / 2 + px(3);
+        const x = Math.min(view.W - half, Math.max(half, p.x));
+        label(ctx, c, view.px, name, x, p.y + p.h / 2 + px(13) + drop, c.muted);
+      }
+      ctx.restore();
+    };
+
+    const drawKettle = (k: Kettle, dk: number) => {
+      const to = seat(k);
+      let x = to.x;
+      let y = to.y;
+      let sq = 1;
+      if (k.hop >= 0) {
+        const t = k.hop;
+        const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+        x = k.from.x + (to.x - k.from.x) * e;
+        const lift = px(34) + Math.abs(to.y - k.from.y) * 0.15;
+        y = k.from.y + (to.y - k.from.y) * t - lift * 4 * t * (1 - t);
+        sq = 1.08;
+      } else if (k.land < 260) {
+        sq = 1 - 0.28 * Math.exp(-k.land / 70) * Math.cos(k.land / 40);
+        y += kr() * (1 - sq);
+      }
+      ctx.save();
+      if (ask) ctx.globalAlpha = 0.35;
+      if (k.route[k.at].startsWith('customer') && k.hop < 0) ctx.globalAlpha *= Math.min(1, k.life / 400);
+      ball(ctx, x, y, kr(), KETTLE[dk], sq);
+      ctx.restore();
+    };
+
+    const drawQuestion = (q: Question, dk: number) => {
+      if (q.delay > 0) return;
+      const b = boxes.get(q.box)!;
+      const p = place(b);
+      const start = pill();
+      const tx = p.x + p.w / 2 - px(4);
+      const ty = p.y - p.h / 2 - px(2);
+      const r = px(narrow ? 7 : 8);
+      let x = tx;
+      let y = ty;
+      let sq = 1;
+      if (q.land < 0) {
+        const t = q.t;
+        x = start.x + (tx - start.x) * t;
+        y = start.y + (ty - start.y) * t - px(70) * 4 * t * (1 - t) * (1 - t);
+      } else {
+        sq = 1 - 0.3 * Math.exp(-q.land / 90) * Math.cos(q.land / 45);
+        y += r * (1 - sq);
+      }
+      const fade = round > LOOP - 700 ? Math.max(0, (LOOP - round) / 700) : 1;
+      ctx.save();
+      ctx.globalAlpha = fade;
+      ball(ctx, x, y, r, HUES.ours[dk], sq);
+      ctx.font = `700 ${px(narrow ? 10 : 11)}px ${c.font}`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#3a210c';
+      ctx.fillText('?', x, y + px(0.5));
+      ctx.restore();
+    };
+
+    draw = () => {
+      clear(c.paper);
+      const dk = isDark(c) ? 1 : 0;
+
+      // Arrows between neighbouring boxes that are there, on both routes.
+      const done = new Set<string>();
+      for (const route of [ROUTE, ROUTE_2]) {
+        const on = route.filter(there);
+        for (let i = 0; i + 1 < on.length; i++) {
+          const key = on[i] + '>' + on[i + 1];
+          if (done.has(key)) continue;
+          done.add(key);
+          const a = boxes.get(on[i])!;
+          const b = boxes.get(on[i + 1])!;
+          edge(a, b, Math.min(1, pop(a.born), pop(b.born)), dk);
+        }
+      }
+      // The sales companies' tie to their country's stock and retailers.
+      for (const [s, w] of [
+        ['sales', 'local'],
+        ['sales2', 'local2'],
+      ]) {
+        const sb = boxes.get(s)!;
+        if (!there(s) || !there(w)) continue;
+        const p = place(sb);
+        ctx.save();
+        ctx.globalAlpha = Math.min(1, pop(sb.born));
+        ctx.strokeStyle = c.rule;
+        ctx.lineWidth = px(1.5);
+        ctx.setLineDash([px(3), px(4)]);
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y + p.h / 2);
+        ctx.lineTo(p.x, rowY(sb.row) - px(2));
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      for (const b of boxes.values()) drawBox(b, dk);
+
+      if (there('freight2')) {
+        ctx.save();
+        ctx.globalAlpha = Math.min(1, pop(boxes.get('freight2')!.born));
+        ctx.font = `500 ${px(narrow ? 11 : 12)}px ${c.font}`;
+        ctx.textBaseline = 'middle';
+        label(ctx, c, view.px, narrow ? 'Country 2' : 'A second country', (view.W / 8) * 2.5 - px(14), rowY(1), c.muted, 'right');
+        ctx.restore();
+      }
+
+      for (const k of kettles) drawKettle(k, dk);
+
+      if (ask) {
+        const p = pill();
+        const cu = place(boxes.get('customer')!);
+        ctx.save();
+        ctx.strokeStyle = HUES.ours[dk];
+        ctx.lineWidth = px(1.5);
+        ctx.setLineDash([px(3), px(4)]);
+        ctx.beginPath();
+        ctx.moveTo(cu.x, cu.y - cu.h / 2);
+        ctx.lineTo(cu.x, p.y + p.h / 2);
+        ctx.stroke();
+        ctx.restore();
+        // Once every box has the question, each answer has to come back.
+        const all = questions.length > 0 && questions.every((q) => q.land > 300);
+        if (all) {
+          const k = Math.min(1, (Math.min(...questions.map((q) => q.land)) - 300) / 600);
+          const fade = round > LOOP - 700 ? Math.max(0, (LOOP - round) / 700) : 1;
+          ctx.save();
+          ctx.strokeStyle = HUES.ours[dk];
+          ctx.globalAlpha = 0.22 * fade;
+          ctx.lineWidth = px(1);
+          for (const q of questions) {
+            const bp = place(boxes.get(q.box)!);
+            const qx = bp.x + bp.w / 2 - px(4);
+            const qy = bp.y - bp.h / 2 - px(2);
+            ctx.beginPath();
+            ctx.moveTo(qx, qy);
+            ctx.lineTo(qx + (p.x - qx) * k, qy + (p.y + p.h / 2 - qy) * k);
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
+        ctx.beginPath();
+        ctx.roundRect(p.x - p.w / 2, p.y - p.h / 2, p.w, p.h, p.h / 2);
+        ctx.fillStyle = c.paper;
+        ctx.fill();
+        ctx.setLineDash([px(4), px(4)]);
+        ctx.strokeStyle = HUES.ours[dk];
+        ctx.lineWidth = px(1.5);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.font = `600 ${px(narrow ? 12 : 13)}px ${c.font}`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = c.ink;
+        ctx.fillText('When will it arrive?', p.x, p.y + px(0.5));
+        if (all) {
+          ctx.font = `500 ${px(narrow ? 11 : 12)}px ${c.font}`;
+          ctx.save();
+          ctx.globalAlpha = Math.min(1, (Math.min(...questions.map((q) => q.land)) - 600) / 400) * (round > LOOP - 700 ? Math.max(0, (LOOP - round) / 700) : 1);
+          label(ctx, c, view.px, narrow ? 'every box must answer' : 'needs an answer from each of them', p.x - p.w / 2 - px(10), p.y, HUES.ours[dk], 'right');
+          ctx.restore();
+        }
+        for (const q of questions) drawQuestion(q, dk);
+      }
+
+      // Key: filled is the company's own, hollow is another company.
+      const ky = view.H - px(16);
+      let kx = px(narrow ? 10 : 14);
+      ctx.font = `500 ${px(narrow ? 11 : 12)}px ${c.font}`;
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'left';
+      for (const [own, words] of [
+        [true, 'run by the company'],
+        [false, 'another company'],
+      ] as const) {
+        ctx.beginPath();
+        ctx.roundRect(kx, ky - px(7), px(20), px(14), px(4));
+        if (own) {
+          // One stripe per team colour on the chain.
+          ctx.save();
+          ctx.clip();
+          (['factory', 'warehouses', 'sales'] as const).forEach((h, n) => {
+            ctx.fillStyle = HUES[h][dk];
+            ctx.fillRect(kx + n * px(20 / 3), ky - px(7), px(20 / 3) + px(0.5), px(14));
+          });
+          ctx.restore();
+        } else {
+          ctx.strokeStyle = c.muted;
+          ctx.lineWidth = px(1.5);
+          ctx.stroke();
+        }
+        ctx.fillStyle = c.muted;
+        ctx.fillText(words, kx + px(28), ky + px(0.5));
+        kx += px(28) + ctx.measureText(words).width + px(22);
+      }
+    };
+
+    let since = 0; // ms since the last growth step
+    const tick = (dt: number) => {
+      shown += dt;
+      for (const b of boxes.values()) if (b.born !== -1) b.born += dt;
+      move(dt);
+      if (ask) askRound(dt);
+      else if (grown < GROWTH.length) {
+        since += dt;
+        if (shown > LEAD && since >= EVERY) {
+          since = 0;
+          grow();
+        }
+      } else if (replay && replay.hidden && since > 1200) replay.hidden = false;
+      else since += dt;
+      draw();
+    };
+
+    replay?.addEventListener('click', () => {
+      reset();
+      since = 0;
+      draw();
+    });
+
+    reset();
+    if (reducedMotion()) {
+      for (const b of boxes.values()) b.born = 1e6;
+      grown = GROWTH.length;
+      if (ask) {
+        round = 2000;
+        askRound(0);
+        for (const q of questions) {
+          q.delay = 0;
+          q.land = 1000;
+        }
+      }
+      draw();
+    } else {
+      animate(figure, tick);
+      draw();
+    }
+  }
+</script>

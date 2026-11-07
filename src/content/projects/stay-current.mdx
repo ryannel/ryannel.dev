@@ -1,0 +1,90 @@
+---
+title: "Stay Current"
+description: "One place to learn software engineering and keep up with it as it changes. This is the dream, and where it stands."
+status: "In progress"
+published: 2026-10-18
+featured: false
+draft: true
+tags: ["experiments", "writing"]
+links:
+  - label: "Stay Current"
+    href: "https://staycurrent.dev"
+---
+
+{/*
+  OUTLINE ONLY. Agreed story arc, 18 October 2026. Not yet drafted.
+  Style references: Sam Who (Memory Allocation) and Ciechanowski (Gears): one idea
+  at a time, say what to notice in each figure, the occasional italic reader
+  question answered plainly. Plain register; no slogan lines or closing zingers.
+*/}
+
+## Part one: the dream
+
+### 1. How much there is to know
+
+- Start a list of what a working engineer touches: databases, APIs, queues, caches, observability, AI. Keep going: auth, networking, containers, CI, infrastructure as code, security, frontend frameworks, browsers, mobile, accessibility, data pipelines, cost, compliance…
+- Stop partway, on purpose. Any reader could add five things that are missing.
+- Each item is a whole field, not one thing.
+- Figure: a grid of labels that runs off the edge of the frame. Its incompleteness is the point.
+
+### 2. Most of it holds still, some of it doesn't
+
+- What stays put: how a B-tree finds a row, what a transaction guarantees. A fifteen-year-old textbook still teaches these correctly.
+- What moves: what a tool is for. Postgres took on JSON, full-text search, geospatial queries and vectors, and the lines between kinds of database blurred. Textbooks don't cover that, and no single release note explains it.
+- Speed varies by field: databases move slowly, observability quickly, and AI almost week to week.
+- So readers need the state of the art as of today, with a date on it, and word when it moves.
+- Figure: fields drawn side by side as timelines, with a mark for each change that alters the advice; sparse or dense depending on the field. A small strip for Postgres. Check the dates before drafting.
+
+### 3. Some people teach this really well
+
+- Transition: before anyone can follow a change, they need to understand the thing that's changing. That half already has great teachers.
+- Lead examples: Sam Who and Bartosz Ciechanowski. One idea at a time, figures you can play with, saying what to notice.
+- Passing mentions: Julia Evans, Red Blob Games, Jay Alammar, Lin Clark, the Raft visualisation, Martin Kleppmann. ByteByteGo (Alex Xu) as the counterpoint: wide reach from keeping each piece small.
+- What they don't do, said plainly and not as criticism: a piece on gears never needs updating; a piece on choosing a database does. They teach how things work, not what's current or when the answer changes. Nobody does both.
+
+### 4. The dream
+
+- One place that does both.
+- These pieces take months of research, thinking and drawing. They're a gift, and there aren't many. Most fields have none.
+- Scale the teaching with AI tools: the same care and techniques across far more topics, for far more people. The reach of ByteByteGo with the depth of Ciechanowski.
+- Keep it current: agents watch releases, revise the articles a change affects, and announce what moved and who it affects.
+- Why now: AI is taking over implementation. To keep steering, people need to reason well about the components, so explanation matters more now, not less.
+
+## Part two: where it stands
+
+### 5. What's built
+
+- Three articles, Sequences, Indexes and Storage, set the writing style and the teaching technique. Use one as the worked example: show a figure or a sandbox step and say what to notice.
+- The site is live on its own domain: staycurrent.dev.
+
+### 6. What's next
+
+A short list in order, written as plans rather than promises:
+
+- Cover all of databases: the first test of the approach at scale.
+- Audio: a spoken version of each article for people who would rather listen. Possibly a podcast-style feed so people can subscribe and hear new articles as they land.
+- Workers that keep up: on a schedule, they search for and follow the latest releases, update the articles a change affects, and publish notices and write-ups for the changes that matter.
+- Expand one major area at a time until it covers everything, tying back to the list from section 1 that trailed off.
+
+Later updates tick these off one at a time. Part one stays as it is.
+
+## Reading list
+
+- Bartosz Ciechanowski, [Gears](https://ciechanow.ski/gears/)
+- Sam Who, [Memory Allocation](https://samwho.dev/memory-allocation/) and [Load Balancing](https://samwho.dev/load-balancing/)
+- Amit Patel, [Introduction to A\*](https://www.redblobgames.com/pathfinding/a-star/introduction.html)
+- Josh Comeau, [An Interactive Guide to Flexbox](https://www.joshwcomeau.com/css/interactive-guide-to-flexbox/)
+- Mike Bostock, [Visualizing Algorithms](https://bost.ocks.org/mike/algorithms/)
+- The Secret Lives of Data, [Raft](https://thesecretlivesofdata.com/raft/)
+- Julia Evans, [jvns.ca](https://jvns.ca/) and [Wizard Zines](https://wizardzines.com/)
+- Lin Clark, [A cartoon intro to WebAssembly](https://hacks.mozilla.org/2017/02/a-cartoon-intro-to-webassembly/)
+- Jay Alammar, [The Illustrated Transformer](https://jalammar.github.io/illustrated-transformer/)
+- Chris Olah, [Understanding LSTM Networks](https://colah.github.io/posts/2015-08-Understanding-LSTMs/)
+- Martin Kleppmann, [Designing Data-Intensive Applications](https://dataintensive.net/)
+- Markus Winand, [Use The Index, Luke](https://use-the-index-luke.com/)
+- Brendan Gregg, [Flame Graphs](https://www.brendangregg.com/flamegraphs.html)
+- Kyle Kingsbury, [Jepsen analyses](https://jepsen.io/analyses)
+- Alex Xu, [ByteByteGo](https://bytebytego.com/)
+- Bret Victor, [Up and Down the Ladder of Abstraction](https://worrydream.com/LadderOfAbstraction/)
+- Nicky Case, [The Evolution of Trust](https://ncase.me/trust/)
+- [Distill](https://distill.pub/)

@@ -1,0 +1,293 @@
+---
+import '../../styles/hitl.css';
+
+/**
+ * The whole story as one bar, for "An afternoon, in the end" in
+ * notes/why-big-companies-are-slow. An orange ball rolls left to right and the
+ * bar fills behind it: a long stretch where requests from around the company
+ * pile up, making the case, waiting for the quarter, building (six team lanes,
+ * mostly grey with a short burst of work each), and at the very end a sliver
+ * for the line on the page. Then it loops.
+ *
+ * Lengths are invented; no dates on purpose. It's a sketch.
+ */
+---
+
+<figure class="hitl slow-timeline" data-slow-timeline>
+  <div class="hitl-stage">
+    <canvas
+      class="slow-canvas"
+      aria-label="A timeline with no dates. Most of it is pressure slowly building, then making the case and waiting for the quarterly decision. Building takes a while, with each team busy on it only briefly. At the very end, a sliver: adding the line to the page."
+    ></canvas>
+    <noscript><p class="hitl-note">The figure is drawn with JavaScript.</p></noscript>
+  </div>
+  <p class="hitl-readout" aria-live="polite"></p>
+  <figcaption>
+    Each small ball is someone else asking when stock will arrive. In the building lanes, colour is
+    a team working on it and grey is waiting. A sketch, with no dates on purpose.
+  </figcaption>
+</figure>
+
+<style>
+  .slow-timeline .hitl-stage {
+    padding: 0;
+    overflow: hidden;
+  }
+  .slow-canvas {
+    display: block;
+    width: 100%;
+  }
+</style>
+
+<script>
+  import { mulberry, theme, fit, animate, label, reducedMotion, NARROW, ball, HUES, isDark } from './canvas';
+  import type { Hue } from './canvas';
+
+  const SEGS: [string, string, number, string][] = [
+    // name, short name, share of the bar, what the readout says
+    ['Pressure grows', 'Pressure', 0.43, 'Warehouses, sales companies and customer care keep asking, and working it out by hand.'],
+    ['Making the case', 'The case', 0.13, 'Someone makes the case: which teams, which countries, legal sign-off.'],
+    ['Next quarter', 'Quarter', 0.12, 'It waits for the quarterly decision.'],
+    ['Building', 'Building', 0.31, 'Each team builds its part when it reaches it.'],
+    ['“Arrives in 3–5 days”', '“3–5 days”', 0.01, 'And the line on the page: an afternoon.'],
+  ];
+  const TEAMS: Hue[] = ['purchasing', 'factory', 'warehouses', 'logistics', 'sales', 'website'];
+  // Where each team's burst of work sits in the building stretch, and how long, as shares of it.
+  const WORK: [number, number][] = [
+    [0.12, 0.08],
+    [0.3, 0.12],
+    [0.05, 0.07],
+    [0.48, 0.1],
+    [0.6, 0.08],
+    [0.86, 0.12],
+  ];
+  const ASK = ['#a3a8ae', '#8b9097']; // one neutral colour for every request
+  const RUN = 12000; // ms for the ball to cross
+  const HOLD = 3500; // ms the finished bar stays before looping
+
+  for (const figure of document.querySelectorAll<HTMLElement>('[data-slow-timeline]')) {
+    const canvas = figure.querySelector<HTMLCanvasElement>('.slow-canvas')!;
+    const readout = figure.querySelector<HTMLElement>('.hitl-readout')!;
+    let narrow = false;
+
+    const layout = (w: number) => {
+      narrow = w < NARROW;
+      const W = narrow ? 600 : 1000;
+      return { W, H: (W / w) * (narrow ? 290 : 216) };
+    };
+    let draw = () => {};
+    const c = theme(figure, () => draw());
+    const { ctx, view, clear } = fit(canvas, layout, () => draw());
+    const px = (n: number) => n * view.px;
+
+    let t = 0;
+
+    // Geometry.
+    const x0 = () => px(narrow ? 14 : 18);
+    const x1 = () => view.W - px(narrow ? 14 : 18);
+    const barY = () => px(narrow ? 176 : 124);
+    const barH = () => px(48);
+    const segX = (i: number) => {
+      let a = 0;
+      for (let n = 0; n < i; n++) a += SEGS[n][2];
+      return x0() + a * (x1() - x0());
+    };
+    const at = (p: number) => x0() + p * (x1() - x0());
+    const pr = () => px(narrow ? 3.8 : 5.2);
+
+    // The requests that pile up over the first stretch, more of them as it goes on.
+    // Each lands near where the ball is when it's made, so the pile ramps up.
+    type Ask = { at: number; f: number };
+    const asks: Ask[] = [];
+    {
+      const rand = mulberry(5);
+      const share = SEGS[0][2];
+      for (let i = 0; i < 70; i++) {
+        const p = Math.sqrt(rand()) * share * 0.97; // later is likelier
+        asks.push({ at: p, f: (p / share) * (0.55 + 0.45 * rand()) });
+      }
+      asks.sort((a, b) => a.at - b.at);
+    }
+
+    let lastSeg = -1;
+    const segAt = (p: number) => {
+      let a = 0;
+      for (let i = 0; i < SEGS.length; i++) {
+        a += SEGS[i][2];
+        if (p < a) return i;
+      }
+      return SEGS.length - 1;
+    };
+
+    draw = () => {
+      clear(c.paper);
+      const dk = isDark(c) ? 1 : 0;
+      const orange = HUES.ours[dk];
+      const p = Math.min(1, t / RUN);
+      const cx = at(p);
+      const y = barY();
+      const h = barH();
+      ctx.textBaseline = 'middle';
+
+      // The empty bar.
+      ctx.beginPath();
+      ctx.roundRect(x0(), y, x1() - x0(), h, px(6));
+      ctx.strokeStyle = c.rule;
+      ctx.lineWidth = px(1);
+      ctx.stroke();
+
+      // Filled behind the ball.
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(x0(), y, x1() - x0(), h, px(6));
+      ctx.clip();
+      ctx.beginPath();
+      ctx.rect(x0(), y, cx - x0(), h);
+      ctx.clip();
+      SEGS.forEach((_, i) => {
+        const a = segX(i);
+        const b = i + 1 < SEGS.length ? segX(i + 1) : x1();
+        if (i === 3) {
+          // Six team lanes: grey waiting, a burst of colour working.
+          const lane = h / 6;
+          TEAMS.forEach((hue, n) => {
+            const ly = y + n * lane + px(1);
+            const lh = lane - px(2);
+            ctx.fillStyle = c.muted;
+            ctx.globalAlpha = 0.3;
+            ctx.fillRect(a, ly, b - a, lh);
+            ctx.globalAlpha = 1;
+            const [s, len] = WORK[n];
+            ctx.fillStyle = HUES[hue][dk];
+            ctx.fillRect(a + s * (b - a), ly, len * (b - a), lh);
+          });
+        } else if (i === 4) {
+          ctx.fillStyle = orange;
+          ctx.fillRect(a, y, b - a, h);
+        } else {
+          ctx.fillStyle = c.muted;
+          ctx.globalAlpha = [0.14, 0.3, 0.2][i];
+          ctx.fillRect(a, y, b - a, h);
+          ctx.globalAlpha = 1;
+          if (i === 2) {
+            // Hatched: nothing happening but the wait.
+            ctx.strokeStyle = c.muted;
+            ctx.globalAlpha = 0.35;
+            ctx.lineWidth = px(1);
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(a, y, b - a, h);
+            ctx.clip();
+            for (let x = a - h; x < b; x += px(7)) {
+              ctx.beginPath();
+              ctx.moveTo(x, y + h);
+              ctx.lineTo(x + h, y);
+              ctx.stroke();
+            }
+            ctx.restore();
+            ctx.globalAlpha = 1;
+          }
+        }
+      });
+      ctx.restore();
+
+      // Dividers.
+      ctx.strokeStyle = c.paper;
+      ctx.lineWidth = px(2);
+      for (let i = 1; i < SEGS.length; i++) {
+        if (segX(i) > cx) break;
+        ctx.beginPath();
+        ctx.moveTo(segX(i), y);
+        ctx.lineTo(segX(i), y + h);
+        ctx.stroke();
+      }
+
+      // Requests dropping onto a pile above the first stretch.
+      const r = pr();
+      const cols = Math.floor((segX(1) - segX(0)) / (2 * r + px(1)));
+      const heights = new Map<number, number>();
+      for (const a of asks) {
+        if (a.at > p) break;
+        const since = (p - a.at) * RUN;
+        const col = Math.min(cols - 1, Math.floor(a.f * cols));
+        const n = heights.get(col) ?? 0;
+        heights.set(col, n + 1);
+        const x = segX(0) + ((col + 0.5) / cols) * (segX(1) - segX(0));
+        const rest = y - r - px(1) - n * (2 * r + px(1));
+        const fall = Math.min(1, since / 380);
+        const top = rest - px(60);
+        const yy = top + (rest - top) * fall * fall;
+        const land = since - 380;
+        const sq = land > 0 ? 1 - 0.25 * Math.exp(-land / 70) * Math.cos(land / 35) : 1.06;
+        ball(ctx, x, yy + r * (1 - sq), r, ASK[dk], sq);
+      }
+
+      if (asks.length && asks[0].at < p) {
+        const kx = x0() + px(4);
+        const ky = px(14);
+        ball(ctx, kx + pr(), ky, pr(), ASK[dk]);
+        ctx.font = `500 ${px(narrow ? 11 : 12)}px ${c.font}`;
+        label(ctx, c, view.px, 'someone asking when stock will arrive', kx + 2 * pr() + px(8), ky, c.muted, 'left');
+      }
+
+      // The ball rolling along the top.
+      const R = px(narrow ? 9 : 10);
+      const by = y - R - px(2);
+      const ballX = Math.max(x0() + R, Math.min(x1() - R, cx));
+      const done = t >= RUN;
+      const age = t - RUN;
+      const hop = done ? Math.max(0, Math.sin(Math.min(1, age / 500) * Math.PI)) * px(26) : 0;
+      ball(ctx, ballX, by - hop, R, orange);
+      // A highlight going round, so it reads as rolling.
+      const ang = (cx - x0()) / R;
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      ctx.beginPath();
+      ctx.arc(ballX + Math.cos(ang) * R * 0.55, by - hop + Math.sin(ang) * R * 0.55, R * 0.18, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Names under the stretches the ball has reached.
+      ctx.font = `500 ${px(narrow ? 11 : 12)}px ${c.font}`;
+      SEGS.forEach(([name, short], i) => {
+        const a = segX(i);
+        if (a > cx + px(1)) return;
+        const b = i + 1 < SEGS.length ? segX(i + 1) : x1();
+        const text = narrow ? short : name;
+        const drop = narrow && i % 2 === 1 ? px(16) : 0;
+        const ly = y + h + px(16) + drop;
+        if (i === SEGS.length - 1) {
+          label(ctx, c, view.px, text, b, y + h + px(narrow ? 50 : 34), orange, 'right');
+        } else label(ctx, c, view.px, text, (a + b) / 2, ly, c.muted);
+      });
+
+      // The sliver for the line itself, stamped on at the end.
+      if (done) {
+        const a = segX(4);
+        const z = 1 + 0.6 * Math.exp(-age / 180) * Math.cos(age / 60);
+        ctx.save();
+        ctx.translate(a + (x1() - a) / 2, y + h / 2);
+        ctx.scale(z, z);
+        ctx.fillStyle = orange;
+        ctx.fillRect(-(x1() - a) / 2 - px(1), -h / 2 - px(3), x1() - a + px(2), h + px(6));
+        ctx.restore();
+      }
+    };
+
+    const tick = (dt: number) => {
+      t += dt;
+      if (t > RUN + HOLD) t = 0;
+      const s = t >= RUN ? SEGS.length - 1 : segAt(t / RUN);
+      if (s !== lastSeg) {
+        lastSeg = s;
+        readout.textContent = SEGS[s][3];
+      }
+      draw();
+    };
+
+    if (reducedMotion()) {
+      t = RUN + 1000;
+      readout.textContent = SEGS[SEGS.length - 1][3];
+    } else readout.textContent = SEGS[0][3];
+    draw();
+    animate(figure, tick);
+  }
+</script>

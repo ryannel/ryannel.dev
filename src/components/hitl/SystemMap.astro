@@ -1,0 +1,111 @@
+---
+import { services, contracts, serviceById } from '../../data/human-in-the-loop';
+import { MAP_W, MAP_H, BOX_W, BOX_H, tint, edge } from '../../lib/hitl';
+
+/**
+ * The dozen-service map every figure in the note draws on. Pure markup: each
+ * service is a <g data-service="id"> and each contract a <path data-contract="id">,
+ * and the figure around it adds `is-lit`, `is-dim` or `is-active` to them from
+ * its script. Keeping the same layout and tints from figure to figure is what
+ * lets a reader carry "checkout is the red one on the left" through the piece.
+ *
+ *   <SystemMap />                      the whole system
+ *   <SystemMap labels={false} />       a thumbnail beside something else
+ */
+interface Props {
+  labels?: boolean;
+  class?: string;
+}
+
+const { labels = true, class: className } = Astro.props;
+---
+
+<svg
+  class:list={['hitl-map', className]}
+  viewBox={`0 0 ${MAP_W} ${MAP_H}`}
+  role="img"
+  aria-label="A map of twelve services and the calls between them."
+>
+  <g class="hitl-contracts">
+    {
+      contracts.map((c) => {
+        const { x1, y1, x2, y2 } = edge(serviceById[c.from], serviceById[c.to]);
+        return (
+          <path data-contract={c.id} data-from={c.from} data-to={c.to} d={`M${x1},${y1} L${x2},${y2}`}>
+            <title>{serviceById[c.from].name} → {serviceById[c.to].name}: {c.label}</title>
+          </path>
+        );
+      })
+    }
+  </g>
+  <g class="hitl-services">
+    {
+      services.map((s) => (
+        <g data-service={s.id} style={`--tint: ${tint(s.hue)}`}>
+          <rect x={s.x - BOX_W / 2} y={s.y - BOX_H / 2} width={BOX_W} height={BOX_H} rx="6" />
+          {labels && (
+            <text x={s.x} y={s.y} text-anchor="middle" dominant-baseline="central">
+              {s.name}
+            </text>
+          )}
+        </g>
+      ))
+    }
+  </g>
+</svg>
+
+<style is:global>
+  .hitl-map {
+    display: block;
+    width: 100%;
+    height: auto;
+    font: 17px/1 var(--font-ui);
+  }
+  .hitl-map [data-contract] {
+    fill: none;
+    stroke: var(--rule);
+    stroke-width: 2;
+    stroke-linecap: round;
+    transition: stroke 0.2s, stroke-width 0.2s, opacity 0.2s;
+  }
+  .hitl-map [data-service] rect {
+    fill: var(--surface);
+    stroke: var(--rule);
+    stroke-width: 1.5;
+    transition: fill 0.2s, stroke 0.2s, opacity 0.2s;
+  }
+  .hitl-map [data-service] text {
+    fill: var(--ink);
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+  /* The three states a figure puts a service or a contract into. */
+  .hitl-map [data-service].is-lit rect {
+    fill: var(--tint);
+    stroke: var(--tint);
+  }
+  .hitl-map [data-service].is-lit text {
+    fill: #141413;
+  }
+  .hitl-map [data-service].is-active rect {
+    stroke: var(--ink);
+    stroke-width: 2.5;
+  }
+  .hitl-map [data-contract].is-lit {
+    stroke: var(--ink);
+    stroke-width: 3;
+  }
+  .hitl-map [data-contract].is-active {
+    stroke: var(--accent);
+    stroke-width: 4;
+  }
+  .hitl-map .is-dim {
+    opacity: 0.3;
+  }
+  .hitl-map .is-clickable {
+    cursor: pointer;
+  }
+  .hitl-map [data-service].is-clickable:hover rect {
+    stroke: var(--ink-muted);
+  }
+</style>

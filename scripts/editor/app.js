@@ -54,7 +54,10 @@ const CALLOUT_LABELS = {
 };
 const TK = /\bTK\b/;
 
-const slugOf = () => /^\/projects\/([a-z0-9-]+)\/?$/.exec(location.pathname)?.[1] ?? null;
+// A page the editor can open: /projects/<slug>/ or /notes/<slug>/.
+const page = /^\/(projects|notes)\/([a-z0-9-]+)\/?$/.exec(location.pathname);
+const slugOf = () => page?.[2] ?? null;
+const collectionOf = () => page?.[1] ?? null;
 const escapeHtml = (s) =>
   s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
@@ -214,6 +217,7 @@ const SHORTCUTS = [
 export default {
   init(canvas, app, server) {
     const slug = slugOf();
+    const collection = collectionOf();
     const article = document.querySelector('article');
     const isNote = Boolean(slug && article?.querySelector('.prose'));
     const ui = createUi();
@@ -229,7 +233,7 @@ export default {
     const sendRaw = (event, payload, meta) => {
       const id = ++msgId;
       if (meta) pending.set(id, meta);
-      server.send(`note-editor:${event}`, { id, slug, ...payload });
+      server.send(`note-editor:${event}`, { id, slug, collection, ...payload });
       return id;
     };
     server.on('note-editor:created', async (msg) => {
@@ -495,6 +499,7 @@ export default {
         background: color-mix(in srgb, ${GOLD} 18%, transparent); font: inherit; color: inherit; }
       .note-editor-source .lang span { opacity: .7; }
       ::highlight(note-editor-tk) { background: color-mix(in srgb, ${GOLD} 45%, transparent); }
+      ::highlight(note-editor-span) { background: Highlight; color: HighlightText; }
       @keyframes note-editor-flash { from { background: color-mix(in srgb, ${GOLD} 40%, transparent); box-shadow: 0 0 0 8px color-mix(in srgb, ${GOLD} 40%, transparent); }
         to { background: transparent; box-shadow: 0 0 0 8px transparent; } }
       .note-editor-changed { animation: note-editor-flash 2.6s ease-out; border-radius: 2px; }
@@ -572,7 +577,7 @@ export default {
           payload.other = otherRange;
         }
       }
-      server.send(`note-editor:${event}`, { id, slug, hash, ...payload });
+      server.send(`note-editor:${event}`, { id, slug, collection, hash, ...payload });
       // No reply within a few seconds means the server is gone; don't hold the rest.
       clearTimeout(writeTimer);
       writeTimer = setTimeout(nextWrite, 5000);
@@ -607,7 +612,7 @@ export default {
         if (writing) writes.push(entry);
         else dispatch(entry);
       } else {
-        server.send(`note-editor:${event}`, { id, slug, hash, ...payload });
+        server.send(`note-editor:${event}`, { id, slug, collection, hash, ...payload });
       }
       return id;
     };
@@ -1132,7 +1137,7 @@ export default {
       const el = node && (node.nodeType === 1 ? node : node.parentElement);
       return el?.closest?.('a') ?? null;
     };
-    const noteHref = (n) => `/projects/${n.slug}/`;
+    const noteHref = (n) => `/${n.collection}/${n.slug}/`;
     const askLink = (block, rect) => {
       const a = linkAt();
       if (!getSelection().rangeCount) return;
@@ -1891,14 +1896,20 @@ export default {
       clearTimeout(contextTimer);
       contextTimer = setTimeout(() => {
         const sel = getSelection();
-        const el =
-          sel?.anchorNode &&
-          (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement);
+        const elementOf = (node) => node && (node.nodeType === 1 ? node : node.parentElement);
+        const el = elementOf(span ? span.startContainer : sel?.anchorNode);
         const block = el?.closest?.('[data-src]');
         if (!block) return;
-        const range = rangeOf(block);
+        let range = rangeOf(block);
         const copy = block.cloneNode(true);
         for (const el of copy.querySelectorAll('.callout-label')) el.remove();
+        let text = copy.textContent.trim().replace(/\s+/g, ' ').slice(0, 400);
+        // A selection dragged across blocks reports them all as one block.
+        const last = span && elementOf(span.endContainer)?.closest?.('[data-src]');
+        if (last && last !== block) {
+          range = { start: range.start, end: rangeOf(last).end };
+          text = `${text} … ${last.textContent.trim().replace(/\s+/g, ' ').slice(0, 400)}`;
+        }
         // A heading's section: it and everything after it up to the next
         // heading of its level or higher, among the note's top-level blocks.
         let section = null;
@@ -1915,9 +1926,9 @@ export default {
         }
         send('context', {
           url: location.href,
-          block: { ...range, text: copy.textContent.trim().replace(/\s+/g, ' ').slice(0, 400) },
+          block: { ...range, text },
           section,
-          selection: sel.toString().trim().slice(0, 600),
+          selection: (span ? span.toString() : sel.toString()).trim().slice(0, 600),
         });
         rememberLast();
       }, 300);
@@ -2507,6 +2518,49 @@ export default {
       deselectCard();
       showPlus();
     };
+    /*
+     * A selection across blocks, so a prompt can be about two paragraphs at
+     * once. Each block is its own editing host, and the browser keeps a
+     * selection inside the host it started in. So once a drag leaves its
+     * block, editing is lifted until the mouse comes up and the selection
+     * runs on as ordinary text. With editing back, the browser only draws
+     * the part in the first block, so the whole span is painted as a
+     * highlight and stays the context until the next click or keypress.
+     */
+    let span = null;
+    let lifted = [];
+    let dragFrom = null;
+    const clearSpan = () => {
+      span = null;
+      if (globalThis.CSS?.highlights) CSS.highlights.delete('note-editor-span');
+    };
+    const onPointerDown = (e) => {
+      if (span) clearSpan();
+      dragFrom = e.button === 0 ? e.target.closest?.('[contenteditable="true"]') : null;
+    };
+    const onPointerMove = (e) => {
+      if (!dragFrom || !(e.buttons & 1) || lifted.length) return;
+      const over = document.elementFromPoint(e.clientX, e.clientY);
+      if (!over || dragFrom.contains(over) || !article.contains(over)) return;
+      lifted = [...article.querySelectorAll('[contenteditable="true"]')];
+      for (const el of lifted) el.contentEditable = 'false';
+    };
+    const onPointerUp = () => {
+      dragFrom = null;
+      if (!lifted.length) return;
+      const sel = getSelection();
+      const range = sel?.rangeCount && !sel.isCollapsed ? sel.getRangeAt(0).cloneRange() : null;
+      for (const el of lifted) el.contentEditable = 'true';
+      lifted = [];
+      if (!range) return;
+      span = range;
+      if (globalThis.CSS?.highlights) CSS.highlights.set('note-editor-span', new Highlight(range));
+      reportContext();
+    };
+    const onSpanKey = (e) => {
+      if (span && !e.metaKey && !e.ctrlKey && !['Shift', 'Alt', 'Meta', 'Control'].includes(e.key)) clearSpan();
+    };
+
     const onSelection = () => {
       reportContext();
       showBar();
@@ -2780,6 +2834,10 @@ export default {
         article.addEventListener('dragover', onDragOver);
         article.addEventListener('drop', onDrop);
         document.addEventListener('selectionchange', onSelection);
+        article.addEventListener('pointerdown', onPointerDown);
+        document.addEventListener('pointermove', onPointerMove);
+        document.addEventListener('pointerup', onPointerUp);
+        document.addEventListener('keydown', onSpanKey);
         window.addEventListener('scroll', onScroll, { passive: true });
         window.addEventListener('resize', onResize);
         document.addEventListener('visibilitychange', onVisibility);
@@ -2793,6 +2851,7 @@ export default {
         style.remove();
         ui.unmount();
         if (globalThis.CSS?.highlights) CSS.highlights.delete('note-editor-tk');
+        clearSpan();
         for (const el of article.querySelectorAll('.note-editor-new, .note-editor-source')) el.remove();
         for (const el of article.querySelectorAll('[contenteditable="true"]')) {
           el.removeAttribute('contenteditable');
@@ -2817,6 +2876,10 @@ export default {
         article.removeEventListener('dragover', onDragOver);
         article.removeEventListener('drop', onDrop);
         document.removeEventListener('selectionchange', onSelection);
+        article.removeEventListener('pointerdown', onPointerDown);
+        document.removeEventListener('pointermove', onPointerMove);
+        document.removeEventListener('pointerup', onPointerUp);
+        document.removeEventListener('keydown', onSpanKey);
         window.removeEventListener('scroll', onScroll);
         window.removeEventListener('resize', onResize);
         document.removeEventListener('visibilitychange', onVisibility);

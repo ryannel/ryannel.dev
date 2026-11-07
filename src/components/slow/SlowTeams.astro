@@ -1,0 +1,555 @@
+---
+import '../../styles/hitl.css';
+
+/**
+ * "Building it" in notes/why-big-companies-are-slow: each team's queue of
+ * work as a column of balls, next job at the bottom. The delivery work is one
+ * orange ball in every queue, tied to the greyed-out promise at the top. When
+ * the figure comes into view each team works through its queue at its own
+ * pace while new work keeps arriving; under each team a strip grows, grey
+ * while the delivery work waits and orange while the team is on it. The
+ * promise lights up only when the last team reaches it.
+ *
+ * Paces and arrival rates are invented; it's a sketch of the shape. The run
+ * steps in fixed ticks from a seeded PRNG, so it is the same every time and
+ * can be run dry first to scale the strips.
+ */
+---
+
+<figure class="hitl slow-teams" data-slow-teams>
+  <div class="hitl-stage">
+    <canvas
+      class="slow-canvas"
+      aria-label="Six teams, each with a queue of work. The delivery work sits at a different place in each queue, and delivery dates go live only when the last team has done its part."
+    ></canvas>
+    <noscript><p class="hitl-note">The figure is drawn with JavaScript.</p></noscript>
+  </div>
+  <div class="hitl-controls">
+    <button type="button" data-replay hidden>Replay</button>
+  </div>
+  <p class="hitl-readout" aria-live="polite"></p>
+  <figcaption>
+    Each ball is a piece of work, and each team does its bottom one next. The orange ball is the
+    delivery work. Under each team, grey is time the delivery work spent waiting and orange is time
+    spent on it. A sketch with invented paces.
+  </figcaption>
+</figure>
+
+<style>
+  .slow-teams .hitl-stage {
+    padding: 0;
+    overflow: hidden;
+  }
+  .slow-canvas {
+    display: block;
+    width: 100%;
+  }
+</style>
+
+<script>
+  import { mulberry, theme, fit, animate, label, reducedMotion, NARROW } from './canvas';
+
+  type Ball = {
+    ours: boolean;
+    y: number; // drawing units, ball centre
+    v: number;
+    acc: number;
+    xo: number; // sideways offset, for work slotted in from the side
+    xv: number;
+    wait: number; // ms before it starts falling (the intro drop)
+    pop: number; // < 0 while alive; 0..1 while popping
+    tone: number; // small shade variation
+  };
+  type Team = {
+    name: string;
+    short: string;
+    hue: [string, string]; // light, dark
+    pace: number; // ms per ball
+    work: number; // progress on the bottom ball, ms
+    balls: Ball[];
+    startAt: number; // run time the delivery work reached the bottom, or -1
+    doneAt: number; // run time it was finished, or -1
+    since: number; // ms since it was finished, for the dimming
+    sparks: { x: number; y: number; vx: number; vy: number; life: number }[];
+  };
+
+  const TEAMS: [string, string, [string, string], number, number][] = [
+    // name, short, [light, dark] colour, ms per ball, starting place of the delivery work
+    ['Purchasing', 'Purchasing', ['#5fa8a0', '#6fc2b8'], 1500, 2],
+    ['Factory', 'Factory', ['#6f97cf', '#86acdf'], 2300, 3],
+    ['Warehouses', 'Warehouses', ['#9a88d6', '#b1a2e6'], 1700, 1],
+    ['Logistics', 'Logistics', ['#d585ad', '#e6a0c2'], 1900, 4],
+    ['Sales companies', 'Sales cos', ['#86b766', '#9fcd80'], 1400, 3],
+    ['Website', 'Website', ['#8e9cb0', '#a9b5c6'], 1600, 6],
+  ];
+  const OURS: [string, string] = ['#ec8a3c', '#f4a35e'];
+  const ON_OURS = '#3a210c';
+  const PROMISE = 'Delivery dates';
+
+  const K = 190; // spring stiffness, 1/s²
+  const D = 13; // damping, 1/s: under-damped, so balls overshoot and settle
+  const TICK = 16; // ms per step of the run
+  const CAP = 9; // most balls a queue holds
+  const POP = 320; // ms a finished ball takes to pop
+  const LEAD = 2200; // ms on screen before the run starts
+
+  for (const figure of document.querySelectorAll<HTMLElement>('[data-slow-teams]')) {
+    const canvas = figure.querySelector<HTMLCanvasElement>('.slow-canvas')!;
+    const replay = figure.querySelector<HTMLButtonElement>('[data-replay]')!;
+    const readout = figure.querySelector<HTMLElement>('.hitl-readout')!;
+    const reduced = reducedMotion();
+    let narrow = false;
+
+    const layout = (w: number) => {
+      narrow = w < NARROW;
+      const W = narrow ? 600 : 1000;
+      return { W, H: (W / w) * (narrow ? 400 : 360) };
+    };
+
+    let draw = () => {};
+    const c = theme(figure, () => draw());
+    const { ctx, view, clear } = fit(canvas, layout, () => draw());
+    const dark = () => {
+      const m = c.paper.match(/\d+/g);
+      return m ? Number(m[0]) + Number(m[1]) + Number(m[2]) < 300 : false;
+    };
+
+    let rand = mulberry(7);
+    let teams: Team[] = [];
+    let clock = 0; // run time, ms
+    let total = 1; // run time when the last team finishes, from a dry run
+    let due = 0;
+    let pending = 0; // frame time not yet stepped
+    let shown = 0; // ms on screen since the last (re)start
+    let running = false;
+    let finished = false;
+    let age = 0; // ms since finishing
+    let urgent: { ball: Ball; team: number; life: number } | null = null;
+
+    const r = () => (narrow ? 14 : 12) * view.px;
+    const gap = () => 5 * view.px;
+
+    /** Where column i sits, and the y of its floor. */
+    const column = (i: number) => {
+      const colW = view.W / 6;
+      const floor = view.H - (narrow ? 76 : 64) * view.px;
+      return { x: colW * (i + 0.5), floor, colW };
+    };
+    const slotY = (i: number, n: number) => column(i).floor - r() - n * (2 * r() + gap());
+    const pill = () => {
+      const h = 28 * view.px;
+      const w = (narrow ? 130 : 140) * view.px;
+      return { x: view.W / 2, y: 12 * view.px + h / 2, w, h };
+    };
+
+    const ball = (ours: boolean, y: number, wait = 0, xo = 0): Ball => ({
+      ours,
+      y,
+      v: 0,
+      acc: 0,
+      xo,
+      xv: 0,
+      wait,
+      pop: -1,
+      tone: rand() * 0.18 - 0.09,
+    });
+
+    const build = (intro: boolean) => {
+      rand = mulberry(7);
+      clock = 0;
+      due = 600;
+      pending = 0;
+      finished = false;
+      running = false;
+      age = 0;
+      urgent = null;
+      teams = TEAMS.map(([name, short, hue, pace, at], i) => {
+        const balls: Ball[] = [];
+        for (let n = 0; n < 7; n++) {
+          const y = intro ? -r() * 2 - n * 40 * view.px : slotY(i, n);
+          balls.push(ball(n === at, y, intro ? i * 90 + n * 70 : 0));
+        }
+        return { name, short, hue, pace, work: 0, balls, startAt: -1, doneAt: -1, since: 0, sparks: [] };
+      });
+    };
+
+    /** One fixed step of the run. */
+    const step = () => {
+      clock += TICK;
+      teams.forEach((t, i) => {
+        const bottom = t.balls[0];
+        if (bottom && bottom.pop >= 0) {
+          bottom.pop += TICK / POP;
+          if (bottom.pop >= 1) t.balls.shift();
+          return;
+        }
+        if (!bottom) return;
+        if (bottom.ours && t.startAt < 0) t.startAt = clock;
+        t.work += TICK;
+        if (t.work < t.pace) return;
+        t.work = 0;
+        bottom.pop = 0;
+        if (!bottom.ours) return;
+        t.doneAt = clock;
+        for (let k = 0; k < 10; k++) {
+          const ang = (k / 10) * Math.PI * 2;
+          t.sparks.push({
+            x: 0,
+            y: slotY(i, 0),
+            vx: Math.cos(ang) * 0.12 * view.px,
+            vy: Math.sin(ang) * 0.12 * view.px - 0.08 * view.px,
+            life: 1,
+          });
+        }
+      });
+      // Once, early on, something urgent jumps the Website team's queue.
+      if (!urgent && clock >= 1800) {
+        const b = ball(false, slotY(5, 1), 0, column(5).colW * 0.5);
+        teams[5].balls.splice(1, 0, b);
+        urgent = { ball: b, team: 5, life: 2200 };
+      }
+      // New work arrives: mostly on top, now and then slotted in lower down.
+      due -= TICK;
+      while (due <= 0) {
+        due += 120 + rand() * 300;
+        const i = Math.floor(rand() * teams.length);
+        const t = teams[i];
+        if (t.balls.length >= CAP) continue;
+        if (rand() < 0.25 && t.balls.length > 2) {
+          const at = 1 + Math.floor(rand() * (t.balls.length - 1));
+          const side = rand() < 0.5 ? -1 : 1;
+          t.balls.splice(at, 0, ball(false, slotY(i, at), 0, side * column(i).colW * 0.5));
+        } else {
+          t.balls.push(ball(false, -r() * 2));
+        }
+      }
+      if (teams.every((t) => t.doneAt >= 0)) {
+        finished = true;
+        running = false;
+      }
+    };
+
+    /** Runs the whole thing dry to learn how long it takes, then sets up for real. */
+    const reset = (intro: boolean) => {
+      build(false);
+      for (let n = 0; n < 20000 && !finished; n++) step();
+      total = clock;
+      build(intro);
+      shown = 0;
+      replay.hidden = true;
+    };
+
+    /** For reduced motion: the finished picture, still. */
+    const toEnd = () => {
+      reset(false);
+      for (let n = 0; n < 20000 && !finished; n++) step();
+      teams.forEach((t, i) => {
+        t.balls = t.balls.filter((b) => b.pop < 0);
+        t.balls.forEach((b, n) => {
+          b.y = slotY(i, n);
+          b.xo = 0;
+        });
+        t.sparks = [];
+        t.since = 1000;
+      });
+      urgent = null;
+      age = 2000;
+    };
+
+    const describe = () => {
+      const left = teams.filter((t) => t.doneAt < 0).length;
+      readout.textContent = finished
+        ? 'Done. Each team spent a moment on it; most of the time went on waiting for them to reach it.'
+        : !running
+          ? 'Six teams, each working through its own queue. The orange ball is the delivery work, one piece in every queue.'
+          : left === teams.length
+            ? 'Each team does its most important work first, and new work keeps arriving.'
+            : `${teams.length - left} of ${teams.length} teams have done their part. Waiting on ${left}.`;
+    };
+
+    const shade = (hex: string, amt: number) => {
+      const n = parseInt(hex.slice(1), 16);
+      const f = (v: number) => Math.max(0, Math.min(255, Math.round(v + amt * 255)));
+      return `rgb(${f(n >> 16)}, ${f((n >> 8) & 255)}, ${f(n & 255)})`;
+    };
+
+    const drawBall = (x: number, y: number, b: Ball, base: string, rr: number, fade: number) => {
+      // Squash on impact, stretch on the way down.
+      const s = Math.max(0.78, Math.min(1.18, 1 + b.acc / 260000));
+      const sx = 1 / Math.sqrt(s);
+      let scale = 1;
+      let alpha = fade;
+      if (b.pop >= 0) {
+        scale = 1 + 0.35 * Math.sin(Math.min(1, b.pop) * Math.PI * 0.5);
+        alpha = 1 - Math.min(1, b.pop);
+      }
+      const w = rr * sx * scale;
+      const h = rr * s * scale;
+      const cy = y + rr - h; // keep the bottom on the slot as it squashes
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      const g = ctx.createRadialGradient(x - w * 0.35, cy - h * 0.4, rr * 0.1, x, cy, rr * 1.1);
+      g.addColorStop(0, shade(base, 0.22 + b.tone));
+      g.addColorStop(1, shade(base, -0.06 + b.tone));
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.ellipse(x, cy, w, h, 0, 0, Math.PI * 2);
+      ctx.fill();
+      if (b.ours) {
+        ctx.lineWidth = 2 * view.px;
+        ctx.strokeStyle = shade(base, -0.18);
+        ctx.stroke();
+      }
+      ctx.restore();
+    };
+
+    const capsule = (x: number, y: number, w: number, h: number) => {
+      ctx.beginPath();
+      ctx.roundRect(x, y, Math.max(w, h), h, h / 2);
+    };
+
+    draw = () => {
+      clear(c.paper);
+      const dk = dark() ? 1 : 0;
+      const orange = OURS[dk];
+      const rr = r();
+      const p = pill();
+      ctx.font = `500 ${(narrow ? 12 : 13) * view.px}px ${c.font}`;
+      ctx.textBaseline = 'middle';
+
+      // Threads from the promise to each piece of delivery work still waiting.
+      const thread = finished
+        ? 0
+        : running || clock > 0
+          ? 0.5
+          : Math.min(1, Math.max(0, (shown - 900) / 500)) * 0.5;
+      if (thread > 0) {
+        ctx.save();
+        ctx.strokeStyle = orange;
+        ctx.lineWidth = 1.5 * view.px;
+        ctx.globalAlpha = thread;
+        teams.forEach((t, i) => {
+          const b = t.balls.find((b) => b.ours && b.pop < 0);
+          if (!b || b.wait > 0) return;
+          const x = column(i).x + b.xo;
+          const y0 = p.y + p.h / 2;
+          ctx.beginPath();
+          ctx.moveTo(p.x, y0);
+          const ex = x - rr - 3 * view.px;
+          ctx.bezierCurveTo(p.x, y0 + (b.y - y0) * 0.6, ex - column(i).colW * 0.3, b.y, ex, b.y);
+          ctx.stroke();
+        });
+        ctx.restore();
+      }
+
+      teams.forEach((t, i) => {
+        const { x, floor, colW } = column(i);
+        const hue = t.hue[dk];
+        const fade = 1;
+        // Floor.
+        ctx.strokeStyle = c.rule;
+        ctx.lineWidth = 1.5 * view.px;
+        ctx.beginPath();
+        ctx.moveTo(x - colW * 0.36, floor);
+        ctx.lineTo(x + colW * 0.36, floor);
+        ctx.stroke();
+        const ly = floor + (narrow && i % 2 ? 34 : 16) * view.px;
+        // Keep the end labels inside the frame.
+        const name = narrow ? t.short : t.name;
+        const half = ctx.measureText(name).width / 2 + 4 * view.px;
+        const lx = Math.max(half, Math.min(view.W - half, x));
+        label(ctx, c, view.px, name, lx, ly, c.muted);
+        // A tick once its part of the delivery work is done.
+        if (t.doneAt >= 0) {
+          const tx = lx + ctx.measureText(name).width / 2 + 9 * view.px;
+          const s = 4 * view.px;
+          ctx.strokeStyle = orange;
+          ctx.lineWidth = 2 * view.px;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.beginPath();
+          ctx.moveTo(tx - s, ly);
+          ctx.lineTo(tx - s * 0.2, ly + s * 0.75);
+          ctx.lineTo(tx + s, ly - s * 0.8);
+          ctx.stroke();
+        }
+
+        // Progress on the bottom ball.
+        const bottom = t.balls[0];
+        if (running && bottom && bottom.pop < 0 && Math.abs(bottom.y - slotY(i, 0)) < rr) {
+          ctx.strokeStyle = bottom.ours ? orange : hue;
+          ctx.lineWidth = 2.5 * view.px;
+          ctx.beginPath();
+          const a0 = -Math.PI / 2;
+          ctx.arc(x, slotY(i, 0), rr + 5 * view.px, a0, a0 + (t.work / t.pace) * Math.PI * 2);
+          ctx.stroke();
+        }
+        for (const b of t.balls) drawBall(x + b.xo, b.y, b, b.ours ? orange : hue, rr, b.ours ? 1 : fade);
+        for (const s of t.sparks) {
+          ctx.globalAlpha = Math.max(0, s.life);
+          ctx.fillStyle = orange;
+          ctx.beginPath();
+          ctx.arc(x + s.x, s.y, 3 * view.px, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.globalAlpha = 1;
+        }
+
+        // The strip: grey while the delivery work waits, orange while it's worked on.
+        const sw = colW * 0.72;
+        const sx = x - sw / 2;
+        const sh = 6 * view.px;
+        const sy = floor + (narrow ? 56 : 40) * view.px - sh / 2;
+        const at = (ms: number) => (Math.min(ms, total) / total) * sw;
+        ctx.save();
+        ctx.globalAlpha = 0.35;
+        ctx.fillStyle = c.rule;
+        capsule(sx, sy, sw, sh);
+        ctx.fill();
+        ctx.restore();
+        const now = t.doneAt >= 0 ? t.doneAt : clock;
+        const waitEnd = t.startAt >= 0 ? t.startAt : now;
+        if (waitEnd > 0) {
+          ctx.fillStyle = c.muted;
+          capsule(sx, sy, at(waitEnd), sh);
+          ctx.fill();
+        }
+        if (t.startAt >= 0) {
+          ctx.fillStyle = orange;
+          capsule(sx + at(t.startAt) - sh / 2, sy, at(now) - at(t.startAt) + sh / 2, sh);
+          ctx.fill();
+        }
+      });
+
+      // Key for the strips under each team.
+      {
+        ctx.font = `500 ${(narrow ? 11 : 12) * view.px}px ${c.font}`;
+        // In a row on a wide screen; stacked on a phone, clear of the pill.
+        let kx = 10 * view.px;
+        let ky = 14 * view.px;
+        for (const [colour, words] of [
+          [c.muted, narrow ? 'waiting' : 'our piece waiting'],
+          [orange, 'worked on'],
+        ] as const) {
+          ctx.fillStyle = colour;
+          capsule(kx, ky - 3 * view.px, 18 * view.px, 6 * view.px);
+          ctx.fill();
+          label(ctx, c, view.px, words, kx + 24 * view.px, ky, c.muted, 'left');
+          if (narrow) ky += 16 * view.px;
+          else kx += 24 * view.px + ctx.measureText(words).width + 14 * view.px;
+        }
+      }
+
+      // Something urgent jumped the queue: say so, once.
+      if (urgent && urgent.life > 0) {
+        ctx.save();
+        ctx.globalAlpha = Math.min(1, urgent.life / 400);
+        const x = column(urgent.team).x + urgent.ball.xo - rr - 8 * view.px;
+        label(ctx, c, view.px, 'urgent: jumps in', x, urgent.ball.y, c.ink, 'right');
+        ctx.restore();
+      }
+
+      // The promise: greyed until the last team is done, then stamped on.
+      const k = finished ? 1 + 0.28 * Math.exp(-age / 220) * Math.cos(age / 55) : 1;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.scale(k, k);
+      capsule(-p.w / 2, -p.h / 2, p.w, p.h);
+      if (finished) {
+        ctx.fillStyle = orange;
+        ctx.fill();
+      } else {
+        ctx.fillStyle = c.paper;
+        ctx.fill();
+        ctx.setLineDash([4 * view.px, 4 * view.px]);
+        ctx.strokeStyle = c.muted;
+        ctx.lineWidth = 1.5 * view.px;
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      ctx.textAlign = 'center';
+      ctx.font = `600 ${(narrow ? 12 : 13) * view.px}px ${c.font}`;
+      ctx.fillStyle = finished ? ON_OURS : c.muted;
+      ctx.fillText(PROMISE, 0, 0);
+      ctx.restore();
+    };
+
+    /** Springs every ball towards its slot, and runs the little effects. dt in ms. */
+    const settle = (dt: number) => {
+      const steps = Math.ceil(dt / 8);
+      const h = dt / steps / 1000;
+      teams.forEach((t, i) => {
+        t.balls.forEach((b, n) => {
+          if (b.wait > 0) {
+            b.wait -= dt;
+            return;
+          }
+          const target = slotY(i, n);
+          for (let s = 0; s < steps; s++) {
+            const a = K * (target - b.y) - D * b.v;
+            b.v += a * h;
+            b.y += b.v * h;
+            b.acc = a;
+            const xa = K * -b.xo - D * b.xv;
+            b.xv += xa * h;
+            b.xo += b.xv * h;
+          }
+        });
+        // Pops that were under way when the run ended still finish.
+        const bottom = t.balls[0];
+        if (!running && bottom && bottom.pop >= 0) {
+          bottom.pop += dt / POP;
+          if (bottom.pop >= 1) t.balls.shift();
+        }
+        for (const s of t.sparks) {
+          s.x += s.vx * dt;
+          s.y += s.vy * dt;
+          s.vy += 0.0009 * dt * view.px;
+          s.life -= dt / 600;
+        }
+        t.sparks = t.sparks.filter((s) => s.life > 0);
+        if (t.doneAt >= 0) t.since += dt;
+      });
+      if (urgent) urgent.life -= dt;
+      if (finished) age += dt;
+    };
+
+    replay.addEventListener('click', () => {
+      reset(true);
+      describe();
+      draw();
+    });
+
+    if (reduced) toEnd();
+    else reset(true);
+
+    let lastLeft = -1;
+    let wasRunning = false;
+    animate(figure, (dt) => {
+      shown += dt;
+      if (!running && !finished && shown >= LEAD) running = true;
+      if (running) {
+        pending += dt;
+        while (pending >= TICK && running) {
+          pending -= TICK;
+          step();
+        }
+      }
+      settle(dt);
+      const left = teams.filter((t) => t.doneAt < 0).length;
+      if (left !== lastLeft || running !== wasRunning) {
+        lastLeft = left;
+        wasRunning = running;
+        describe();
+      }
+      if (finished && replay.hidden && age > 600) replay.hidden = false;
+      // Hold the finished picture a moment, then go round again.
+      if (finished && age > 6500) {
+        reset(true);
+        describe();
+      }
+      draw();
+    });
+    describe();
+    draw();
+  }
+</script>

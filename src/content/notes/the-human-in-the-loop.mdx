@@ -1,0 +1,239 @@
+---
+title: "The human in the loop"
+description: "Big organisations are slow because tens of teams have to agree before anything ships. A model can now write a plan across all of their code at once. What matters is whether the people who have to carry it can read it."
+published: 2026-10-25
+draft: true
+tags: ["ai", "ways of working"]
+links:
+  - label: "Testing of Microservices (Spotify Engineering, 2018)"
+    href: "https://engineering.atspotify.com/2018/01/testing-of-microservices/"
+---
+
+import HitlEcosystem from '../../components/hitl/HitlEcosystem.astro';
+import HitlBrief from '../../components/hitl/HitlBrief.astro';
+import HitlPlan from '../../components/hitl/HitlPlan.astro';
+import HitlTree from '../../components/hitl/HitlTree.astro';
+import HitlPullRequest from '../../components/hitl/HitlPullRequest.astro';
+import HitlRunner from '../../components/hitl/HitlRunner.astro';
+
+{/* DRAFT. Rewritten 25 October 2026 with the figures built, in the reference
+  style rather than Ryan's phrasing; review repairs applied the same day.
+  References: Sam Who, Memory Allocation; Ciechanowski, Gears ("Disc" through
+  "Strings Attached").
+
+  Everything the figures show is an invented example (src/data/human-in-the-loop.ts)
+  and the text says so. Claims only Ryan can confirm:
+  - The opening grows an invented coffee company; it stands for any large
+    commercial operation. "Hundreds of teams" and "thousands of systems" are
+    Ryan's scale, as are "more than half" of the agreement not being about
+    software and tens of teams for anything meaningful.
+  - The opening figure grows the coffee company in eight invented steps, with
+    invented head counts (src/data/human-in-the-loop.ts, `growth`, `teams`).
+    The text after it uses two real rules, simplified: the EU fourteen-day withdrawal from an online
+    order, and Japan's lower consumption tax on food to take away.
+  - TK: how the map is built (from the code itself, or by the model).
+  - TK: what a plan review costs in people's time.
+  - The real corrections have the shape of the invented one: facts about the
+    organisation, not the code.
+  - The plan gets 80 to 90% of the way; gaps surface at integration as rework;
+    tests are agreed before code; the delivery runner works; the people who
+    agree the plan are the ones on call for what it builds; models already draw. */}
+
+Every company eventually has to change what it does: sell a new product, enter a new country,
+comply with a new law. A small company can do that in an afternoon. A large one can take a
+year, and from outside it can be hard to see why.
+
+In this piece I’d like to look at where that time goes. We’ll grow a company one step at a time
+and see what each step adds. Then I’ll talk about some of the things I see happening that could
+help big companies move a bit faster and where I think AI tools can help.
+
+## Growing
+
+You may have bought coffee from a stall where one person takes the order, makes the drink, takes
+the money and decides tomorrow’s prices. Let’s take a closer look at that business. Everything it
+knows is in one head. If the owner wants to sell tea as well, they buy some tea.
+
+The figure below draws that business. The dot is the owner and the square is the till; the line
+between them is the owner using it, and the moving dots are what passes along it. Step it forward
+as you read on, or let it play, and watch what each step adds.
+
+<HitlEcosystem />
+
+That works while the queue is short. Once it grows, one person can’t take every order, so a second
+person takes orders and the first makes the drinks. The two of them now have to agree how an
+order gets from one to the other. It is a small thing, a shout or a slip of paper, but it is the
+first handover, and from here on any change to how orders work has to suit both of them.
+
+As the business grows, the same happens to each job in turn. Buying beans, setting prices, paying
+staff and delivering to offices each outgrow the person doing them and become a team. A team
+can’t keep its job in one head either, so it writes down how the job is done, and at this size
+writing it down means building a system. The shouts and slips of paper become calls between
+systems.
+
+So far every customer is in one country. Let’s add a second. It has its own tax, its own
+currency, its own consumer law and its own rules about what information a company may keep on
+its customers. The company doesn’t build a second set of systems. Each system it has learns a
+second set of rules: the price gains a branch, and so do the receipt and the refund. A company
+that sells in forty countries has forty sets of branches running through every team.
+
+Then it starts selling through others: supermarkets that stock its beans, franchisees who run its
+cafés, delivery apps and the payment companies that take the money. Each has systems of its own.
+Each connection is negotiated, put in a contract, built and supported, by a team on each side.
+
+Every one of those steps was the sensible thing to do at the time. The result is a company with
+hundreds of teams, some of them whole departments, and thousands of systems, and the knowledge of
+how it works is spread across all of them. The figure stops at a few hundred people and a few dozen
+systems, but the shape is the same.
+
+Now change one thing. Germany lets a customer withdraw from an online order within
+fourteen days, and that reaches the order, the payment, the invoice, the refund, the returns and
+the contract. Japan taxes a coffee to take away at a lower rate than one drunk in, so the price,
+the till, the invoice and every franchisee have to know which it was. Almost anything worth
+changing lands like this: on several systems, in several parts of the company, at once.
+
+For anything new to reach the market and hold up under real sales volume, all of the people
+behind those systems have to agree on what happens. In my experience more than half of that agreement is
+not about software. It is about process, and about what the business can sell and support. The
+agreeing is what makes everything slow, and anything meaningful takes tens of teams.
+
+Models can now write much of the code, and that is where the attention has gone. The code was
+never the slow part. What I have been working on is whether a model can help with the part that
+is: getting those teams to agree on what to build, and keeping them coordinated while they build
+it.
+
+I think it can, and the rest of this piece is about how. I will use one small invented feature,
+on a system far smaller than that company’s, so that the figures stay readable.
+
+## The brief
+
+Most features that cross teams start as a sentence. Ours is this:
+
+> Show customers an estimated delivery date on the order page.
+
+The system it lands on has a dozen services, each in its own repository and owned by its own
+team. The sentence goes to all twelve. Each team reads it, works out what it means for them, and
+agrees to it. Step through the teams with the arrows under the figure and watch which services
+each one expects to change.
+
+<HitlBrief />
+
+The lit region moves. Checkout expects to calculate the date when the order is placed. The
+warehouse expects to send one later, once the order has been picked. The order page expects to
+show a field and for somebody else to fill it. Three teams expect no change at all. Press *Every
+team at once*, and no two readings match. None of them has misread the sentence. It allows every
+one of these.
+
+For a feature that touches two teams this is fine. The two people talk, the gap shows up in the
+first conversation, and a sentence is the cheapest way to start. With a dozen teams the gaps
+don’t show up in conversation. They show up when the services are first connected, and each one
+costs a round of rework in someone else’s code.
+
+A longer brief would need somebody who knows what changes in each of the dozen services, down to
+the fields and the calls between them. Nobody holds that much of a large system in their head.
+The people who know the system best know its shape, and leave the detail to each team, which is
+exactly where the different readings come from.
+
+## The plan
+
+A coding model can do the part nobody could. Give it the sentence and the twelve repositories and
+it reads all of them and writes a plan: which service gains which field, which calls between
+services change, and the order the changes have to ship in. The figure below is a sketch of the
+plan it writes for the delivery date, laid out as a model lays one out, by what depends on what
+and not team by team.
+
+<HitlPlan />
+
+The lines with a dot each settle something the sentence left open: the date is estimated by
+Shipping, asked for by Checkout, stored by Orders, and revised by Shipping again once a carrier
+is booked. A team that disagrees with the plan now disagrees with a line.
+
+The plan gets us eighty or ninety percent of the way. The rest is for the teams
+to find, which means the teams have to read it, and a plan this specific is long. The strip
+beside the column is the whole plan, and the window on it is how much you can see at once. Now
+choose *Checkout* under the figure. Six lines concern Checkout, and the thirty-nine around them
+concern everyone else. To follow what happens to your own service you read past the warehouse,
+the order page and payments, in whatever order the model reached them, and keep them all in mind
+on the way.
+
+My job is to understand the whole plan, across teams that aren’t mine. Each team needs to
+understand the part that concerns them, and the parts next to it. Either way the piece you need
+is mixed in with everything else, so a tool that lets one person check a model’s plan is the
+same tool that lets twelve teams agree on it.
+
+## The map
+
+The plan doesn’t need to be shorter. It needs to be read one service at a time, by the people
+that service belongs to, with enough around it to see where it fits.
+
+To do that I have been building an app that first scans each repository and draws a map of the
+system, TK, with the services and the calls between them. The plan is then laid onto the map
+rather than written beside it.
+
+<HitlTree />
+
+Open the Checkout branch. Its plan assumes Shipping will answer a question Shipping has never
+been asked, so click the lit line to Shipping, and click it again to cross. The one line on the
+far side that answers it is marked.
+
+That crossing is the reason for the map. The plan says Checkout will ask and Shipping will
+answer; the map lets you check that both sides say so, instead of trusting the description. It
+is also how the checkout team learns what Shipping does, and how the shipping team learns what
+Checkout expects of it, which neither has needed to know before.
+
+## Agreeing
+
+The plan lives in a repository, and every change to it is a pull request. We build the plan with
+the model, then review it as a group, all looking at the same map. Someone opens a service, the
+team that owns it says what the plan has wrong, and the correction goes in as a pull request. We
+go round until everyone is happy.
+
+<HitlPullRequest />
+
+The correction in the figure is invented, but it is the shape of the real ones. The model had
+the warehouse send a dispatch date when an order is picked, which is what the code suggests.
+Press *After*. The fix is a fact about how the warehouse runs, which the code does not say and
+only the warehouse team knew.
+
+There is no figure for the meeting itself, but it is a different meeting from the one that
+started with the sentence. People argue about a field, or the order of two deployments, not
+about what a sentence meant, and arguments like that come to an end. It costs TK of everyone’s
+time, and when the group doesn’t converge someone still has to decide. Against that is the rework
+the sentence would have caused, found later, across a dozen services.
+
+The teams that agree the plan are the teams on call for what it builds. Whatever the model
+writes, a person is paged when the delivery date is wrong, and a team that agrees a line is
+agreeing to run it in production and to be the ones paged for it. That is why the plan has to be
+understood in the room rather than trusted.
+
+## Delivery
+
+Once everyone is happy with the plan, the rest follows from it. We break it into deliverables,
+open an issue for each one on its repository, and put them in the order they have to be
+deployed. Each one ships behind a feature flag, so a service can deploy its part before its
+neighbours have finished theirs. We agree the tests for each issue before any code is written.
+
+Most of those tests check one service in isolation from the services around it, the large middle
+layer in Spotify’s post on testing microservices. A few end-to-end tests follow the feature
+across the real services, the layer that post says to keep smallest. The model writes the code
+for each issue, and a test runner I have been building takes the delivery plan and wraps each
+issue in its tests, so we can burn through the issues in order with the tests going green at
+every step.
+
+<HitlRunner />
+
+Press play. The warehouse’s step is now fourth, and the tests beside each issue are the ones its
+team asked for.
+
+The model writing the code and the runner proving it both work, and both are almost beside the
+point. By the time the runner starts, the hard work is done: every team involved has agreed what
+they are going to build.
+
+## The gap
+
+I don’t expect to be building these apps for long. The models are already drawing: interactive
+pages, canvases with an idea sketched out, diagrams on request. Before long I expect a model to
+present a plan the way I would want to explore it, one service at a time and on a map, with no
+app in between. Until then, we build them ourselves.
+
+What I don’t expect to change is the meeting, where the people who will carry something read it,
+in detail, and agree to it before it is built.

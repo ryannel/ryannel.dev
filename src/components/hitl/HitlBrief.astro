@@ -1,0 +1,127 @@
+---
+import '../../styles/hitl.css';
+import SystemMap from './SystemMap.astro';
+import { brief, readings, serviceById } from '../../data/human-in-the-loop';
+
+/**
+ * One sentence, twelve readings. Step through the teams and watch which
+ * services each one expects to change. Clicking a service on the map jumps to
+ * its team's reading.
+ */
+const named = readings.map((r) => ({ ...r, name: serviceById[r.team].name }));
+---
+
+<figure class="hitl hitl-brief" data-hitl-brief data-readings={JSON.stringify(named)}>
+  <div class="hitl-stage">
+    <blockquote class="brief-text">{brief}</blockquote>
+    <SystemMap />
+  </div>
+  <div class="hitl-controls">
+    <button type="button" data-act="prev" aria-label="Previous team">←</button>
+    <span class="brief-which hitl-note" aria-hidden="true"></span>
+    <button type="button" data-act="next" aria-label="Next team">→</button>
+    <span class="hitl-spacer"></span>
+    <button type="button" data-act="all">Every team at once</button>
+  </div>
+  <p class="hitl-readout" aria-live="polite"></p>
+  <figcaption>
+    The brief, and what each team took it to mean. The lit services are the ones that team expects to change. Click a service to see its team's reading.
+  </figcaption>
+</figure>
+
+<style>
+  .brief-text {
+    margin: 0 0 1rem;
+    padding: 0.6rem 0.9rem;
+    border: 0;
+    border-radius: 0.5rem;
+    background: var(--surface);
+    font: italic 1rem/1.4 var(--font-prose);
+    color: var(--ink);
+  }
+  .brief-which {
+    min-width: 7rem;
+    text-align: center;
+  }
+</style>
+
+<script>
+  import { clearStates, mark } from '../../lib/hitl';
+
+  interface Reading {
+    team: string;
+    name: string;
+    changes: string[];
+    note: string;
+  }
+
+  for (const figure of document.querySelectorAll<HTMLElement>('[data-hitl-brief]')) {
+    const readings: Reading[] = JSON.parse(figure.dataset.readings!);
+    const readout = figure.querySelector<HTMLElement>('.hitl-readout')!;
+    const which = figure.querySelector<HTMLElement>('.brief-which')!;
+    const button = (act: string) => figure.querySelector<HTMLButtonElement>(`[data-act="${act}"]`)!;
+    const map = figure.querySelector<SVGSVGElement>('.hitl-map')!;
+    let i = 0;
+
+    const show = (index: number) => {
+      i = (index + readings.length) % readings.length;
+      const r = readings[i];
+      clearStates(map);
+      mark(map, '[data-service]', 'is-dim', true);
+      mark(map, `[data-service="${r.team}"]`, 'is-active', true);
+      mark(map, `[data-service="${r.team}"]`, 'is-dim', false);
+      for (const id of r.changes) {
+        mark(map, `[data-service="${id}"]`, 'is-lit', true);
+        mark(map, `[data-service="${id}"]`, 'is-dim', false);
+      }
+      which.textContent = `Team ${i + 1} of ${readings.length}`;
+      readout.innerHTML = `<strong>${r.name} team:</strong> ${r.note}`;
+      button('all').setAttribute('aria-pressed', 'false');
+    };
+
+    const showAll = () => {
+      clearStates(map);
+      const counts = new Map<string, number>();
+      for (const r of readings) for (const id of r.changes) counts.set(id, (counts.get(id) ?? 0) + 1);
+      mark(map, '[data-service]', 'is-dim', true);
+      for (const [id, n] of counts) {
+        mark(map, `[data-service="${id}"]`, 'is-dim', false);
+        mark(map, `[data-service="${id}"]`, 'is-lit', true);
+        const g = map.querySelector<SVGGElement>(`[data-service="${id}"]`);
+        if (g) g.style.opacity = String(0.35 + (0.65 * n) / readings.length);
+      }
+      which.textContent = 'All teams';
+      const most = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+      const top = most[0];
+      const topName = figure.querySelector(`[data-service="${top[0]}"] text`)?.textContent ?? top[0];
+      readout.innerHTML = `Every team's reading at once. The darker a service, the more teams expect it to change. ${topName} is named by ${top[1]} of ${readings.length} teams, ${counts.size} of the twelve services are named by someone, and no two teams that expect a change expect the same set.`;
+      button('all').setAttribute('aria-pressed', 'true');
+    };
+
+    const resetOpacity = () => map.querySelectorAll<SVGGElement>('[data-service]').forEach((g) => (g.style.opacity = ''));
+
+    button('prev').addEventListener('click', () => { resetOpacity(); show(i - 1); });
+    button('next').addEventListener('click', () => { resetOpacity(); show(i + 1); });
+    button('all').addEventListener('click', showAll);
+    for (const g of map.querySelectorAll<SVGGElement>('[data-service]')) {
+      g.classList.add('is-clickable');
+      g.setAttribute('tabindex', '0');
+      g.setAttribute('role', 'button');
+      const jump = () => {
+        resetOpacity();
+        const idx = readings.findIndex((r) => r.team === g.dataset.service);
+        if (idx >= 0) show(idx);
+      };
+      g.addEventListener('click', jump);
+      g.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); jump(); }
+      });
+    }
+    figure.addEventListener('keydown', (e) => {
+      if (e.target instanceof HTMLInputElement) return;
+      if (e.key === 'ArrowLeft') { resetOpacity(); show(i - 1); }
+      if (e.key === 'ArrowRight') { resetOpacity(); show(i + 1); }
+    });
+    show(0);
+  }
+</script>

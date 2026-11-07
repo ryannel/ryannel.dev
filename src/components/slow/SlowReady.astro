@@ -1,0 +1,336 @@
+---
+import '../../styles/hitl.css';
+
+/**
+ * Two ways that needing every team costs time. In the first, each team is
+ * ready in a given week with some chance, independently, and the work can only
+ * go when every one of them is: the chance of that is the product, p^k (after
+ * Komoroske's "coordination headwind"). In the second, each team takes a week
+ * on average, at random, and the work waits for the last: the expected wait is
+ * 1 + 1/2 + … + 1/k weeks for exponential times. Arithmetic, with invented
+ * teams; the inputs are the reader's.
+ */
+---
+
+<figure class="hitl slow-ready" data-slow-ready>
+  <div class="hitl-stage">
+    <canvas class="slow-canvas" aria-label="A row of teams, each either ready or not this week, and a strip of past weeks marking those when every team was ready at once."></canvas>
+    <noscript><p class="hitl-note">The figure is drawn with JavaScript.</p></noscript>
+  </div>
+  <div class="hitl-controls">
+    <button type="button" data-mode="ready" aria-pressed="true">Everyone ready</button>
+    <button type="button" data-mode="slowest" aria-pressed="false">Waiting for the slowest</button>
+  </div>
+  <div class="hitl-controls">
+    <label for="slow-teams" class="hitl-note">Teams</label>
+    <input id="slow-teams" type="range" min="1" max="20" step="1" value="10" />
+    <span class="slow-value" data-out="teams" aria-hidden="true">10</span>
+  </div>
+  <div class="hitl-controls">
+    <label for="slow-p" class="hitl-note slow-p">Each ready</label>
+    <input id="slow-p" class="slow-p" type="range" min="80" max="99" step="1" value="95" />
+    <span class="slow-value slow-p" data-out="p" aria-hidden="true">95%</span>
+  </div>
+  <p class="hitl-readout" aria-live="polite"></p>
+  <figcaption>
+    Each square is a team the work needs. In the first view, each team is ready in a given week with the chance you set, and the strip marks the weeks when all of them were. In the second, each team takes a week on average and the work waits for the last one. Arithmetic, not data.
+  </figcaption>
+</figure>
+
+<style>
+  .slow-ready .hitl-stage {
+    padding: 0;
+    overflow: hidden;
+  }
+  .slow-canvas {
+    display: block;
+    width: 100%;
+    aspect-ratio: 25 / 9;
+  }
+  .slow-ready label {
+    min-width: 4.5rem;
+  }
+  .slow-value {
+    min-width: 2.5rem;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .slow-ready .is-off {
+    opacity: 0.35;
+  }
+</style>
+
+<script>
+  import { mulberry, exp, theme, fit, animate, label, reducedMotion, NARROW } from './canvas';
+
+  const WEEK = 1300; // ms per week in the first view
+  const RUN = 1100; // ms per week in the second
+  const STRIP = 26; // weeks of history
+
+  for (const figure of document.querySelectorAll<HTMLElement>('[data-slow-ready]')) {
+    const canvas = figure.querySelector<HTMLCanvasElement>('.slow-canvas')!;
+    const readout = figure.querySelector<HTMLElement>('.hitl-readout')!;
+    const modes = [...figure.querySelectorAll<HTMLButtonElement>('[data-mode]')];
+    const teamsIn = figure.querySelector<HTMLInputElement>('#slow-teams')!;
+    const pIn = figure.querySelector<HTMLInputElement>('#slow-p')!;
+    const outTeams = figure.querySelector<HTMLElement>('[data-out="teams"]')!;
+    const outP = figure.querySelector<HTMLElement>('[data-out="p"]')!;
+    const reduced = reducedMotion();
+    const rand = mulberry(5);
+
+    let k = 10;
+    let p = 0.95;
+    let mode: 'ready' | 'slowest' = 'ready';
+    let fade = 1; // 1 shows the first view, 0 the second
+    let narrow = false;
+    let W = 1000;
+    const layout = (width: number) => {
+      narrow = width < NARROW;
+      W = narrow ? 600 : 1000;
+      return { W, H: narrow ? 380 : 360 };
+    };
+
+    // The first view: this week's teams, and the weeks gone by.
+    const MAX = 20;
+    const ready = Array.from({ length: MAX }, () => ({ on: true, v: 1, at: 0 }));
+    let history: { all: boolean; v: number }[] = [];
+    let clock = 0;
+    let weekAt = 0;
+
+    // The second view: how long each team takes this time round, and how far it has got.
+    let times: number[] = [];
+    let run = 0;
+
+    const week = () => {
+      for (let i = 0; i < MAX; i++) {
+        ready[i].on = rand() < p;
+        ready[i].at = clock + i * 25;
+      }
+      const all = ready.slice(0, k).every((r) => r.on);
+      history.push({ all, v: reduced ? 1 : 0 });
+      if (history.length > STRIP) history.shift();
+    };
+    const race = () => {
+      times = Array.from({ length: MAX }, () => exp(rand, 1));
+      run = 0;
+    };
+    const slowest = () => Math.max(...times.slice(0, k));
+    const harmonic = (n: number) => {
+      let h = 0;
+      for (let i = 1; i <= n; i++) h += 1 / i;
+      return h;
+    };
+
+    const draw = () => {
+      const px = view.px;
+      clear(c.paper);
+
+      if (fade > 0.01) {
+        ctx.globalAlpha = fade;
+        // This week's teams in a row.
+        const slot = Math.min(46, (W - 40) / k);
+        const size = slot * 0.74;
+        const gap = slot - size;
+        const x0 = W / 2 - (k * slot - gap) / 2;
+        const inset = size * 0.3;
+        ctx.font = `600 ${(narrow ? 10 : 12) * px}px ${c.font}`;
+        label(ctx, c, px, 'THIS WEEK', W / 2, 46, c.muted);
+        for (let i = 0; i < k; i++) {
+          const r = ready[i];
+          const x = x0 + i * (size + gap);
+          const y = 66;
+          ctx.globalAlpha = fade;
+          ctx.fillStyle = c.paper;
+          ctx.fillRect(x, y, size, size);
+          ctx.globalAlpha = fade * r.v;
+          ctx.fillStyle = c.accent;
+          ctx.fillRect(x, y, size, size);
+          ctx.globalAlpha = fade;
+          ctx.lineWidth = 1.3;
+          ctx.strokeStyle = r.v > 0.5 ? c.strong : c.muted;
+          ctx.strokeRect(x, y, size, size);
+          // Not ready: a cross.
+          if (r.v < 0.99) {
+            ctx.globalAlpha = fade * (1 - r.v);
+            ctx.strokeStyle = c.ink;
+            ctx.beginPath();
+            ctx.moveTo(x + inset, y + inset);
+            ctx.lineTo(x + size - inset, y + size - inset);
+            ctx.moveTo(x + size - inset, y + inset);
+            ctx.lineTo(x + inset, y + size - inset);
+            ctx.stroke();
+          }
+        }
+        // The weeks gone by: filled when every team was ready.
+        ctx.globalAlpha = fade;
+        label(ctx, c, px, 'WEEKS WHEN EVERY TEAM WAS READY', W / 2, 182, c.muted);
+        const cslot = Math.min(34, (W - 40) / STRIP);
+        const cell = cslot * 0.82;
+        const cg = cslot - cell;
+        const sx0 = W / 2 - (STRIP * cslot - cg) / 2;
+        const ci = cell * 0.28;
+        for (let i = 0; i < STRIP; i++) {
+          const x = sx0 + i * (cell + cg);
+          const h = history[history.length - STRIP + i];
+          ctx.globalAlpha = fade;
+          ctx.strokeStyle = c.rule;
+          ctx.lineWidth = 1;
+          ctx.strokeRect(x, 202, cell, cell);
+          if (!h) continue;
+          ctx.globalAlpha = fade * h.v;
+          if (h.all) {
+            ctx.fillStyle = c.strong;
+            ctx.fillRect(x, 202, cell, cell);
+          } else {
+            ctx.strokeStyle = c.muted;
+            ctx.beginPath();
+            ctx.moveTo(x + ci, 202 + ci);
+            ctx.lineTo(x + cell - ci, 202 + cell - ci);
+            ctx.moveTo(x + cell - ci, 202 + ci);
+            ctx.lineTo(x + ci, 202 + cell - ci);
+            ctx.stroke();
+          }
+        }
+        // The chance, as a bar.
+        ctx.globalAlpha = fade;
+        const bw = Math.min(600, W - 80);
+        const bx = W / 2 - bw / 2;
+        ctx.strokeStyle = c.rule;
+        ctx.strokeRect(bx, 286, bw, 14);
+        ctx.fillStyle = c.strong;
+        ctx.fillRect(bx, 286, bw * p ** k, 14);
+        ctx.font = `${(narrow ? 10 : 12) * px}px ${c.font}`;
+        label(ctx, c, px, `chance that every team is ready in a given week: ${Math.round(p ** k * 100)}%`, W / 2, 326, c.ink);
+      }
+
+      if (fade < 0.99) {
+        ctx.globalAlpha = 1 - fade;
+        // A bar per team, growing until that team is done; the work waits for the last.
+        const x0 = narrow ? 90 : 150;
+        const x1 = W - (narrow ? 30 : 70);
+        const span = 5;
+        const wx = (w: number) => x0 + (Math.min(w, span) / span) * (x1 - x0);
+        const top = 40;
+        const rowH = Math.min(22, 250 / k);
+        ctx.strokeStyle = c.rule;
+        ctx.lineWidth = 1;
+        ctx.font = `${11 * px}px ${c.font}`;
+        ctx.fillStyle = c.muted;
+        ctx.textAlign = 'center';
+        for (let w = 0; w <= span; w++) {
+          ctx.beginPath();
+          ctx.moveTo(wx(w), top - 6);
+          ctx.lineTo(wx(w), top + k * rowH + 6);
+          ctx.stroke();
+          ctx.fillText(w === 1 ? '1 week' : `${w}`, wx(w), top + k * rowH + 22 * px);
+        }
+        const end = slowest();
+        for (let i = 0; i < k; i++) {
+          const done = run >= times[i];
+          const y = top + i * rowH + rowH * 0.18;
+          ctx.globalAlpha = 1 - fade;
+          ctx.fillStyle = done ? c.accent : c.muted;
+          if (!done) ctx.globalAlpha = (1 - fade) * 0.45;
+          ctx.fillRect(x0, y, wx(Math.min(run, times[i])) - x0, rowH * 0.64);
+          if (done && times[i] === end) {
+            ctx.globalAlpha = 1 - fade;
+            ctx.strokeStyle = c.strong;
+            ctx.strokeRect(x0, y, wx(times[i]) - x0, rowH * 0.64);
+          }
+        }
+        ctx.globalAlpha = 1 - fade;
+        ctx.font = `600 ${12 * px}px ${c.font}`;
+        label(ctx, c, px, 'TEAMS', x0 - 16, top + (k * rowH) / 2 + 4 * px, c.muted, 'right');
+        // When the last team finishes.
+        if (run >= end) {
+          ctx.strokeStyle = c.strong;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(wx(end), top - 12);
+          ctx.lineTo(wx(end), top + k * rowH + 6);
+          ctx.stroke();
+          label(ctx, c, px, `everyone done: ${end.toFixed(1)} weeks`, Math.min(wx(end), x1 - 60), top - 18, c.strong);
+        }
+      }
+      ctx.globalAlpha = 1;
+    };
+
+    const c = theme(figure, () => draw());
+    const { ctx, view, clear } = fit(canvas, layout, () => draw());
+
+    const words = (n: number) => (n === 1 ? 'one team' : `${n} teams`);
+    const describe = () => {
+      if (mode === 'ready') {
+        const seen = history.slice(-STRIP);
+        const hits = seen.filter((h) => h.all).length;
+        const all = k === 1 ? 'it is' : k === 2 ? 'both are' : `all ${k} are`;
+        readout.innerHTML = `<strong>${words(k)}, each ready ${Math.round(p * 100)}% of weeks.</strong> ${all[0].toUpperCase() + all.slice(1)} ready in ${Math.round(p ** k * 100)}% of weeks. <span class="hitl-note">${seen.length ? `In the strip: ${hits} of ${seen.length}.` : ''}</span>`;
+      } else {
+        readout.innerHTML = `<strong>${words(k)}, each taking a week on average.</strong> Waiting for ${k === 1 ? 'it' : `all ${k}`} takes about ${harmonic(k).toFixed(1)} weeks. <span class="hitl-note">This time: ${run >= slowest() ? `${slowest().toFixed(1)} weeks` : '…'}</span>`;
+      }
+    };
+
+    const setMode = (m: 'ready' | 'slowest') => {
+      mode = m;
+      for (const b of modes) b.setAttribute('aria-pressed', String(b.dataset.mode === m));
+      for (const el of figure.querySelectorAll<HTMLElement>('.slow-p')) el.classList.toggle('is-off', m !== 'ready');
+      pIn.disabled = m !== 'ready';
+      if (m === 'slowest') race();
+      if (reduced) {
+        fade = m === 'ready' ? 1 : 0;
+        if (m === 'slowest') run = slowest();
+        draw();
+      }
+      describe();
+    };
+    for (const b of modes) b.addEventListener('click', () => setMode(b.dataset.mode as 'ready' | 'slowest'));
+    teamsIn.addEventListener('input', () => {
+      k = Number(teamsIn.value);
+      outTeams.textContent = teamsIn.value;
+      // Old weeks were for a different number of teams.
+      history = [];
+      if (mode === 'slowest') {
+        race();
+        if (reduced) run = slowest();
+      }
+      describe();
+      draw();
+    });
+    pIn.addEventListener('input', () => {
+      p = Number(pIn.value) / 100;
+      outP.textContent = `${pIn.value}%`;
+      history = [];
+      describe();
+      draw();
+    });
+
+    animate(figure, (dt) => {
+      clock += dt;
+      fade += ((mode === 'ready' ? 1 : 0) - fade) * (1 - Math.exp(-dt / 180));
+      if (mode === 'ready' && clock >= weekAt) {
+        week();
+        weekAt = clock + WEEK;
+      }
+      for (const r of ready) if (clock >= r.at) r.v += ((r.on ? 1 : 0) - r.v) * (1 - Math.exp(-dt / 90));
+      for (const h of history) h.v += (1 - h.v) * (1 - Math.exp(-dt / 200));
+      if (mode === 'slowest') {
+        const end = slowest();
+        run += dt / RUN;
+        // Hold the finished race for a moment, then run another.
+        if (run > end + 2.2) race();
+      }
+      describe();
+      draw();
+    });
+
+    race();
+    if (reduced) {
+      // No motion: a strip of weeks already drawn, and a race already run.
+      for (let i = 0; i < STRIP; i++) week();
+      for (const r of ready) r.v = r.on ? 1 : 0;
+      run = slowest();
+    }
+    describe();
+    draw();
+  }
+</script>

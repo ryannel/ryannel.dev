@@ -1,0 +1,207 @@
+---
+import '../../styles/hitl.css';
+import SystemMap from './SystemMap.astro';
+import { plan, services, serviceById } from '../../data/human-in-the-loop';
+import { tint } from '../../lib/hitl';
+
+/**
+ * The plan as the model wrote it: one long column, each line tinted with the
+ * service it changes, with a strip beside the scroll bar showing the tints
+ * down the full length. Hovering a line lights its service on a small map.
+ * "Follow" dims every line but one service's.
+ */
+---
+
+<figure class="hitl hitl-plan" data-hitl-plan data-names={JSON.stringify(Object.fromEntries(services.map((s) => [s.id, s.name])))}>
+  <div class="hitl-stage">
+    <div class="plan-layout">
+      <div class="plan-column" tabindex="0" aria-label="The plan, in the order the model wrote it">
+        {
+          plan.map((line, n) => (
+            <p
+              class:list={['hitl-line', { 'is-decision': line.decision }]}
+              data-line={n}
+              data-s={line.s}
+              style={`--tint: ${tint(serviceById[line.s].hue)}`}
+            >
+              {line.text}
+            </p>
+          ))
+        }
+      </div>
+      <div class="plan-strip" aria-hidden="true">
+        {plan.map((line) => <span data-s={line.s} style={`--tint: ${tint(serviceById[line.s].hue)}`}></span>)}
+        <span class="plan-strip-window"></span>
+      </div>
+      <div class="plan-side">
+        <SystemMap labels={false} />
+        <p class="hitl-readout" aria-live="polite">{plan.length} lines. Hover one to see which service it changes.</p>
+      </div>
+    </div>
+  </div>
+  <div class="hitl-controls">
+    <label class="hitl-note" for="plan-follow">Follow one service:</label>
+    <select id="plan-follow" class="plan-follow">
+      <option value="">None</option>
+      {services.map((s) => <option value={s.id}>{s.name}</option>)}
+    </select>
+    <span class="hitl-spacer"></span>
+    <span class="hitl-note"><span class="plan-dot"></span> a decision the brief left open</span>
+  </div>
+  <figcaption>
+    The plan, in the order the model wrote it, each line tinted with the service it changes. The strip on the right is the whole plan's length. Scroll the column, or follow one service and see what you have to read past.
+  </figcaption>
+</figure>
+
+<style>
+  .plan-layout {
+    display: grid;
+    grid-template-columns: 1fr 10px 18rem;
+    gap: 0.75rem;
+    align-items: stretch;
+  }
+  @media (max-width: 40rem) {
+    .plan-layout {
+      grid-template-columns: 1fr 10px;
+    }
+    .plan-side {
+      grid-column: 1 / -1;
+    }
+  }
+  .plan-column {
+    max-height: 24rem;
+    overflow-y: auto;
+    scrollbar-width: none;
+    padding-right: 0.25rem;
+  }
+  .plan-column::-webkit-scrollbar {
+    display: none;
+  }
+  .plan-column:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .hitl .plan-column .hitl-line {
+    cursor: default;
+  }
+  /* The strip: one segment per line, in the plan's own proportions. */
+  .plan-strip {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    height: 24rem;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .plan-strip span {
+    flex: 1;
+    background: var(--tint);
+    opacity: 0.8;
+    transition: opacity 0.2s;
+  }
+  .plan-strip span.is-dim {
+    opacity: 0.15;
+  }
+  .plan-strip-window {
+    position: absolute;
+    left: 0;
+    right: 0;
+    flex: none;
+    border: 2px solid var(--paper);
+    outline: 1.5px solid var(--ink);
+    outline-offset: -1px;
+    border-radius: 3px;
+    background: transparent !important;
+    opacity: 1 !important;
+    pointer-events: none;
+  }
+  .plan-side {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .plan-side .hitl-readout {
+    margin: 0;
+    font-size: 0.8125rem;
+    color: var(--ink-muted);
+  }
+  .plan-follow {
+    font: inherit;
+    color: var(--ink);
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    padding: 0.3rem 0.75rem;
+  }
+  .plan-dot {
+    display: inline-block;
+    width: 0.4rem;
+    height: 0.4rem;
+    margin-right: 0.2rem;
+    border-radius: 50%;
+    background: var(--ink);
+    vertical-align: middle;
+  }
+</style>
+
+<script>
+  import { clearStates, mark } from '../../lib/hitl';
+
+  for (const figure of document.querySelectorAll<HTMLElement>('[data-hitl-plan]')) {
+    const column = figure.querySelector<HTMLElement>('.plan-column')!;
+    const strip = figure.querySelector<HTMLElement>('.plan-strip')!;
+    const stripWindow = figure.querySelector<HTMLElement>('.plan-strip-window')!;
+    const map = figure.querySelector<SVGSVGElement>('.hitl-map')!;
+    const readout = figure.querySelector<HTMLElement>('.hitl-readout')!;
+    const follow = figure.querySelector<HTMLSelectElement>('.plan-follow')!;
+    const lines = [...figure.querySelectorAll<HTMLElement>('.hitl-line')];
+    const names: Record<string, string> = JSON.parse(figure.dataset.names!);
+    const serviceName = (id: string) => names[id] ?? id;
+
+    // The window on the strip tracks how much of the column is in view.
+    const syncWindow = () => {
+      const h = strip.clientHeight;
+      const top = (column.scrollTop / column.scrollHeight) * h;
+      const height = (column.clientHeight / column.scrollHeight) * h;
+      stripWindow.style.top = `${top}px`;
+      stripWindow.style.height = `${Math.max(6, height)}px`;
+    };
+    column.addEventListener('scroll', syncWindow, { passive: true });
+    new ResizeObserver(syncWindow).observe(column);
+    syncWindow();
+
+    let following = '';
+    const counts = new Map<string, number>();
+    for (const l of lines) counts.set(l.dataset.s!, (counts.get(l.dataset.s!) ?? 0) + 1);
+
+    const render = (hover: HTMLElement | null) => {
+      clearStates(map);
+      const active = hover?.dataset.s ?? following;
+      for (const l of lines) l.classList.toggle('is-dim', !!following && l.dataset.s !== following);
+      for (const s of strip.querySelectorAll<HTMLElement>('span[data-s]')) s.classList.toggle('is-dim', !!following && s.dataset.s !== following);
+      if (active) {
+        mark(map, '[data-service]', 'is-dim', true);
+        mark(map, `[data-service="${active}"]`, 'is-dim', false);
+        mark(map, `[data-service="${active}"]`, 'is-lit', true);
+      }
+      if (hover) {
+        readout.textContent = `${serviceName(hover.dataset.s!)}${hover.classList.contains('is-decision') ? ', and a decision the brief left open' : ''}.`;
+      } else if (following) {
+        const n = counts.get(following) ?? 0;
+        readout.textContent = `${n} of ${lines.length} lines change ${serviceName(following)}. The other ${lines.length - n} are in between them.`;
+      } else {
+        readout.textContent = `${lines.length} lines. Hover one to see which service it changes.`;
+      }
+    };
+    for (const l of lines) {
+      l.addEventListener('mouseenter', () => render(l));
+      l.addEventListener('mouseleave', () => render(null));
+    }
+    follow.addEventListener('change', () => {
+      following = follow.value;
+      render(null);
+    });
+    render(null);
+  }
+</script>

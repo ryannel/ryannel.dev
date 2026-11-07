@@ -40,7 +40,9 @@ import {
   slugify,
 } from './edits.mjs';
 
-const NOTES_DIR = 'src/content/projects';
+/** Where each kind of page lives; the page's first path segment picks one. New notes are projects. */
+const COLLECTIONS = { projects: 'src/content/projects', notes: 'src/content/notes' };
+const NOTES_DIR = COLLECTIONS.projects;
 const ASSETS_DIR = 'src/assets';
 const CONTEXT_FILE = '.astro/editor-context.json';
 const SLUG = /^[a-z0-9][a-z0-9-]*$/;
@@ -49,12 +51,13 @@ const HISTORY = 100;
 
 const hashOf = (text) => createHash('sha1').update(text).digest('hex').slice(0, 12);
 
-/** Resolve a slug to a note file inside NOTES_DIR, or null. Never trusts the path. */
-const noteFile = (root, slug) => {
-  if (typeof slug !== 'string' || !SLUG.test(slug)) return null;
+/** Resolve a slug to a file in its collection, or null. Never trusts the path. */
+const noteFile = (root, slug, collection = 'projects') => {
+  if (typeof slug !== 'string' || !SLUG.test(slug) || !Object.hasOwn(COLLECTIONS, collection)) return null;
+  const dir = resolve(root, COLLECTIONS[collection]);
   for (const ext of ['.mdx', '.md']) {
-    const file = resolve(root, NOTES_DIR, slug + ext);
-    if (file.startsWith(resolve(root, NOTES_DIR)) && existsSync(file)) return file;
+    const file = resolve(dir, slug + ext);
+    if (file.startsWith(dir) && existsSync(file)) return file;
   }
   return null;
 };
@@ -75,18 +78,20 @@ const listImages = (root) => {
 };
 
 /** Every note, for the internal-link picker. Files starting `__` are drafts of mine. */
-const listNotes = (root) => {
-  const dir = resolve(root, NOTES_DIR);
-  if (!existsSync(dir)) return [];
-  return readdirSync(dir)
-    .filter((name) => /\.mdx?$/.test(name) && !name.startsWith('__'))
-    .map((name) => {
-      const front = readFrontmatter(readFileSync(join(dir, name), 'utf8'));
-      const slug = basename(name, extname(name));
-      return { slug, title: front.title || slug, draft: front.draft };
+const listNotes = (root) =>
+  Object.entries(COLLECTIONS)
+    .flatMap(([collection, path]) => {
+      const dir = resolve(root, path);
+      if (!existsSync(dir)) return [];
+      return readdirSync(dir)
+        .filter((name) => /\.mdx?$/.test(name) && !name.startsWith('__'))
+        .map((name) => {
+          const front = readFrontmatter(readFileSync(join(dir, name), 'utf8'));
+          const slug = basename(name, extname(name));
+          return { collection, slug, title: front.title || slug, draft: front.draft };
+        });
     })
     .sort((a, b) => a.title.localeCompare(b.title));
-};
 
 export default function noteEditor() {
   let root = process.cwd();
@@ -135,8 +140,8 @@ export default function noteEditor() {
           return rawSend(...args);
         };
 
-        const read = (slug) => {
-          const file = noteFile(root, slug);
+        const read = (slug, collection) => {
+          const file = noteFile(root, slug, collection);
           if (!file) return null;
           const text = readFileSync(file, 'utf8');
           // Stamped offsets count from the start of the file, front matter included.
@@ -180,7 +185,7 @@ export default function noteEditor() {
         });
 
         const write = (msg, edit, { history = true, extra } = {}) => {
-          const note = read(msg.slug);
+          const note = read(msg.slug, msg.collection);
           if (!note) return reply('error', { id: msg.id, message: `No note for “${msg.slug}”.` });
           // The file moved on since the page last saw it (a change from outside
           // that the page has not taken yet): send its shape, and the page
@@ -225,7 +230,7 @@ export default function noteEditor() {
         });
 
         toolbar.on('note-editor:hello', (msg) => {
-          const note = read(msg.slug);
+          const note = read(msg.slug, msg.collection);
           if (!note) return reply('error', { id: msg.id, message: `No note for “${msg.slug}”.` });
           open.add(note.file);
           if (!written.has(note.file)) written.set(note.file, note.hash);
@@ -234,7 +239,7 @@ export default function noteEditor() {
 
         // The source of one range, for editing a block as raw markdown.
         toolbar.on('note-editor:source', (msg) => {
-          const note = read(msg.slug);
+          const note = read(msg.slug, msg.collection);
           if (!note) return reply('error', { id: msg.id, message: `No note for “${msg.slug}”.` });
           try {
             const { current } = sliceBlock(note.text, note.base, { ...msg, expect: undefined });
@@ -269,7 +274,7 @@ export default function noteEditor() {
           const [from, to] = back ? [past, future] : [future, past];
           // An undo that starts from text the editor never wrote is undoing a
           // change made outside it (Claude, an editor); the page says so.
-          const note = read(msg.slug);
+          const note = read(msg.slug, msg.collection);
           const outside = Boolean(note && written.has(note.file) && written.get(note.file) !== note.hash);
           write(
             msg,
@@ -390,7 +395,7 @@ export default function noteEditor() {
         // them out.
         // Whether the note differs from what is committed: publishing is a push.
         toolbar.on('note-editor:git', (msg) => {
-          const note = read(msg.slug);
+          const note = read(msg.slug, msg.collection);
           if (!note) return reply('git', { id: msg.id, state: 'unknown' });
           try {
             const out = execFileSync('git', ['status', '--porcelain', '--', note.file], {
@@ -409,7 +414,7 @@ export default function noteEditor() {
         });
 
         toolbar.on('note-editor:check', (msg) => {
-          const note = read(msg.slug);
+          const note = read(msg.slug, msg.collection);
           if (!note) return reply('error', { id: msg.id, message: `No note for “${msg.slug}”.` });
           reply('check', { id: msg.id, orphans: orphanImports(note.text) });
         });
@@ -419,7 +424,7 @@ export default function noteEditor() {
 
         // Where the cursor is, for the Claude Code prompt hook.
         toolbar.on('note-editor:context', (msg) => {
-          const note = read(msg.slug);
+          const note = read(msg.slug, msg.collection);
           if (!note) return;
           const dir = join(root, '.astro');
           if (!existsSync(dir)) mkdirSync(dir, { recursive: true });

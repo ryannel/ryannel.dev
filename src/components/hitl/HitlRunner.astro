@@ -1,0 +1,206 @@
+---
+import '../../styles/hitl.css';
+import SystemMap from './SystemMap.astro';
+import { deliverables, serviceById } from '../../data/human-in-the-loop';
+import { tint } from '../../lib/hitl';
+
+/**
+ * The runner replaying a delivery: issues turn green one at a time in
+ * deployment order, each lighting its service on the map, with the tests
+ * going green beside them. A slider scrubs; Play walks it.
+ */
+const total = deliverables.reduce((n, d) => n + d.isolated + d.endToEnd, 0);
+---
+
+<figure class="hitl hitl-runner" data-hitl-runner data-steps={JSON.stringify(deliverables)}>
+  <div class="hitl-stage">
+    <div class="runner-layout">
+      <ol class="runner-issues">
+        {
+          deliverables.map((d, i) => (
+            <li data-step={i + 1} data-s={d.s} style={`--tint: ${tint(serviceById[d.s].hue)}`}>
+              <span class="runner-mark" aria-hidden="true"></span>
+              <span class="runner-title"><span class="runner-service">{serviceById[d.s].name}</span> {d.title}</span>
+              <span class="runner-tests hitl-note">{d.isolated}{d.endToEnd ? ` + ${d.endToEnd}` : ''}</span>
+            </li>
+          ))
+        }
+      </ol>
+      <div class="runner-side">
+        <SystemMap />
+      </div>
+    </div>
+  </div>
+  <div class="hitl-controls">
+    <button type="button" data-act="play" aria-label="Play">▶</button>
+    <input type="range" class="runner-scrub" min="0" max={deliverables.length} value="0" step="1" aria-label="Deployment step" />
+    <span class="runner-count hitl-note"></span>
+  </div>
+  <p class="hitl-readout" aria-live="polite"></p>
+  <figcaption>
+    The runner replaying the delivery. Press play, or drag the slider. Each issue deploys in the order the group agreed, lights its service, and its tests go green: the count is tests of that service alone, plus end-to-end tests across the real services. {total} tests in all.
+  </figcaption>
+</figure>
+
+<style>
+  .runner-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    gap: 1rem;
+    align-items: start;
+  }
+  @media (max-width: 40rem) {
+    .runner-layout {
+      grid-template-columns: 1fr;
+    }
+    .runner-side {
+      order: -1;
+    }
+  }
+  .runner-issues {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .runner-issues li {
+    display: grid;
+    grid-template-columns: 1.1rem 1fr auto;
+    gap: 0.4rem;
+    align-items: baseline;
+    margin: 0 0 2px;
+    padding: 0.35rem 0.6rem 0.35rem 0.5rem;
+    border-left: 4px solid var(--tint);
+    background: color-mix(in oklab, var(--tint) 10%, transparent);
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    opacity: 0.55;
+    transition: opacity 0.25s;
+  }
+  .runner-issues li.is-done,
+  .runner-issues li.is-current {
+    opacity: 1;
+  }
+  .runner-service {
+    font-weight: 600;
+  }
+  .runner-mark {
+    display: inline-block;
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 50%;
+    border: 1.5px solid var(--ink-muted);
+    align-self: center;
+    transition: background 0.25s, border-color 0.25s;
+  }
+  .runner-issues li.is-done .runner-mark {
+    background: light-dark(#2f9e5b, #5ac97f);
+    border-color: light-dark(#2f9e5b, #5ac97f);
+  }
+  .runner-issues li.is-current .runner-mark {
+    border-color: var(--ink);
+    animation: runner-pulse 0.9s ease-in-out infinite alternate;
+  }
+  @keyframes runner-pulse {
+    from { transform: scale(0.85); }
+    to { transform: scale(1.15); }
+  }
+  .runner-tests {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .runner-issues li.is-done .runner-tests {
+    color: light-dark(#2f9e5b, #5ac97f);
+  }
+  .runner-count {
+    min-width: 7rem;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .hitl-map [data-service].is-done rect {
+    fill: var(--tint);
+    stroke: light-dark(#2f9e5b, #5ac97f);
+    stroke-width: 2.5;
+  }
+  .hitl-map [data-service].is-done text {
+    fill: #141413;
+  }
+</style>
+
+<script>
+  import { clearStates, mark } from '../../lib/hitl';
+
+  interface Step {
+    s: string;
+    title: string;
+    isolated: number;
+    endToEnd: number;
+  }
+
+  for (const figure of document.querySelectorAll<HTMLElement>('[data-hitl-runner]')) {
+    const steps: Step[] = JSON.parse(figure.dataset.steps!);
+    const map = figure.querySelector<SVGSVGElement>('.hitl-map')!;
+    const readout = figure.querySelector<HTMLElement>('.hitl-readout')!;
+    const count = figure.querySelector<HTMLElement>('.runner-count')!;
+    const scrub = figure.querySelector<HTMLInputElement>('.runner-scrub')!;
+    const play = figure.querySelector<HTMLButtonElement>('[data-act="play"]')!;
+    const items = [...figure.querySelectorAll<HTMLLIElement>('.runner-issues li')];
+    const name = (id: string) => map.querySelector(`[data-service="${id}"] text`)?.textContent ?? id;
+    const total = steps.reduce((n, d) => n + d.isolated + d.endToEnd, 0);
+    const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let timer: number | undefined;
+
+    const show = (k: number) => {
+      scrub.value = String(k);
+      clearStates(map);
+      map.querySelectorAll('.is-done').forEach((el) => el.classList.remove('is-done'));
+      let green = 0;
+      items.forEach((li, i) => {
+        li.classList.toggle('is-done', i < k);
+        li.classList.toggle('is-current', i === k);
+        if (i < k) green += steps[i].isolated + steps[i].endToEnd;
+      });
+      for (let i = 0; i < k; i++) mark(map, `[data-service="${steps[i].s}"]`, 'is-done', true);
+      if (k < steps.length) mark(map, `[data-service="${steps[k].s}"]`, 'is-active', true);
+      count.textContent = `${green} of ${total} tests green`;
+      if (k === 0) {
+        readout.textContent = `Nothing deployed yet. Press play, or drag the slider.`;
+      } else {
+        const d = steps[k - 1];
+        const e2e = d.endToEnd ? `, and ${d.endToEnd} end-to-end test${d.endToEnd === 1 ? '' : 's'} across the real services` : '';
+        readout.textContent =
+          k === steps.length
+            ? `Step ${k} of ${steps.length}: ${name(d.s)}, ${d.title.toLowerCase()}. ${d.isolated} tests of ${name(d.s)} alone${e2e}. The feature is live, and every service lit up in the order the plan said.`
+            : `Step ${k} of ${steps.length}: ${name(d.s)}, ${d.title.toLowerCase()}. ${d.isolated} tests of ${name(d.s)} alone${e2e}.`;
+      }
+    };
+
+    const stop = () => {
+      if (timer) clearInterval(timer);
+      timer = undefined;
+      play.textContent = '▶';
+      play.setAttribute('aria-label', 'Play');
+    };
+    const start = () => {
+      let k = Number(scrub.value);
+      if (k >= steps.length) k = 0;
+      show(k);
+      if (reduced) {
+        show(Math.min(steps.length, k + 1));
+        return;
+      }
+      play.textContent = '❚❚';
+      play.setAttribute('aria-label', 'Pause');
+      timer = window.setInterval(() => {
+        k += 1;
+        show(k);
+        if (k >= steps.length) stop();
+      }, 900);
+    };
+    play.addEventListener('click', () => (timer ? stop() : start()));
+    scrub.addEventListener('input', () => {
+      stop();
+      show(Number(scrub.value));
+    });
+    show(0);
+  }
+</script>

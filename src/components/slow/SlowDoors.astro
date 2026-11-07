@@ -1,0 +1,291 @@
+---
+import '../../styles/hitl.css';
+
+/**
+ * Who decides, in a small company and a large one that is doing it right.
+ * Decisions arrive at a team, most of them easy to reverse (two-way doors) and
+ * a few not (one-way doors). In both companies the team decides the two-way
+ * doors itself, usually within a day. The one-way doors go to whoever holds the
+ * context: in the small company the owner, who the team sees at lunch every
+ * day; in the large one a steering group of senior people that meets every two
+ * weeks or every month, also takes one-way doors from other teams, and has
+ * room for a fixed number a month. Invented rates: 4.7 decisions a week from
+ * this team, 15% of them one-way; 2.5 a week from other teams; the steering
+ * group can settle four a week, so it is 80% full.
+ */
+---
+
+<figure class="hitl slow-doors" data-slow-doors>
+  <div class="hitl-stage">
+    <canvas class="slow-canvas" aria-label="Decisions flowing from a team: easy-to-undo ones straight across to decided, hard-to-undo ones up to whoever decides them, where they wait for the next meeting."></canvas>
+    <noscript><p class="hitl-note">The figure is drawn with JavaScript.</p></noscript>
+  </div>
+  <div class="hitl-controls">
+    <button type="button" data-mode="small" aria-pressed="false">Small company</button>
+    <button type="button" data-mode="fortnight" aria-pressed="true">Steering every two weeks</button>
+    <button type="button" data-mode="month" aria-pressed="false">Steering every month</button>
+  </div>
+  <p class="hitl-readout" aria-live="polite"></p>
+  <figcaption>
+    Circles are decisions that are easy to undo, which the team makes itself. Squares are decisions that aren’t, which go up: in a small company to the owner at lunch, in a large one to a steering group that also hears other teams’ decisions (the faint squares). Invented rates, not data.
+  </figcaption>
+</figure>
+
+<style>
+  .slow-doors .hitl-stage {
+    padding: 0;
+    overflow: hidden;
+  }
+  .slow-canvas {
+    display: block;
+    width: 100%;
+    aspect-ratio: 5 / 2;
+  }
+</style>
+
+<script>
+  import { mulberry, exp, theme, fit, animate, label, reducedMotion, NARROW } from './canvas';
+
+  const WEEK = 2200; // ms per simulated week
+  const RATE = 4.7; // decisions a week from this team
+  const ONE_WAY = 0.15;
+  const OTHERS = 2.5; // one-way doors a week from other teams, in the large company
+  const MODES = {
+    small: { every: 1 / 7, cap: 3, title: 'Small company.' },
+    fortnight: { every: 2, cap: 8, title: 'Steering group every two weeks.' },
+    month: { every: 4, cap: 16, title: 'Steering group every month.' },
+  };
+  type Mode = keyof typeof MODES;
+  const TEAM = { x: 130, y: 280 };
+  const BOARD = { x: 560, y: 96, w: 190, h: 52 };
+  const DONE = { x: 900, y: 280 };
+
+  type State = 'team' | 'deciding' | 'queued' | 'done';
+  interface Decision {
+    oneWay: boolean;
+    /** From another team, straight into the steering group's queue. */
+    other: boolean;
+    born: number;
+    state: State;
+    until: number;
+    x: number;
+    y: number;
+    alpha: number;
+    /** A corner to turn on the way, so decisions follow the routes. */
+    via: { x: number; y: number } | null;
+  }
+
+  for (const figure of document.querySelectorAll<HTMLElement>('[data-slow-doors]')) {
+    const canvas = figure.querySelector<HTMLCanvasElement>('.slow-canvas')!;
+    const readout = figure.querySelector<HTMLElement>('.hitl-readout')!;
+    const buttons = [...figure.querySelectorAll<HTMLButtonElement>('[data-mode]')];
+    const reduced = reducedMotion();
+
+    let mode: Mode = 'fortnight';
+    let narrow = false;
+    let rand = mulberry(9);
+    let t = 0;
+    let nextArrival = 0;
+    let nextOther = Infinity;
+    let nextMeeting = 0;
+    let pulse = 0;
+    let items: Decision[] = [];
+    let queue: Decision[] = [];
+    let times = { two: [] as number[], one: [] as number[] };
+
+    const finish = (d: Decision) => {
+      if (d.state === 'queued') d.via = d.other ? null : { x: DONE.x, y: BOARD.y };
+      d.state = 'done';
+      if (d.other) return;
+      const list = d.oneWay ? times.one : times.two;
+      list.push((t - d.born) * 7);
+      if (list.length > 60) list.shift();
+    };
+    const step = (until: number) => {
+      const m = MODES[mode];
+      for (;;) {
+        const due = items.filter((d) => (d.state === 'team' || d.state === 'deciding') && d.until <= until).sort((a, b) => a.until - b.until)[0];
+        const next = Math.min(nextArrival, nextOther, nextMeeting, due ? due.until : Infinity);
+        if (next > until) break;
+        t = next;
+        if (t === nextArrival) {
+          items.push({ oneWay: rand() < ONE_WAY, other: false, born: t, state: 'team', until: t + 0.12, x: 20, y: TEAM.y, alpha: 0, via: null });
+          nextArrival = t + exp(rand, 1 / RATE);
+        } else if (t === nextOther) {
+          const d: Decision = { oneWay: true, other: true, born: t, state: 'queued', until: t, x: BOARD.x - BOARD.w / 2 - 60, y: -20, alpha: 0, via: null };
+          items.push(d);
+          queue.push(d);
+          nextOther = t + exp(rand, 1 / OTHERS);
+        } else if (t === nextMeeting) {
+          for (const d of queue.splice(0, m.cap)) finish(d);
+          pulse = 1;
+          nextMeeting = t + m.every;
+        } else if (due) {
+          if (due.state === 'deciding') finish(due);
+          else if (!due.oneWay) {
+            // The team decides it, usually within a day.
+            due.state = 'deciding';
+            due.until = t + exp(rand, 0.6 / 7);
+          } else {
+            due.state = 'queued';
+            due.via = { x: TEAM.x, y: BOARD.y };
+            queue.push(due);
+          }
+        }
+      }
+      t = until;
+    };
+
+    /** Where each decision should be: at the team, waiting to go up, or decided. */
+    const target = (d: Decision) => {
+      if (d.state === 'team' || d.state === 'deciding') {
+        const k = items.indexOf(d) % 7;
+        return { x: TEAM.x + (d.state === 'deciding' ? 70 : 0) + ((k % 4) - 1.5) * 10, y: TEAM.y + (Math.floor(k / 4) - 0.5) * 12 };
+      }
+      if (d.state === 'queued') {
+        const j = queue.indexOf(d);
+        const per = narrow ? 8 : 12;
+        return { x: BOARD.x - BOARD.w / 2 - 20 - (j % per) * 15, y: BOARD.y - 14 + Math.floor(j / per) * 15 };
+      }
+      if (d.other) return { x: BOARD.x + BOARD.w / 2 + 40, y: -30 };
+      return { x: DONE.x + 40, y: DONE.y };
+    };
+
+    /** Starts afresh under this way of deciding, already settled into its usual state. */
+    const reset = (m: Mode) => {
+      mode = m;
+      rand = mulberry(9);
+      t = 0;
+      items = [];
+      queue = [];
+      times = { two: [], one: [] };
+      nextArrival = exp(rand, 1 / RATE);
+      nextOther = m === 'small' ? Infinity : exp(rand, 1 / OTHERS);
+      nextMeeting = MODES[m].every;
+      // Part way between meetings, so the picture isn't always just after one.
+      step(60 + MODES[m].every * 0.6);
+      items = items.filter((d) => d.state !== 'done');
+      for (const d of items) Object.assign(d, target(d), { alpha: reduced ? 1 : 0, via: null });
+      for (const b of buttons) b.setAttribute('aria-pressed', String(b.dataset.mode === m));
+    };
+
+    const draw = () => {
+      const px = view.px;
+      clear(c.paper);
+      const small = mode === 'small';
+      ctx.lineWidth = 1.2;
+      // The routes: up and over for one-way doors, straight across for two-way.
+      ctx.strokeStyle = c.muted;
+      ctx.globalAlpha = 0.9;
+      ctx.beginPath();
+      ctx.moveTo(TEAM.x, TEAM.y - 30);
+      ctx.lineTo(TEAM.x, BOARD.y);
+      ctx.lineTo(BOARD.x - BOARD.w / 2, BOARD.y);
+      ctx.moveTo(BOARD.x + BOARD.w / 2, BOARD.y);
+      ctx.lineTo(DONE.x, BOARD.y);
+      ctx.lineTo(DONE.x, DONE.y - 30);
+      ctx.moveTo(TEAM.x + 40, TEAM.y);
+      ctx.lineTo(DONE.x - 40, DONE.y);
+      ctx.stroke();
+      // Other teams' decisions come in from above.
+      if (!small) {
+        ctx.setLineDash([3, 4]);
+        ctx.strokeStyle = c.rule;
+        ctx.beginPath();
+        ctx.moveTo(BOARD.x - BOARD.w / 2 - 60, 0);
+        ctx.lineTo(BOARD.x - BOARD.w / 2 - 60, BOARD.y - 30);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      ctx.globalAlpha = 1;
+
+      // Whoever decides the one-way doors, lit when they meet.
+      ctx.fillStyle = c.paper;
+      ctx.fillRect(BOARD.x - BOARD.w / 2, BOARD.y - BOARD.h / 2, BOARD.w, BOARD.h);
+      ctx.globalAlpha = 0.25 * pulse;
+      ctx.fillStyle = c.accent;
+      ctx.fillRect(BOARD.x - BOARD.w / 2, BOARD.y - BOARD.h / 2, BOARD.w, BOARD.h);
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = pulse > 0.1 ? c.strong : c.muted;
+      ctx.strokeRect(BOARD.x - BOARD.w / 2, BOARD.y - BOARD.h / 2, BOARD.w, BOARD.h);
+      ctx.font = `600 ${(narrow ? 10 : 12) * px}px ${c.font}`;
+      label(ctx, c, px, small ? 'THE OWNER, AT LUNCH' : 'STEERING GROUP', BOARD.x, BOARD.y + 4 * px, c.ink);
+      ctx.font = `${11 * px}px ${c.font}`;
+      const days = Math.max(0, Math.ceil((nextMeeting - t) * 7));
+      label(ctx, c, px, small ? 'every day' : `meets in ${days} day${days === 1 ? '' : 's'}`, BOARD.x, BOARD.y + BOARD.h / 2 + 18 * px, c.muted);
+
+      ctx.font = `600 ${(narrow ? 10 : 12) * px}px ${c.font}`;
+      label(ctx, c, px, 'TEAM', TEAM.x, TEAM.y + 46, c.muted);
+      label(ctx, c, px, 'DECIDED', DONE.x, DONE.y + 46, c.muted);
+
+      // Decisions: circles are two-way doors, squares one-way; other teams' are faint.
+      for (const d of items) {
+        ctx.globalAlpha = d.alpha * (d.other ? 0.35 : 1);
+        ctx.fillStyle = d.other ? c.muted : d.oneWay ? c.strong : c.ink;
+        if (d.oneWay) ctx.fillRect(d.x - 5.5, d.y - 5.5, 11, 11);
+        else {
+          ctx.beginPath();
+          ctx.arc(d.x, d.y, 4.6, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      ctx.globalAlpha = 1;
+    };
+
+    const c = theme(figure, () => draw());
+    const { ctx, view, clear } = fit(
+      canvas,
+      (width) => {
+        // On a phone the team, the deciders and decided move closer together.
+        narrow = width < NARROW;
+        TEAM.x = narrow ? 70 : 130;
+        DONE.x = narrow ? 530 : 900;
+        BOARD.x = narrow ? 310 : 560;
+        BOARD.w = narrow ? 240 : 190;
+        return { W: narrow ? 600 : 1000, H: 400 };
+      },
+      () => draw(),
+    );
+
+    const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+    const days = (xs: number[]) => {
+      if (!xs.length) return '…';
+      const d = Math.round(mean(xs));
+      return `${d} day${d === 1 ? '' : 's'}`;
+    };
+    const describe = () => {
+      const waiting = queue.length;
+      const mine = queue.filter((d) => !d.other).length;
+      const note = mode === 'small' ? '' : `${waiting} waiting for the steering group, ${mine} of them from this team.`;
+      readout.innerHTML = `<strong>${MODES[mode].title}</strong> From question to answer, one-way doors take about ${days(times.one)} and two-way doors about ${days(times.two)}. <span class="hitl-note">${note}</span>`;
+    };
+
+    for (const b of buttons)
+      b.addEventListener('click', () => {
+        reset(b.dataset.mode as Mode);
+        describe();
+        draw();
+      });
+
+    animate(figure, (dt) => {
+      step(t + dt / WEEK);
+      const g = 1 - Math.exp(-dt / 160);
+      for (const d of items) {
+        if (d.via && Math.hypot(d.via.x - d.x, d.via.y - d.y) < 14) d.via = null;
+        const aim = d.via ?? target(d);
+        d.x += (aim.x - d.x) * g;
+        d.y += (aim.y - d.y) * g;
+        const fadeOut = d.state === 'done' && !d.via && Math.hypot(d.x - aim.x, d.y - aim.y) < 30;
+        d.alpha += ((fadeOut ? 0 : 1) - d.alpha) * (1 - Math.exp(-dt / 220));
+      }
+      items = items.filter((d) => !(d.state === 'done' && d.alpha < 0.02));
+      pulse *= Math.exp(-dt / 500);
+      describe();
+      draw();
+    });
+
+    reset(mode);
+    describe();
+    draw();
+  }
+</script>

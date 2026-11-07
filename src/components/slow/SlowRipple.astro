@@ -1,0 +1,370 @@
+---
+import '../../styles/hitl.css';
+
+/**
+ * The same software owned two ways. Sixty parts, each depending on a few
+ * others; change one and everything that depends on it may have to change too,
+ * and so on outward. In the large company the parts belong to six teams; in the
+ * small one, to one team. The wiring is identical, so a change reaches the same
+ * parts either way; what differs is how many teams own them. Wired from a fixed
+ * seed so that a change reaches about a quarter of the parts on average. A
+ * sketch.
+ */
+const teams = ['Checkout', 'Stock', 'Payments', 'Loyalty', 'Delivery', 'Reporting'];
+---
+
+<figure class="hitl slow-ripple" data-slow-ripple data-teams={JSON.stringify(teams)}>
+  <div class="hitl-stage">
+    <canvas class="slow-canvas" aria-label="Sixty parts of a company's software with lines for what depends on what, owned either by six teams or by one. Changing one part lights up every part that depends on it, then everything that depends on those."></canvas>
+    <noscript><p class="hitl-note">The figure is drawn with JavaScript.</p></noscript>
+  </div>
+  <div class="hitl-controls">
+    <button type="button" data-mode="large" aria-pressed="true">Large company</button>
+    <button type="button" data-mode="small" aria-pressed="false">Small company</button>
+    <span class="hitl-spacer"></span>
+    <button type="button" data-act="change">Change a part</button>
+  </div>
+  <p class="hitl-readout" aria-live="polite"></p>
+  <figcaption>
+    Each circle is a part of the company’s software, and each line says one part depends on another. Click a part to change it, or let the figure pick one. The parts and lines are the same in both companies; only who owns them changes. A sketch.
+  </figcaption>
+</figure>
+
+<style>
+  .slow-ripple .hitl-stage {
+    padding: 0;
+    overflow: hidden;
+  }
+  .slow-canvas {
+    display: block;
+    width: 100%;
+    aspect-ratio: 25 / 13;
+    cursor: pointer;
+  }
+</style>
+
+<script>
+  import { mulberry, theme, fit, animate, label, reducedMotion, NARROW } from './canvas';
+
+  const PER = 10;
+  const HOP = 420; // ms for a change to pass along one dependency
+  const HOLD = 2600; // ms the lit parts stay lit once it has spread
+  const GOLDEN = Math.PI * (3 - Math.sqrt(5));
+
+  interface Part {
+    x: number;
+    y: number;
+    /** Where it sits in its team, from the team's centre, and in the one big team. */
+    dx: number;
+    dy: number;
+    sx: number;
+    sy: number;
+    team: number;
+    /** When the current change reaches it, or Infinity; and how lit it is. */
+    hit: number;
+    lit: number;
+    /** The part it was reached from, for the moving dot. */
+    via: number;
+  }
+
+  /**
+   * Dependencies as [dependent, dependency]. Inside each team, every part
+   * depends on one or two earlier parts; a few parts depend on another team's
+   * last part, and some more depend on parts elsewhere at random.
+   */
+  function wire(n: number) {
+    const rand = mulberry(3);
+    const edges: [number, number][] = [];
+    const add = (a: number, b: number) => {
+      if (a !== b && !edges.some(([x, y]) => x === a && y === b)) edges.push([a, b]);
+    };
+    for (let t = 0; t < n; t++)
+      for (let i = 1; i < PER; i++) {
+        const a = t * PER + i;
+        add(a, t * PER + Math.floor(rand() * i));
+        if (rand() < 0.4) add(a, t * PER + Math.floor(rand() * i));
+      }
+    for (let t = 0; t < n; t++) {
+      const a = t * PER + 1 + Math.floor(rand() * (PER - 1));
+      const u = (t + 1 + Math.floor(rand() * (n - 1))) % n;
+      add(a, u * PER + PER - 1);
+    }
+    for (let k = 0; k < 20; k++) {
+      const a = Math.floor(rand() * n * PER);
+      const b = Math.floor(rand() * n * PER);
+      if (Math.floor(a / PER) !== Math.floor(b / PER)) add(a, b);
+    }
+    return edges;
+  }
+
+  /** Everything that depends on `s`, directly or not, with how many steps away. */
+  function spread(edges: [number, number][], count: number, s: number) {
+    const dependents: number[][] = Array.from({ length: count }, () => []);
+    for (const [a, b] of edges) dependents[b].push(a);
+    const hops = new Map<number, { hop: number; via: number }>([[s, { hop: 0, via: -1 }]]);
+    const queue = [s];
+    while (queue.length) {
+      const x = queue.shift()!;
+      for (const y of dependents[x])
+        if (!hops.has(y)) {
+          hops.set(y, { hop: hops.get(x)!.hop + 1, via: x });
+          queue.push(y);
+        }
+    }
+    return hops;
+  }
+
+  for (const figure of document.querySelectorAll<HTMLElement>('[data-slow-ripple]')) {
+    const names: string[] = JSON.parse(figure.dataset.teams!);
+    const canvas = figure.querySelector<HTMLCanvasElement>('.slow-canvas')!;
+    const readout = figure.querySelector<HTMLElement>('.hitl-readout')!;
+    const modes = [...figure.querySelectorAll<HTMLButtonElement>('[data-mode]')];
+    const change = figure.querySelector<HTMLButtonElement>('[data-act="change"]')!;
+    const reduced = reducedMotion();
+    const rand = mulberry(11);
+
+    let mode: 'large' | 'small' = 'large';
+    let together = 0; // 0 drawn as six teams, 1 as one
+
+    // Six teams in two rows of three, or three rows of two on a phone; parts
+    // fill each team in a small spiral. The small company is one big spiral.
+    let narrow = false;
+    let W = 1000;
+    let H = 520;
+    const centre = (t: number) =>
+      narrow ? { x: 160 + (t % 2) * 280, y: 115 + Math.floor(t / 2) * 235 } : { x: 190 + (t % 3) * 310, y: 150 + Math.floor(t / 3) * 225 };
+    const middle = () => ({ x: W / 2, y: H / 2 - 12 });
+    const parts: Part[] = [];
+    names.forEach((_, t) => {
+      for (let i = 0; i < PER; i++) {
+        const r = 17 * Math.sqrt(i + 0.6);
+        const a = i * GOLDEN + t;
+        const j = t * PER + i;
+        const R = 19 * Math.sqrt(j + 0.6);
+        const A = j * GOLDEN;
+        parts.push({ x: 0, y: 0, dx: r * Math.cos(a), dy: r * Math.sin(a), sx: R * Math.cos(A), sy: R * Math.sin(A), team: t, hit: Infinity, lit: 0, via: -1 });
+      }
+    });
+    const home = (p: Part) => {
+      const o = centre(p.team);
+      const m = middle();
+      return { x: o.x + p.dx + (m.x + p.sx - o.x - p.dx) * ease(together), y: o.y + p.dy + (m.y + p.sy - o.y - p.dy) * ease(together) };
+    };
+    const ease = (t: number) => t * t * (3 - 2 * t);
+    const place = () => {
+      for (const p of parts) Object.assign(p, home(p));
+    };
+    const layout = (width: number) => {
+      narrow = width < NARROW;
+      W = narrow ? 600 : 1000;
+      H = narrow ? 760 : 520;
+      place();
+      return { W, H };
+    };
+
+    const edges = wire(names.length);
+    let average = 0;
+    for (let s = 0; s < parts.length; s++) average += spread(edges, parts.length, s).size - 1;
+    average /= parts.length * (parts.length - 1);
+    const sizes = parts.map((_, s) => spread(edges, parts.length, s).size - 1);
+
+    let now = performance.now();
+    let source = -1;
+    let started = 0;
+    let reached = new Map<number, { hop: number; via: number }>();
+    let finish = 0;
+
+    const draw = () => {
+      const px = view.px;
+      clear(c.paper);
+
+      // How lit each team is, for its outline.
+      const teamLit = names.map((_, t) => Math.max(0, ...parts.filter((p) => p.team === t).map((p) => p.lit)));
+      const anyLit = Math.max(...teamLit);
+      ctx.font = `600 ${11 * px}px ${c.font}`;
+      // The six teams, fading out as they merge.
+      if (together < 0.99)
+        names.forEach((name, t) => {
+          const { x: cx, y: cy } = centre(t);
+          const lit = teamLit[t];
+          ctx.globalAlpha = 1 - together;
+          ctx.beginPath();
+          ctx.arc(cx, cy, 78, 0, Math.PI * 2);
+          ctx.fillStyle = c.accent;
+          ctx.globalAlpha = (1 - together) * 0.12 * lit;
+          ctx.fill();
+          ctx.globalAlpha = (1 - together) * (0.5 + 0.5 * lit);
+          ctx.lineWidth = 1;
+          ctx.strokeStyle = lit > 0.05 ? c.strong : c.rule;
+          ctx.stroke();
+          ctx.globalAlpha = 1 - together;
+          label(ctx, c, px, name.toUpperCase(), cx, cy + 78 + 18 * px, lit > 0.05 ? c.strong : c.muted);
+        });
+      // The one team, fading in.
+      if (together > 0.01) {
+        const m = middle();
+        const r = 19 * Math.sqrt(parts.length) + 22;
+        ctx.globalAlpha = together * 0.12 * anyLit;
+        ctx.fillStyle = c.accent;
+        ctx.beginPath();
+        ctx.arc(m.x, m.y, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = together * (0.5 + 0.5 * anyLit);
+        ctx.strokeStyle = anyLit > 0.05 ? c.strong : c.rule;
+        ctx.stroke();
+        ctx.globalAlpha = together;
+        label(ctx, c, px, 'ONE TEAM', m.x, m.y + r + 18 * px, anyLit > 0.05 ? c.strong : c.muted);
+      }
+
+      // Dependencies: muted, and accent where the change has passed along them.
+      for (const [a, b] of edges) {
+        const pa = parts[a];
+        const pb = parts[b];
+        const carried = pa.via === b ? Math.min(pa.lit, pb.lit) : 0;
+        ctx.globalAlpha = 0.35 + 0.55 * carried;
+        ctx.strokeStyle = carried > 0.05 ? c.strong : c.muted;
+        ctx.lineWidth = carried > 0.05 ? 1.6 : 1;
+        ctx.beginPath();
+        ctx.moveTo(pa.x, pa.y);
+        ctx.lineTo(pb.x, pb.y);
+        ctx.stroke();
+      }
+
+      // The change on its way, a dot per dependency it is crossing now.
+      ctx.fillStyle = c.strong;
+      ctx.globalAlpha = 1;
+      for (const [i, r] of reached) {
+        if (r.via < 0) continue;
+        const t = (now - (started + (r.hop - 1) * HOP)) / HOP;
+        if (t <= 0 || t >= 1) continue;
+        const from = parts[r.via];
+        const to = parts[i];
+        const e = ease(t);
+        ctx.beginPath();
+        ctx.arc(from.x + (to.x - from.x) * e, from.y + (to.y - from.y) * e, 3.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Parts.
+      parts.forEach((p, i) => {
+        ctx.globalAlpha = 1;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 6.5, 0, Math.PI * 2);
+        ctx.fillStyle = c.paper;
+        ctx.fill();
+        if (p.lit > 0.01) {
+          ctx.globalAlpha = p.lit;
+          ctx.fillStyle = i === source ? c.ink : c.strong;
+          ctx.fill();
+          ctx.globalAlpha = 1;
+        }
+        ctx.lineWidth = 1.3;
+        ctx.strokeStyle = p.lit > 0.05 ? c.strong : c.muted;
+        ctx.stroke();
+        if (i === source && p.lit > 0.05) {
+          ctx.globalAlpha = p.lit;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 11, 0, Math.PI * 2);
+          ctx.strokeStyle = c.ink;
+          ctx.stroke();
+        }
+      });
+      ctx.globalAlpha = 1;
+    };
+
+    const c = theme(figure, () => draw());
+    const { ctx, view, clear } = fit(canvas, layout, () => draw());
+
+    const describe = (done: boolean) => {
+      const title = mode === 'large' ? 'Large company.' : 'Small company.';
+      const avg = `On average a change here reaches ${Math.round(average * 100)}% of the other parts.`;
+      if (source < 0) {
+        readout.innerHTML = `<strong>${title}</strong> <span class="hitl-note">${avg}</span>`;
+        return;
+      }
+      const arrived = [...reached.keys()].filter((i) => reduced || done || started + reached.get(i)!.hop * HOP <= now);
+      const n = arrived.length - 1;
+      const owners = new Set(arrived.map((i) => parts[i].team)).size;
+      const who = mode === 'small' ? 'all owned by the one team' : owners === 1 ? 'all owned by one team' : `owned by ${owners} teams`;
+      readout.innerHTML = `<strong>${title}</strong> The change has reached ${n} of the other ${parts.length - 1} parts, ${who}. <span class="hitl-note">${avg}</span>`;
+    };
+
+    const trigger = (s: number) => {
+      now = performance.now();
+      source = s;
+      started = now;
+      reached = spread(edges, parts.length, s);
+      let far = 0;
+      parts.forEach((p, i) => {
+        const r = reached.get(i);
+        p.hit = r ? started + r.hop * HOP : Infinity;
+        p.via = r ? r.via : -1;
+        if (reduced) p.lit = r ? 1 : 0;
+        if (r) far = Math.max(far, r.hop);
+      });
+      finish = started + far * HOP + HOLD;
+      describe(reduced);
+      if (reduced) draw();
+    };
+
+    /** A part whose change spreads about as far as is typical, so the auto-play is fair. */
+    const pick = () => {
+      for (let k = 0; k < 40; k++) {
+        const s = Math.floor(rand() * parts.length);
+        if (sizes[s] >= average * (parts.length - 1) * 0.8) return s;
+      }
+      return Math.floor(rand() * parts.length);
+    };
+
+    const setMode = (m: 'large' | 'small') => {
+      mode = m;
+      for (const b of modes) b.setAttribute('aria-pressed', String(b.dataset.mode === m));
+      if (reduced) {
+        together = m === 'small' ? 1 : 0;
+        place();
+      }
+      // Change the same part again, now owned the other way.
+      trigger(source >= 0 ? source : pick());
+    };
+    for (const b of modes) b.addEventListener('click', () => setMode(b.dataset.mode as 'large' | 'small'));
+    change.addEventListener('click', () => trigger(pick()));
+
+    canvas.addEventListener('click', (ev) => {
+      const rect = canvas.getBoundingClientRect();
+      const x = ((ev.clientX - rect.left) / rect.width) * W;
+      const y = ((ev.clientY - rect.top) / rect.height) * H;
+      let best = -1;
+      let bd = 26 ** 2;
+      parts.forEach((p, i) => {
+        const d = (p.x - x) ** 2 + (p.y - y) ** 2;
+        if (d < bd) {
+          bd = d;
+          best = i;
+        }
+      });
+      if (best >= 0) trigger(best);
+    });
+
+    animate(figure, (dt) => {
+      now = performance.now();
+      const aim = mode === 'small' ? 1 : 0;
+      if (together !== aim) {
+        together += Math.sign(aim - together) * Math.min(Math.abs(aim - together), dt / 900);
+        place();
+      }
+      const fading = now > finish;
+      for (const p of parts) {
+        const target = !fading && now >= p.hit ? 1 : 0;
+        p.lit += (target - p.lit) * (target ? 1 - Math.exp(-dt / 90) : 1 - Math.exp(-dt / 350));
+      }
+      if (source >= 0 && !fading) describe(false);
+      // Once the last one has faded, change another part.
+      if (fading && now > finish + 900) trigger(pick());
+      draw();
+    });
+
+    trigger(pick());
+    if (reduced) describe(true);
+    draw();
+  }
+</script>

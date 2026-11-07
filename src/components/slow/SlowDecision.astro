@@ -1,0 +1,130 @@
+---
+import '../../styles/hitl.css';
+import './loop.css';
+---
+<figure class="hitl slow-loop decision" data-decision>
+  <div class="hitl-stage">
+    <canvas role="img" aria-label="Small decisions move straight through the teams. Some proposals rise to area leads; a few, including the orange delivery proposal, need leadership to choose between competing priorities. Quarterly rounds pass: other work is chosen in Q1 and Q2, and the delivery proposal is approved in Q3 before returning to team plans. The teams keep working throughout."></canvas>
+    <button class="loop-pause" data-pause-loop type="button" aria-label="Pause animation" aria-pressed="false">Ⅱ</button>
+    <p class="decision-status" data-decision-status>The delivery proposal needs a decision across teams.</p>
+    <noscript><p>Teams decide local work themselves. Bigger decisions go up. In this example, the delivery proposal waits through two quarterly rounds before being approved in the third.</p></noscript>
+  </div>
+  <figcaption>Small decisions stay close to the work. Bigger ones go up, and may wait several quarters for a place in the plans. A sketch with invented timings.</figcaption>
+</figure>
+<style>
+  .decision-status { margin: 0; padding: 1rem 1.25rem; border-top: 1px solid var(--rule); font-size: 0.8125rem; color: var(--ink-muted); min-height: 4.5rem; box-sizing: border-box; }
+</style>
+<script>
+  import { theme, fit, ball, HUES, isDark } from './canvas';
+  import { loop, ease, clamp } from './loop';
+  type Point = { x: number; y: number };
+  const DURATION = 13200;
+  // Three invented quarterly rounds. Approval is a decision, not completed work.
+  const ROUNDS = [3000, 6400, 9800];
+  const interpolate = (a:Point,b:Point,p:number):Point => ({x:a.x+(b.x-a.x)*p,y:a.y+(b.y-a.y)*p});
+  const travel = (points:Point[],p:number):Point => {
+    const lengths=points.slice(1).map((b,i)=>Math.hypot(b.x-points[i].x,b.y-points[i].y));
+    let distance=clamp(p)*lengths.reduce((sum,n)=>sum+n,0);
+    for(let i=0;i<lengths.length;i++) {
+      if(distance<=lengths[i]) return interpolate(points[i],points[i+1],distance/lengths[i]);
+      distance-=lengths[i];
+    }
+    return points[points.length-1];
+  };
+  for (const figure of document.querySelectorAll<HTMLElement>('[data-decision]')) {
+    let time=0, lastStatus='';
+    let draw=()=>{};
+    const status=figure.querySelector<HTMLElement>('[data-decision-status]')!;
+    const c=theme(figure,()=>draw());
+    const {ctx,view,clear}=fit(figure.querySelector('canvas')!,width=>({W:width,H:408}),()=>draw());
+    draw=()=>{
+      clear(c.paper);
+      const w=view.W, narrow=w<560, dark=isDark(c);
+      const orange=HUES.ours[dark?1:0], grey=dark?'#9eabbc':'#7b8b9e';
+      const x0=w*.40, rise=w*.56, gate=w*.76, end=w*.91;
+      const bottom=274, middle=184, top=94;
+      const point=(x:number,y:number):Point=>({x,y});
+      const path=(points:Point[],colour=dark?'#4b514e':'#bec4bc',dash=false)=>{
+        ctx.strokeStyle=colour;ctx.lineWidth=1.5;ctx.lineJoin='round';ctx.lineCap='round';ctx.setLineDash(dash?[3,5]:[]);
+        ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.stroke();ctx.setLineDash([]);
+      };
+      const text=(s:string,x:number,y:number,colour=c.muted,size=12,align:CanvasTextAlign='left')=>{
+        ctx.font=`${size}px ${c.font}`;ctx.textBaseline='middle';ctx.textAlign=align;ctx.fillStyle=colour;ctx.fillText(s,x,y);
+      };
+      const body=(p:Point,r:number,colour:string,age=1000)=>{
+        const squash=1-.17*Math.exp(-Math.max(0,age)/160)*Math.cos(Math.max(0,age)/60);
+        ctx.fillStyle=c.rule;ctx.beginPath();ctx.ellipse(p.x,p.y+r+3,r*.85,2,0,0,Math.PI*2);ctx.fill();
+        ball(ctx,p.x,p.y+r*(1-squash),r,colour,squash);
+      };
+      ball(ctx,22,25,5,orange);text('Delivery dates',34,25);
+      ball(ctx,147,25,5,grey);text('Other work',159,25);
+      const labelX=narrow?16:24;
+      text('Leadership',labelX,top-4,c.ink,narrow?12:14);
+      text('Quarterly priorities',labelX,top+15,c.muted,narrow?10:12);
+      text('Area leads',labelX,middle-4,c.ink,narrow?12:14);
+      text('Across teams',labelX,middle+15,c.muted,narrow?10:12);
+      text('Teams',labelX,bottom-4,c.ink,narrow?12:14);
+      text('Local decisions',labelX,bottom+15,c.muted,narrow?10:12);
+      const local=[point(x0,bottom),point(end,bottom)];
+      const area=[point(x0,bottom),point(x0,middle),point(end-12,middle),point(end-12,bottom)];
+      const up=[point(rise,middle),point(rise,top),point(gate,top)];
+      const down=[point(gate,top),point(end,top),point(end,bottom)];
+      path(local);path(area);path(up);path(down);
+      // Upward arrowheads make escalation readable in a still frame.
+      for(const [x,y] of [[x0,230],[rise,140]]) path([point(x-4,y+4),point(x,y),point(x+4,y+4)],c.muted);
+      text('Into team plans',end,311,c.muted,narrow?10:12,'right');
+      // Local decisions never approach the quarterly gate.
+      for(let i=0;i<4;i++) {
+        const p=((time+i*650)%2600)/2600;
+        const at=travel(local,p);at.y-=Math.sin(p*Math.PI*4)**2*4;
+        ctx.globalAlpha=Math.min(1,p*10,(1-p)*10);body(at,6,grey);ctx.globalAlpha=1;
+      }
+      // Some decisions go one level up and return without reaching leadership.
+      for(let i=0;i<2;i++) {
+        const p=((time+i*2100)%4200)/4200;
+        ctx.globalAlpha=Math.min(1,p*12,(1-p)*12);body(travel(area,ease(p)),7,grey);ctx.globalAlpha=1;
+      }
+      // Other large proposals wait upstairs too, then get selected at each round.
+      ROUNDS.forEach((round,i)=>{
+        if(time>round+1600)return;
+        let at=point(gate-16-i*(narrow?15:23),top);
+        if(time<round-1700) {
+          const p=ease((time-(round-3500))/1800);
+          at=travel([point(rise,middle),point(rise,top),at],p);
+          ctx.globalAlpha=clamp((time-(round-3500))/250);
+        } else if(time>round) at=travel([at,...down],ease((time-round)/1500));
+        body(at,7,grey);ctx.globalAlpha=1;
+      });
+      // Only the company-wide lane has a gate, opening at quarterly rounds.
+      const opening=Math.max(...ROUNDS.map((at,i)=>ease((time-at+180)/220)*(1-ease((time-at-(i===2?1300:700))/250))));
+      ctx.strokeStyle=c.muted;ctx.lineWidth=3;ctx.lineCap='round';
+      ctx.beginPath();ctx.moveTo(gate,top+14);ctx.lineTo(gate,top+26);ctx.stroke();
+      ctx.save();ctx.translate(gate,top+14);ctx.rotate(opening*Math.PI*.46);
+      ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(0,-40);ctx.stroke();ctx.restore();
+      const waiting=point(rise,top);
+      let ours:Point;
+      if(time<900) ours=travel([point(x0,bottom),point(x0,middle)],ease(time/900));
+      else if(time<1600) ours=interpolate(point(x0,middle),point(rise,middle),ease((time-900)/700));
+      else if(time<2500) ours=interpolate(point(rise,middle),waiting,ease((time-1600)/900));
+      else if(time<10100) ours=waiting;
+      else ours=travel([waiting,...down],ease((time-10100)/1600));
+      // A small pulse holds attention on the waiting proposal, without moving it around.
+      ctx.globalAlpha=.12;ctx.fillStyle=orange;ctx.beginPath();ctx.arc(ours.x,ours.y,17+Math.sin(time/500)*1.5,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
+      body(ours,10.5,orange,time<10100?time-2500:time-11700);
+      if(time>=2500&&time<10100) text('Waiting',rise,top-29,orange,11,'center');
+      // The same proposal stays put while a whole quarter passes underneath it.
+      const left=24,right=w-24,span=(right-left)/3,y=351;
+      for(let i=0;i<3;i++) {
+        const selected=time>=ROUNDS[i];
+        ctx.fillStyle=c.rule;ctx.beginPath();ctx.roundRect(left+i*span,y,span-5,5,2);ctx.fill();
+        const progress=clamp((Math.min(time,10200)-i*3400)/3400);
+        if(progress>0){ctx.fillStyle=orange;ctx.beginPath();ctx.roundRect(left+i*span,y,(span-5)*progress,5,2);ctx.fill();}
+        text(`Q${i+1}`,left+i*span,y-14,c.ink,12);
+        text(selected?(i===2?'Approved':'Other work chosen'):'Planning round',left+i*span,y+22,selected&&i===2?orange:c.muted,narrow?9:11);
+      }
+      const message=time<2500?'The delivery proposal needs a decision across teams.':time<3000?'It reaches leadership and waits for the next planning round.':time<6400?'Q1: other work is chosen. The teams carry on; this proposal waits.':time<9800?'Q2: deferred again. Another quarter passes before the next round.':time<11700?'Q3: approved. The work can now join the teams’ plans.':'Approval is only the start. Each team still has its own queue.';
+      if(message!==lastStatus){status.textContent=message;lastStatus=message;}
+    };
+    loop(figure,DURATION,7600,t=>{time=t;draw();});
+  }
+</script>

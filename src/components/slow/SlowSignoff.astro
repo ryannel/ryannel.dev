@@ -1,0 +1,273 @@
+---
+import '../../styles/hitl.css';
+
+/**
+ * Legal sign-off per country, for "Making the case" in
+ * notes/why-big-companies-are-slow. The proposal (orange) splits into a copy
+ * for each country's legal team. Each takes its own time, then stamps the
+ * promise in its own words. A strip along the bottom grows until the last one
+ * signs; then it loops.
+ *
+ * Review times are invented; it's a sketch.
+ */
+---
+
+<figure class="hitl slow-signoff" data-slow-signoff>
+  <div class="hitl-stage">
+    <canvas
+      class="slow-canvas"
+      aria-label="The proposal goes to the legal team in four countries. Each takes a different time and words the promise its own way: ships within 3 to 5 days in the United States, arrives in 3 to 5 days in the United Kingdom, and the same in German and French. The proposal is ready only when the slowest signs."
+    ></canvas>
+    <noscript><p class="hitl-note">The figure is drawn with JavaScript.</p></noscript>
+  </div>
+  <p class="hitl-readout" aria-live="polite"></p>
+  <figcaption>
+    Each country’s legal team signs off the promise in its own words. The strip is the time spent
+    waiting for all of them. A sketch with invented times.
+  </figcaption>
+</figure>
+
+<style>
+  .slow-signoff .hitl-stage {
+    padding: 0;
+    overflow: hidden;
+  }
+  .slow-canvas {
+    display: block;
+    width: 100%;
+  }
+</style>
+
+<script>
+  import { theme, fit, animate, label, reducedMotion, NARROW, ball, HUES, isDark } from './canvas';
+
+  const COUNTRIES: [string, string, [string, string, string], number][] = [
+    // name, code, the promise in its words (the part whose meaning differs in the middle), ms to review
+    ['United States', 'US', ['', 'Ships', ' within 3–5 days'], 2400],
+    ['United Kingdom', 'UK', ['Arrives in 3–5 days', '', ''], 3600],
+    ['Germany', 'DE', ['Lieferung in 3–5 ', 'Werktagen', ''], 6200],
+    ['France', 'FR', ['Livraison en 3 à 5 jours', '', ''], 4600],
+  ];
+  const SPLIT = 900; // ms before the proposal splits
+  const FLY = 650; // ms a copy takes to reach its country
+  const HOLD = 3600; // ms the finished picture stays before looping
+  const ON_ORANGE = '#3a210c';
+
+  for (const figure of document.querySelectorAll<HTMLElement>('[data-slow-signoff]')) {
+    const canvas = figure.querySelector<HTMLCanvasElement>('.slow-canvas')!;
+    const readout = figure.querySelector<HTMLElement>('.hitl-readout')!;
+    let narrow = false;
+
+    const layout = (w: number) => {
+      narrow = w < NARROW;
+      const W = narrow ? 600 : 1000;
+      return { W, H: (W / w) * (narrow ? 390 : 300) };
+    };
+    let draw = () => {};
+    const c = theme(figure, () => draw());
+    const { ctx, view, clear } = fit(canvas, layout, () => draw());
+    const px = (n: number) => n * view.px;
+
+    let t = 0; // ms into the loop
+    const START = SPLIT + FLY; // when the reviews begin
+    const doneAt = (i: number) => START + 120 * i + COUNTRIES[i][3];
+    const END = Math.max(...COUNTRIES.map((_, i) => doneAt(i)));
+
+    // Geometry.
+    const top = () => ({ x: view.W / 2, y: px(34) });
+    const card = (i: number) => {
+      const cols = narrow ? 2 : 4;
+      const gap = px(narrow ? 10 : 14);
+      const margin = px(narrow ? 12 : 16);
+      const w = (view.W - 2 * margin - gap * (cols - 1)) / cols;
+      const h = px(narrow ? 112 : 132);
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const y = px(78) + row * (h + gap);
+      return { x: margin + col * (w + gap), y, w, h };
+    };
+    const seat = (i: number) => {
+      const k = card(i);
+      return { x: k.x + k.w / 2, y: k.y + k.h * 0.47 };
+    };
+    const strip = () => {
+      const last = card(COUNTRIES.length - 1);
+      const y = last.y + last.h + px(narrow ? 34 : 34);
+      return { x0: px(narrow ? 12 : 16), x1: view.W - px(narrow ? 12 : 16), y };
+    };
+    const r = () => px(narrow ? 9 : 10);
+
+    const describe = () => {
+      readout.textContent =
+        t < START
+          ? 'The proposal goes to the legal team in each country.'
+          : t < END
+            ? 'Each checks the promise against its own rules, and words it its own way.'
+            : 'Ready to go only when the slowest has signed.';
+    };
+
+    draw = () => {
+      clear(c.paper);
+      const dk = isDark(c) ? 1 : 0;
+      const orange = HUES.ours[dk];
+      const T = top();
+      ctx.textBaseline = 'middle';
+
+      // The proposal at the top: whole until it splits, then glowing when all have signed.
+      const ready = t >= END;
+      const age = t - END;
+      let sq = 1;
+      if (ready) sq = 1 - 0.25 * Math.exp(-age / 160) * Math.cos(age / 60);
+      ctx.save();
+      ctx.globalAlpha = t < SPLIT || ready ? 1 : 0.35;
+      ball(ctx, T.x, T.y, r() * 1.25, orange, sq);
+      ctx.restore();
+      if (ready) {
+        ctx.strokeStyle = ON_ORANGE;
+        ctx.lineWidth = px(2.2);
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        const s = r() * 0.5;
+        ctx.beginPath();
+        ctx.moveTo(T.x - s, T.y);
+        ctx.lineTo(T.x - s * 0.2, T.y + s * 0.75);
+        ctx.lineTo(T.x + s, T.y - s * 0.7);
+        ctx.stroke();
+      }
+      ctx.font = `500 ${px(narrow ? 12 : 13)}px ${c.font}`;
+      label(ctx, c, view.px, ready ? 'Signed off' : 'Proposed: “Arrives in 3–5 days”', T.x + r() * 1.25 + px(10), T.y, c.muted, 'left');
+
+      COUNTRIES.forEach(([name, , words, review], i) => {
+        const k = card(i);
+        const done = doneAt(i);
+        const signed = t >= done;
+        ctx.beginPath();
+        ctx.roundRect(k.x, k.y, k.w, k.h, px(10));
+        ctx.fillStyle = signed ? (dk ? 'rgba(244,163,94,0.07)' : 'rgba(236,138,60,0.07)') : c.paper;
+        ctx.fill();
+        ctx.strokeStyle = signed ? orange : c.rule;
+        ctx.lineWidth = px(signed ? 1.5 : 1);
+        ctx.stroke();
+
+        ctx.font = `600 ${px(narrow ? 12 : 13)}px ${c.font}`;
+        ctx.textAlign = 'center';
+        ctx.fillStyle = c.ink;
+        ctx.fillText(name, k.x + k.w / 2, k.y + px(18));
+
+        // The copy: flying in, under review with its ring filling, then signed.
+        const fly = (t - SPLIT - 120 * i) / FLY;
+        if (fly <= 0) return;
+        const s = seat(i);
+        let x = s.x;
+        let y = s.y;
+        let bsq = 1;
+        if (fly < 1) {
+          x = T.x + (s.x - T.x) * fly;
+          y = T.y + (s.y - T.y) * fly - px(50) * 4 * fly * (1 - fly);
+        } else {
+          const land = (fly - 1) * FLY;
+          bsq = 1 - 0.28 * Math.exp(-land / 80) * Math.cos(land / 40);
+        }
+        ball(ctx, x, y + r() * (1 - bsq), r(), orange, bsq);
+        if (fly >= 1) {
+          const p = Math.min(1, Math.max(0, (t - (done - review)) / review));
+          ctx.lineWidth = px(2.5);
+          ctx.lineCap = 'round';
+          ctx.strokeStyle = c.rule;
+          ctx.beginPath();
+          ctx.arc(x, y, r() + px(6), 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.strokeStyle = orange;
+          ctx.beginPath();
+          ctx.arc(x, y, r() + px(6), -Math.PI / 2, -Math.PI / 2 + p * Math.PI * 2);
+          ctx.stroke();
+          if (signed) {
+            const sz = r() * 0.5;
+            ctx.strokeStyle = ON_ORANGE;
+            ctx.lineWidth = px(2);
+            ctx.beginPath();
+            ctx.moveTo(x - sz, y);
+            ctx.lineTo(x - sz * 0.2, y + sz * 0.75);
+            ctx.lineTo(x + sz, y - sz * 0.7);
+            ctx.stroke();
+          }
+        }
+
+        // Its words, stamped on.
+        if (signed) {
+          const a = t - done;
+          const z = 1 + 0.3 * Math.exp(-a / 150) * Math.cos(a / 55);
+          ctx.save();
+          ctx.translate(k.x + k.w / 2, k.y + k.h - px(narrow ? 18 : 22));
+          ctx.font = `600 ${px(narrow ? 11.5 : 13)}px ${c.font}`;
+          // The words that differ from country to country, in orange.
+          const parts = [`“${words[0]}`, words[1], `${words[2]}”`];
+          const widths = parts.map((w) => ctx.measureText(w).width);
+          const total = widths.reduce((a, b) => a + b, 0);
+          const fit = Math.min(1, (k.w - px(14)) / total);
+          ctx.scale(z * fit, z * fit);
+          ctx.textAlign = 'left';
+          let x = -total / 2;
+          parts.forEach((w, n) => {
+            ctx.fillStyle = n === 1 ? orange : c.ink;
+            ctx.fillText(w, x, 0);
+            x += widths[n];
+          });
+          ctx.restore();
+        }
+      });
+
+      // The wait: one strip, growing until the last country signs.
+      const S = strip();
+      const span = S.x1 - S.x0;
+      const scale = (ms: number) => S.x0 + (Math.max(0, ms - START) / (END - START)) * span;
+      const now = Math.min(t, END);
+      ctx.lineCap = 'round';
+      ctx.lineWidth = px(6);
+      ctx.strokeStyle = c.rule;
+      ctx.beginPath();
+      ctx.moveTo(S.x0, S.y);
+      ctx.lineTo(S.x1, S.y);
+      ctx.stroke();
+      if (t > START) {
+        ctx.strokeStyle = c.muted;
+        ctx.globalAlpha = 0.7;
+        ctx.beginPath();
+        ctx.moveTo(S.x0, S.y);
+        ctx.lineTo(scale(now), S.y);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+      ctx.font = `500 ${px(narrow ? 11 : 12)}px ${c.font}`;
+      COUNTRIES.forEach(([, code], i) => {
+        const at = doneAt(i);
+        if (t < at) return;
+        const x = scale(at);
+        ctx.fillStyle = orange;
+        ctx.beginPath();
+        ctx.arc(x, S.y, px(5), 0, Math.PI * 2);
+        ctx.fill();
+        label(ctx, c, view.px, code, Math.min(S.x1 - px(10), Math.max(S.x0 + px(10), x)), S.y - px(14), c.muted);
+      });
+      label(ctx, c, view.px, ready ? 'waited for the slowest' : 'waiting for sign-off', S.x0, S.y + px(17), c.muted, 'left');
+      label(ctx, c, view.px, 'time →', S.x1, S.y + px(17), c.muted, 'right');
+    };
+
+    let last = '';
+    const tick = (dt: number) => {
+      t += dt;
+      if (t > END + HOLD) t = 0;
+      const phase = t < START ? 'a' : t < END ? 'b' : 'c';
+      if (phase !== last) {
+        last = phase;
+        describe();
+      }
+      draw();
+    };
+
+    if (reducedMotion()) t = END + 1000;
+    describe();
+    draw();
+    animate(figure, tick);
+  }
+</script>

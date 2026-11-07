@@ -1,0 +1,245 @@
+---
+import '../../styles/hitl.css';
+
+/**
+ * Teams and the services they own, growing one team at a time. Each new team
+ * builds three services, and each new service leans on two that already
+ * exist, preferring the ones many others already use (the way a login or a
+ * payments service ends up underneath everything). The readout counts the
+ * pairs of teams whose services depend on each other, and how many teams a
+ * change to one service reaches on average once everything that depends on it,
+ * and everything that depends on those, is counted. Seeded, so the same team
+ * count always draws the same company. A sketch.
+ */
+---
+
+<figure class="hitl slow-web" data-slow-web>
+  <div class="hitl-stage">
+    <canvas class="slow-canvas" aria-label="Teams arranged in a ring, each with a few services, and lines for every service that depends on another. Adding teams adds lines between them faster than it adds teams."></canvas>
+    <noscript><p class="hitl-note">The figure is drawn with JavaScript.</p></noscript>
+  </div>
+  <div class="hitl-controls">
+    <label for="slow-web-teams" class="hitl-note">Teams</label>
+    <input id="slow-web-teams" type="range" min="1" max="16" step="1" value="1" />
+    <span class="slow-value" aria-hidden="true">1</span>
+    <span class="hitl-spacer"></span>
+    <button type="button" data-grow>Grow</button>
+  </div>
+  <p class="hitl-readout" aria-live="polite"></p>
+  <figcaption>
+    Each small circle is a service, grouped by the team that owns it. A line means one service depends on another; lines between teams are darker. Move the slider, or press Grow, to add teams one at a time. A sketch, with invented wiring.
+  </figcaption>
+</figure>
+
+<style>
+  .slow-web .hitl-stage {
+    padding: 0;
+    overflow: hidden;
+  }
+  .slow-canvas {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+  }
+  .slow-value {
+    min-width: 1.5rem;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+</style>
+
+<script>
+  import { mulberry, theme, fit, animate, reducedMotion } from './canvas';
+
+  const MAX = 16;
+  const PER_TEAM = 3;
+  const DEPS = 2;
+
+  interface Service {
+    team: number;
+    deps: number[];
+    /** Where it's drawn now, easing towards its place, and how visible. */
+    x: number;
+    y: number;
+    alpha: number;
+  }
+
+  // The whole company, wired once: team k's services are always the same, so sliding back and forth only shows or hides them.
+  const rand = mulberry(11);
+  const all: Service[] = [];
+  const used: number[] = [];
+  for (let team = 0; team < MAX; team++)
+    for (let s = 0; s < PER_TEAM; s++) {
+      const deps = new Set<number>();
+      // A team's first service stands alone at the start; after that, lean on what exists, the busier the likelier.
+      const want = all.length ? Math.min(DEPS, all.length) : 0;
+      while (deps.size < want) {
+        let r = rand() * used.reduce((a, u) => a + u + 1, 0);
+        const i = used.findIndex((u) => (r -= u + 1) <= 0);
+        deps.add(i < 0 ? used.length - 1 : i);
+      }
+      for (const d of deps) used[d]++;
+      all.push({ team, deps: [...deps], x: 0, y: 0, alpha: 0 });
+      used.push(0);
+    }
+
+  /** For the first n teams: pairs of teams tied together, and how many teams a change reaches on average. */
+  const measure = (n: number) => {
+    const count = n * PER_TEAM;
+    const dependents: number[][] = Array.from({ length: count }, () => []);
+    const pairs = new Set<string>();
+    for (let i = 0; i < count; i++)
+      for (const d of all[i].deps) {
+        dependents[d].push(i);
+        const a = Math.min(all[i].team, all[d].team);
+        const b = Math.max(all[i].team, all[d].team);
+        if (a !== b) pairs.add(`${a}-${b}`);
+      }
+    let reach = 0;
+    let most = 0;
+    for (let i = 0; i < count; i++) {
+      const seen = new Set([i]);
+      const stack = [i];
+      while (stack.length) for (const j of dependents[stack.pop()!]) if (!seen.has(j)) (seen.add(j), stack.push(j));
+      const teams = new Set([...seen].map((j) => all[j].team)).size;
+      reach += teams;
+      most = Math.max(most, teams);
+    }
+    return { pairs: pairs.size, possible: (n * (n - 1)) / 2, reach: reach / count, most, links: all.slice(0, count).reduce((a, s) => a + s.deps.length, 0) };
+  };
+
+  for (const figure of document.querySelectorAll<HTMLElement>('[data-slow-web]')) {
+    const canvas = figure.querySelector<HTMLCanvasElement>('.slow-canvas')!;
+    const readout = figure.querySelector<HTMLElement>('.hitl-readout')!;
+    const slider = figure.querySelector<HTMLInputElement>('input[type="range"]')!;
+    const value = figure.querySelector<HTMLElement>('.slow-value')!;
+    const grow = figure.querySelector<HTMLButtonElement>('[data-grow]')!;
+    const reduced = reducedMotion();
+    const services = all.map((s) => ({ ...s }));
+    let n = 1;
+    let growing: number | undefined;
+    const W = 600;
+
+    /** Teams sit on a ring that fills as they arrive; a team's services sit in a small triangle around its place. */
+    const place = (i: number) => {
+      const s = services[i];
+      const angle = -Math.PI / 2 + (s.team / Math.max(n, 1)) * Math.PI * 2;
+      const ring = n === 1 ? 0 : 200;
+      const cx = W / 2 + Math.cos(angle) * ring;
+      const cy = W / 2 + Math.sin(angle) * ring;
+      const k = i % PER_TEAM;
+      const a = angle + (k / PER_TEAM) * Math.PI * 2;
+      return { x: cx + Math.cos(a) * 22, y: cy + Math.sin(a) * 22, cx, cy };
+    };
+
+    const draw = () => {
+      clear(c.paper);
+      // Team circles first.
+      for (let t = 0; t < n; t++) {
+        const p = place(t * PER_TEAM);
+        ctx.strokeStyle = c.rule;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(p.cx, p.cy, 38, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      // Dependencies: within a team faint, between teams in ink.
+      for (let i = 0; i < services.length; i++) {
+        const s = services[i];
+        if (s.alpha < 0.02) continue;
+        for (const d of s.deps) {
+          const o = services[d];
+          const across = o.team !== s.team;
+          ctx.globalAlpha = Math.min(s.alpha, o.alpha) * (across ? 0.45 : 0.6);
+          ctx.strokeStyle = across ? c.ink : c.muted;
+          ctx.lineWidth = across ? 1 : 1.5;
+          ctx.beginPath();
+          ctx.moveTo(s.x, s.y);
+          // Lines between teams bow towards the middle, so the web reads as a web.
+          const mx = (s.x + o.x) / 2;
+          const my = (s.y + o.y) / 2;
+          ctx.quadraticCurveTo(mx + (W / 2 - mx) * 0.5, my + (W / 2 - my) * 0.5, o.x, o.y);
+          ctx.stroke();
+        }
+      }
+      // Services on top.
+      for (const s of services) {
+        if (s.alpha < 0.02) continue;
+        ctx.globalAlpha = s.alpha;
+        ctx.fillStyle = c.paper;
+        ctx.strokeStyle = c.strong;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, 7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    };
+
+    const c = theme(figure, () => draw());
+    const { ctx, clear } = fit(canvas, () => ({ W, H: W }), () => draw());
+
+    const describe = () => {
+      const m = measure(n);
+      const teams = `${n} team${n > 1 ? 's' : ''}`;
+      readout.innerHTML =
+        n === 1
+          ? `<strong>${teams}.</strong> Every change stays inside it.`
+          : `<strong>${teams}, ${m.pairs} pairs of them tied together</strong> (of ${m.possible} possible). A change to one service reaches ${m.reach.toFixed(1)} teams on average, and the most shared one reaches ${m.most}.`;
+      value.textContent = String(n);
+      slider.value = String(n);
+    };
+
+    const settle = () => {
+      for (let i = 0; i < services.length; i++) {
+        const p = place(i);
+        Object.assign(services[i], { x: p.x, y: p.y, alpha: services[i].team < n ? 1 : 0 });
+      }
+    };
+    const set = (k: number) => {
+      n = Math.max(1, Math.min(MAX, k));
+      // New services start where their team will sit, so they appear in place rather than flying in.
+      for (let i = 0; i < services.length; i++) if (services[i].alpha < 0.02) Object.assign(services[i], place(i));
+      describe();
+      if (reduced) {
+        settle();
+        draw();
+      }
+    };
+
+    slider.addEventListener('input', () => {
+      clearInterval(growing);
+      growing = undefined;
+      set(Number(slider.value));
+    });
+    grow.addEventListener('click', () => {
+      clearInterval(growing);
+      set(1);
+      growing = window.setInterval(() => {
+        if (n >= MAX) {
+          clearInterval(growing);
+          growing = undefined;
+          return;
+        }
+        set(n + 1);
+      }, reduced ? 0 : 700);
+    });
+
+    animate(figure, (dt) => {
+      const g = 1 - Math.exp(-dt / 160);
+      for (let i = 0; i < services.length; i++) {
+        const s = services[i];
+        const p = place(i);
+        s.x += (p.x - s.x) * g;
+        s.y += (p.y - s.y) * g;
+        s.alpha += ((s.team < n ? 1 : 0) - s.alpha) * g;
+      }
+      draw();
+    });
+
+    set(1);
+    settle();
+    draw();
+  }
+</script>

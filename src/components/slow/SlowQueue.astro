@@ -1,0 +1,364 @@
+---
+import '../../styles/hitl.css';
+
+/**
+ * Work queueing in front of five busy teams. Changes arrive at random and pass
+ * through each team in turn; each team takes a day per change on average, at
+ * random, and works on one at a time. The slider sets how busy the teams are,
+ * which is how often work arrives. This is the textbook M/M/1 tandem queue:
+ * a change spends 1 / (1 − busy) days at each team on average, so five days of
+ * work takes 25 days at 80% and 50 at 90%. The chart plots that line, with a
+ * dot for each change as it finishes. A model with invented teams, not data.
+ */
+const stages = ['Checkout', 'Delivery', 'Payments', 'App', 'Release'];
+---
+
+<figure class="hitl slow-queue" data-slow-queue data-stages={JSON.stringify(stages)}>
+  <div class="hitl-stage">
+    <canvas class="slow-canvas" aria-label="Five teams in a row, each with a queue of waiting work in front of it, and a chart below of how long a change takes against how busy the teams are."></canvas>
+    <noscript><p class="hitl-note">The figure is drawn with JavaScript.</p></noscript>
+  </div>
+  <div class="hitl-controls">
+    <label for="slow-busy" class="hitl-note">How busy</label>
+    <input id="slow-busy" type="range" min="50" max="95" step="1" value="80" />
+    <span class="slow-busy-value" aria-hidden="true">80%</span>
+  </div>
+  <p class="hitl-readout" aria-live="polite"></p>
+  <figcaption>
+    Pieces of work pass through five teams, each of which takes a day on average to do its part. One piece is marked in the accent colour. The slider sets how busy the teams are. The line is what queueing theory predicts, and each dot is a piece of work that finished. A model, not measurements.
+  </figcaption>
+</figure>
+
+<style>
+  .slow-queue .hitl-stage {
+    padding: 0;
+    overflow: hidden;
+  }
+  .slow-canvas {
+    display: block;
+    width: 100%;
+    aspect-ratio: 25 / 14;
+  }
+  .slow-busy-value {
+    min-width: 2.75rem;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+</style>
+
+<script>
+  import { mulberry, exp, theme, fit, animate, label, reducedMotion, NARROW } from './canvas';
+
+  const DAY = 380; // ms of animation per simulated day
+  const BOX = { w: 92, h: 46, y: 252 };
+  const GAP = 13; // between waiting changes in a queue
+  const ROWS = 11; // rows of three drawn above each team before "+n"
+  const CHART = { x0: 130, x1: 900, y0: 520, y1: 372, lo: 0.5, hi: 0.99, max: 100 };
+
+  interface Item {
+    id: number;
+    stage: number; // 5 when finished
+    born: number;
+    /** Days of work done in finished stages, and when the current stage's work started. */
+    work: number;
+    since: number;
+    x: number;
+    y: number;
+    alpha: number;
+    tracked: boolean;
+  }
+
+  for (const figure of document.querySelectorAll<HTMLElement>('[data-slow-queue]')) {
+    const names: string[] = JSON.parse(figure.dataset.stages!);
+    const canvas = figure.querySelector<HTMLCanvasElement>('.slow-canvas')!;
+    const readout = figure.querySelector<HTMLElement>('.hitl-readout')!;
+    const slider = figure.querySelector<HTMLInputElement>('input[type="range"]')!;
+    const value = figure.querySelector<HTMLElement>('.slow-busy-value')!;
+    const reduced = reducedMotion();
+    const K = names.length;
+    // On a phone the same picture is drawn narrower, with the teams closer together.
+    let narrow = false;
+    let W = 1000;
+    const sx = (i: number) => (narrow ? 60 + i * 120 : 120 + i * 190);
+    const layout = (width: number) => {
+      narrow = width < NARROW;
+      W = narrow ? 600 : 1000;
+      BOX.w = narrow ? 76 : 92;
+      CHART.x0 = narrow ? 70 : 130;
+      CHART.x1 = narrow ? 570 : 900;
+      return { W, H: narrow ? 580 : 560 };
+    };
+
+    // The simulation, in days.
+    let rand = mulberry(1);
+    let rho = 0.8;
+    let shown = 0.8; // the slider while dragging; the simulation catches up on release
+    let t = 0;
+    let nextArrival = 0;
+    let queues: Item[][] = [];
+    let ends: number[] = [];
+    let items: Item[] = [];
+    let finished: { rho: number; days: number; tracked: boolean }[] = [];
+    let ids = 0;
+    let tracked: Item | null = null;
+    let lastTracked: { days: number; work: number } | null = null;
+    let trackAfter = 0; // the day from which the next arrival is marked
+
+    const startService = (i: number) => {
+      const head = queues[i][0];
+      if (!head) return;
+      head.since = t;
+      ends[i] = t + exp(rand, 1);
+    };
+    /** Runs the queues forward to day `until`. */
+    const run = (until: number, record: boolean) => {
+      for (;;) {
+        let next = nextArrival;
+        let which = -1;
+        for (let i = 0; i < K; i++)
+          if (queues[i].length && ends[i] < next) {
+            next = ends[i];
+            which = i;
+          }
+        if (next > until) break;
+        t = next;
+        if (which < 0) {
+          const it: Item = { id: ids++, stage: 0, born: t, work: 0, since: t, x: 20, y: BOX.y, alpha: 0, tracked: false };
+          if (record && !tracked && t >= trackAfter) {
+            it.tracked = true;
+            tracked = it;
+          }
+          items.push(it);
+          queues[0].push(it);
+          if (queues[0].length === 1) startService(0);
+          nextArrival = t + exp(rand, 1 / rho);
+        } else {
+          const it = queues[which].shift()!;
+          it.work += t - it.since;
+          it.stage = which + 1;
+          startService(which);
+          if (it.stage < K) {
+            queues[it.stage].push(it);
+            if (queues[it.stage].length === 1) startService(it.stage);
+          } else if (record) {
+            finished.push({ rho, days: t - it.born, tracked: it.tracked });
+            if (finished.length > 150) finished.shift();
+            if (it.tracked) {
+              lastTracked = { days: t - it.born, work: it.work };
+              tracked = null;
+              // Mark another change after a short pause, so the last one can be read.
+              trackAfter = t + 6;
+            }
+          }
+        }
+      }
+      t = until;
+    };
+    /** Starts afresh at this level of busyness, already settled into its usual state. */
+    const reset = (r: number) => {
+      rho = r;
+      rand = mulberry(Math.round(r * 100));
+      t = 0;
+      queues = names.map(() => []);
+      ends = names.map(() => Infinity);
+      items = [];
+      tracked = null;
+      lastTracked = null;
+      trackAfter = 0;
+      nextArrival = exp(rand, 1 / rho);
+      // Long enough for the queues to reach their usual lengths, which takes longer the busier they are.
+      run(Math.min(4000, 40 + 6 / (1 - Math.sqrt(r)) ** 2), false);
+      items = items.filter((it) => it.stage < K);
+      for (const it of items) it.alpha = reduced ? 1 : 0;
+      place(true);
+    };
+
+    /** Where each change should be drawn: in a team's box, waiting above it, or leaving. */
+    const target = (it: Item) => {
+      if (it.stage >= K) return { x: W + 30, y: BOX.y };
+      const q = queues[it.stage];
+      const j = q.indexOf(it);
+      if (j === 0) return { x: sx(it.stage) - BOX.w / 2 + 16, y: BOX.y };
+      const k = j - 1;
+      const row = Math.floor(k / 3);
+      return { x: sx(it.stage) + ((k % 3) - 1) * GAP, y: BOX.y - BOX.h / 2 - 14 - Math.min(row, ROWS) * GAP };
+    };
+    const place = (instant: boolean) => {
+      if (!instant) return;
+      for (const it of items) Object.assign(it, target(it));
+    };
+
+    const lead = (r: number) => K / (1 - r);
+    const cx = (r: number) => CHART.x0 + ((r - CHART.lo) / (CHART.hi - CHART.lo)) * (CHART.x1 - CHART.x0);
+    const cy = (d: number) => CHART.y0 - (Math.min(d, CHART.max) / CHART.max) * (CHART.y0 - CHART.y1);
+
+    const draw = () => {
+      const px = view.px;
+      clear(c.paper);
+      ctx.font = `${12 * px}px ${c.font}`;
+
+      // The teams, joined left to right.
+      ctx.strokeStyle = c.rule;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(20, BOX.y);
+      ctx.lineTo(W - 20, BOX.y);
+      ctx.stroke();
+      names.forEach((name, i) => {
+        const x = sx(i) - BOX.w / 2;
+        ctx.fillStyle = c.paper;
+        ctx.fillRect(x, BOX.y - BOX.h / 2, BOX.w, BOX.h);
+        ctx.strokeStyle = c.muted;
+        ctx.strokeRect(x, BOX.y - BOX.h / 2, BOX.w, BOX.h);
+        // How far through its current change the team is.
+        const head = queues[i][0];
+        if (head) {
+          const done = Math.min(1, (t - head.since) / Math.max(0.05, ends[i] - head.since));
+          ctx.fillStyle = head.tracked ? c.strong : c.muted;
+          ctx.globalAlpha = 0.25;
+          ctx.fillRect(x + 30, BOX.y - 4, (BOX.w - 40) * done, 8);
+          ctx.globalAlpha = 1;
+        }
+        ctx.font = `600 ${(narrow ? 10 : 12) * px}px ${c.font}`;
+        label(ctx, c, px, name.toUpperCase(), sx(i), BOX.y + BOX.h / 2 + 20 * px, c.muted);
+        const waiting = queues[i].length - 1;
+        const hidden = waiting - ROWS * 3 - 3;
+        if (hidden > 0) {
+          ctx.font = `${11 * px}px ${c.font}`;
+          label(ctx, c, px, `+${hidden}`, sx(i), BOX.y - BOX.h / 2 - 14 - (ROWS + 1) * GAP - 4, c.muted);
+        }
+      });
+
+      // The changes; the tracked one last, so it is on top.
+      const dot = (it: Item) => {
+        ctx.globalAlpha = it.alpha;
+        ctx.beginPath();
+        ctx.arc(it.x, it.y, it.tracked ? 5.5 : 4.2, 0, Math.PI * 2);
+        ctx.fillStyle = it.tracked ? c.strong : c.ink;
+        ctx.fill();
+        if (it.tracked) {
+          ctx.beginPath();
+          ctx.arc(it.x, it.y, 9, 0, Math.PI * 2);
+          ctx.strokeStyle = c.strong;
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
+      };
+      for (const it of items) if (!it.tracked) dot(it);
+      for (const it of items) if (it.tracked) dot(it);
+      ctx.globalAlpha = 1;
+
+      // The chart: days for five days of work, against how busy the teams are.
+      ctx.strokeStyle = c.rule;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(CHART.x0, CHART.y1 - 6);
+      ctx.lineTo(CHART.x0, CHART.y0);
+      ctx.lineTo(CHART.x1, CHART.y0);
+      ctx.stroke();
+      ctx.font = `${11 * px}px ${c.font}`;
+      ctx.fillStyle = c.muted;
+      ctx.textAlign = 'center';
+      for (const r of [0.5, 0.6, 0.7, 0.8, 0.9]) ctx.fillText(`${Math.round(r * 100)}%`, cx(r), CHART.y0 + 16 * px);
+      ctx.textAlign = 'right';
+      for (const d of [0, 50, 100]) ctx.fillText(`${d}`, CHART.x0 - 8, cy(d) + 4 * px);
+      ctx.textAlign = 'left';
+      ctx.fillText('days from start to finish', CHART.x0 + 8, CHART.y1 - 4);
+      ctx.textAlign = 'right';
+      ctx.fillText('how busy each team is', CHART.x1, CHART.y0 - 8);
+      // Five days of work, the floor.
+      ctx.setLineDash([3, 4]);
+      ctx.beginPath();
+      ctx.moveTo(CHART.x0, cy(K));
+      ctx.lineTo(CHART.x1, cy(K));
+      ctx.stroke();
+      ctx.setLineDash([]);
+      // Finished changes.
+      for (const f of finished) {
+        ctx.globalAlpha = f.days > CHART.max ? 0.35 : 0.5;
+        ctx.fillStyle = f.tracked ? c.strong : c.muted;
+        ctx.beginPath();
+        ctx.arc(cx(f.rho), cy(f.days), f.tracked ? 4 : 2.6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      // The line queueing theory predicts.
+      ctx.strokeStyle = c.ink;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      for (let r = CHART.lo; r <= CHART.hi + 1e-9; r += 0.0025) {
+        const y = cy(lead(r));
+        if (r === CHART.lo) ctx.moveTo(cx(r), y);
+        else ctx.lineTo(cx(r), y);
+        if (lead(r) > CHART.max) break;
+      }
+      ctx.stroke();
+      // Where the slider is.
+      const mx = cx(shown);
+      const my = cy(lead(shown));
+      ctx.strokeStyle = c.strong;
+      ctx.setLineDash([2, 3]);
+      ctx.beginPath();
+      ctx.moveTo(mx, CHART.y0);
+      ctx.lineTo(mx, my);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = c.strong;
+      ctx.beginPath();
+      ctx.arc(mx, my, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.font = `600 ${12 * px}px ${c.font}`;
+      const days = `${Math.round(lead(shown))} days`;
+      const right = mx > CHART.x1 - 80;
+      label(ctx, c, px, days, mx + (right ? -10 : 10), Math.max(CHART.y1 + 4, my - 8), c.strong, right ? 'right' : 'left');
+    };
+
+    const c = theme(figure, () => draw());
+    const { ctx, view, clear } = fit(canvas, layout, () => draw());
+
+    const describe = () => {
+      const pct = Math.round(shown * 100);
+      const days = Math.round(lead(shown));
+      let note = '';
+      if (tracked) {
+        const work = tracked.work + (tracked.stage < K && queues[tracked.stage][0] === tracked ? t - tracked.since : 0);
+        note = `The marked piece has been going ${Math.floor(t - tracked.born)} days; ${work.toFixed(1)} of them were work.`;
+      } else if (lastTracked) note = `The last marked piece took ${Math.round(lastTracked.days)} days, for ${lastTracked.work.toFixed(1)} days of work.`;
+      readout.innerHTML = `<strong>Each team busy ${pct}% of the time.</strong> Five days of work takes about ${days} days. <span class="hitl-note">${note}</span>`;
+    };
+
+    slider.addEventListener('input', () => {
+      shown = Number(slider.value) / 100;
+      value.textContent = `${slider.value}%`;
+      describe();
+      if (reduced) draw();
+    });
+    slider.addEventListener('change', () => {
+      reset(Number(slider.value) / 100);
+      describe();
+      draw();
+    });
+
+    animate(figure, (dt) => {
+      run(t + dt / DAY, true);
+      const g = 1 - Math.exp(-dt / 140);
+      for (const it of items) {
+        const aim = target(it);
+        it.x += (aim.x - it.x) * g;
+        it.y += (aim.y - it.y) * g;
+        it.alpha += ((it.stage >= K ? 0 : 1) - it.alpha) * (1 - Math.exp(-dt / 250));
+      }
+      items = items.filter((it) => it.stage < K || it.x < W + 20);
+      describe();
+      draw();
+    });
+
+    reset(rho);
+    if (reduced) {
+      // No motion: show the queues as they stand, and the line.
+      for (const it of items) it.alpha = 1;
+    }
+    describe();
+    draw();
+  }
+</script>

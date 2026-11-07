@@ -1,0 +1,638 @@
+---
+import '../../styles/hitl.css';
+import { growth, teams } from '../../data/human-in-the-loop';
+
+/**
+ * A coffee company growing, drawn as teams and the systems they depend on.
+ * Each circle is a team: a café, or a small team of up to five. Each square
+ * is a system. Grey lines are a team using a system; coloured lines are one
+ * system passing information to another. The steps in `growth` take it from
+ * one person at a till to a dozen cafés and an app, and the view pulls back
+ * to keep it all in. Drawn from a fixed seed, the same picture every time.
+ */
+---
+
+<figure class="hitl hitl-eco" data-hitl-eco data-growth={JSON.stringify(growth)} data-teams={JSON.stringify(teams)}>
+  <div class="hitl-stage">
+    <canvas class="eco-canvas" aria-label="A company drawn as teams and systems, growing from one person at a till to a dozen cafés and an app: about thirty teams across eleven departments, depending on more than forty systems, with the dependencies between them multiplying."></canvas>
+    <noscript><p class="hitl-note">The network is drawn with JavaScript.</p></noscript>
+  </div>
+  <div class="hitl-controls">
+    <button type="button" data-act="prev" aria-label="Previous step">←</button>
+    <span class="eco-progress hitl-note" aria-hidden="true"></span>
+    <button type="button" data-act="next" aria-label="Next step">→</button>
+    <span class="hitl-spacer"></span>
+    <button type="button" data-act="play" aria-label="Pause">❚❚</button>
+  </div>
+  <p class="hitl-readout" aria-live="polite"></p>
+  <figcaption>
+    A coffee company growing, from one till to a dozen cafés and an app. Each circle is a team, a café or a small team of up to five, grouped into departments; each square is a system. Grey lines join a team to a system it uses, and coloured lines join systems that pass information to each other. Step through with the arrows, or let it play. A sketch: the numbers are invented, at the scale of a real chain.
+  </figcaption>
+</figure>
+
+<style>
+  .hitl .hitl-stage {
+    padding: 0;
+    overflow: hidden;
+  }
+  .eco-canvas {
+    display: block;
+    width: 100%;
+    aspect-ratio: 8 / 5;
+  }
+  .eco-progress {
+    min-width: 5.5rem;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+  .hitl-readout strong {
+    font-weight: 600;
+  }
+  .hitl-readout .hitl-note {
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+</style>
+
+<script>
+  interface Step {
+    title: string;
+    text: string;
+    cafes: number;
+  }
+  interface SystemData {
+    name: string;
+    what: string;
+    from: number;
+    everyone?: boolean;
+    usedBy?: string[];
+    feeds?: string[];
+  }
+  interface TeamData {
+    name: string;
+    what: string;
+    x: number;
+    y: number;
+    people: number[];
+    systems: SystemData[];
+  }
+  interface Node {
+    x: number;
+    y: number;
+    system: boolean;
+    /** The department it belongs to. */
+    dept: number;
+    /** For a team, how many people are in it at each step; 0 before it exists. */
+    sizes: number[];
+    /** The first step (from 0) at which it is drawn. */
+    from: number;
+    name?: string;
+    what?: string;
+    /** How visible it is now, what it is heading for, and when it starts heading there. */
+    v: number;
+    target: number;
+    at: number;
+    /** A team's drawn size, easing toward its headcount at this step. */
+    r: number;
+    rAim: number;
+  }
+  interface Edge {
+    a: number;
+    b: number;
+    /** One system passing information to another, drawn in the accent colour. */
+    wired: boolean;
+  }
+  interface Message {
+    edge: number;
+    t: number;
+    speed: number;
+    dir: 1 | -1;
+  }
+
+  /** A small deterministic PRNG, so the picture is the same on every visit. */
+  const mulberry = (seed: number) => () => {
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+
+  const W = 1000;
+  const H = 600;
+  const SQUAD = 5; // people in a small team
+  const GOLDEN = Math.PI * (3 - Math.sqrt(5));
+  /** A team's radius for its headcount. */
+  const radius = (n: number) => (n ? 2 + 1.5 * Math.sqrt(n) : 0);
+
+  function build(teams: TeamData[], growth: Step[]) {
+    const rand = mulberry(7);
+    const nodes: Node[] = [];
+    const steps = growth.length;
+    const cafes = teams.findIndex((t) => t.name === 'Cafés');
+    /** Each department's team nodes, and its system nodes by name. */
+    const squads: number[][] = teams.map(() => []);
+    const byName = new Map<string, number>();
+
+    teams.forEach((t, ti) => {
+      // A department is a cluster of teams in a sunflower spiral, the first in
+      // the middle: a café each for the cafés, small teams of five elsewhere.
+      const isCafe = ti === cafes;
+      const count = isCafe ? Math.max(...growth.map((g) => g.cafes)) : Math.max(1, Math.ceil(Math.max(...t.people) / SQUAD));
+      const sizes = (j: number) =>
+        growth.map((g, s) => {
+          const p = t.people[s];
+          if (!isCafe) return Math.max(0, Math.min(SQUAD, p - j * SQUAD));
+          if (j >= g.cafes) return 0;
+          return Math.floor(p / g.cafes) + (j < p % g.cafes ? 1 : 0);
+        });
+      const spacing = isCafe ? 13 : 9;
+      const phase = rand() * Math.PI * 2;
+      let reach = 0;
+      for (let j = 0; j < count; j++) {
+        const sz = sizes(j);
+        const from = sz.findIndex((n) => n > 0);
+        if (from < 0) continue;
+        const r = spacing * Math.sqrt(j);
+        const a = phase + j * GOLDEN;
+        reach = Math.max(reach, r + radius(Math.max(...sz)));
+        squads[ti].push(nodes.length);
+        nodes.push({ x: t.x + r * Math.cos(a), y: t.y + r * Math.sin(a), system: false, dept: ti, sizes: sz, from, v: 0, target: 0, at: 0, r: 0, rAim: 0 });
+      }
+      // Its systems sit in a ring around the teams.
+      const n = t.systems.length;
+      const ring = Math.max(reach + 15, (n * 17) / (2 * Math.PI));
+      const spin = -Math.PI / 2 + rand() * 0.6;
+      t.systems.forEach((s, k) => {
+        const a = spin + (k / n) * Math.PI * 2;
+        byName.set(s.name, nodes.length);
+        nodes.push({ x: t.x + ring * Math.cos(a), y: t.y + ring * Math.sin(a), system: true, dept: ti, sizes: [], from: s.from - 1, name: s.name, what: s.what, v: 0, target: 0, at: 0, r: 0, rAim: 0 });
+      });
+    });
+
+    const edges: Edge[] = [];
+    const seen = new Set<string>();
+    const link = (a: number | undefined, b: number | undefined) => {
+      if (a === undefined || b === undefined || a === b) return;
+      const key = a < b ? `${a}-${b}` : `${b}-${a}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      edges.push({ a, b, wired: nodes[a].system && nodes[b].system });
+    };
+
+    teams.forEach((t, ti) =>
+      t.systems.forEach((s) => {
+        const sys = byName.get(s.name)!;
+        // Every team in the department that looks after it uses it, and so do
+        // the departments named in usedBy, or every team for pay and logins.
+        const users = s.everyone ? teams.map((_, i) => i) : [ti, ...(s.usedBy ?? []).map((d) => teams.findIndex((x) => x.name === d))];
+        users.forEach((u) => squads[u]?.forEach((q) => link(q, sys)));
+        // Until anyone is hired to look after it, it is the owner's job.
+        if (!t.people[s.from - 1]) link(squads[cafes][0], sys);
+        (s.feeds ?? []).forEach((f) => link(sys, byName.get(f)));
+      }),
+    );
+
+    return { nodes, edges, rand, steps };
+  }
+
+  for (const figure of document.querySelectorAll<HTMLElement>('[data-hitl-eco]')) {
+    const growth: Step[] = JSON.parse(figure.dataset.growth!);
+    const teams: TeamData[] = JSON.parse(figure.dataset.teams!);
+    const canvas = figure.querySelector<HTMLCanvasElement>('.eco-canvas')!;
+    const readout = figure.querySelector<HTMLElement>('.hitl-readout')!;
+    const progress = figure.querySelector<HTMLElement>('.eco-progress')!;
+    const play = figure.querySelector<HTMLButtonElement>('[data-act="play"]')!;
+    const prev = figure.querySelector<HTMLButtonElement>('[data-act="prev"]')!;
+    const next = figure.querySelector<HTMLButtonElement>('[data-act="next"]')!;
+    const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const { nodes, edges, rand } = build(teams, growth);
+    const ctx = canvas.getContext('2d')!;
+
+    // Colours come from the page, light or dark; light-dark() is resolved on a real element.
+    const probe = document.createElement('span');
+    probe.style.position = 'absolute';
+    probe.style.visibility = 'hidden';
+    figure.append(probe);
+    const colours = { paper: '', ink: '', muted: '', accent: '', strong: '', font: '' };
+    const readTheme = () => {
+      const s = getComputedStyle(document.documentElement);
+      const resolve = (v: string) => {
+        probe.style.color = v;
+        return getComputedStyle(probe).color;
+      };
+      colours.paper = resolve(s.getPropertyValue('--paper').trim());
+      colours.ink = resolve(s.getPropertyValue('--ink').trim());
+      colours.muted = resolve(s.getPropertyValue('--ink-muted').trim());
+      colours.accent = resolve(s.getPropertyValue('--accent').trim());
+      colours.strong = resolve(s.getPropertyValue('--accent-strong').trim());
+      colours.font = s.getPropertyValue('--font-ui').trim();
+    };
+
+    let now = performance.now();
+    let hovered: number | null = null;
+
+    /**
+     * What is on screen. An edge is live when both its ends are meant to be
+     * drawn; messages only travel live edges, and there are more of them the
+     * more live edges there are, so the traffic grows with the company.
+     */
+    const live = new Uint8Array(edges.length);
+    const out: number[][] = nodes.map(() => []);
+    edges.forEach((e, ei) => {
+      out[e.a].push(ei);
+      out[e.b].push(ei);
+    });
+    let liveList: number[] = [];
+    const messages: Message[] = [];
+    for (let k = 0; k < 120; k++) messages.push({ edge: -1, t: rand(), speed: 0.006 + rand() * 0.012, dir: rand() < 0.5 ? 1 : -1 });
+    let active = 0;
+    const respawn = (m: Message) => {
+      m.edge = liveList.length ? liveList[Math.floor(rand() * liveList.length)] : -1;
+      m.t = 0;
+    };
+
+    /** The view: zoom `k` about the point (x, y), easing toward a target that fits what is shown. */
+    const view = { k: 1, x: W / 2, y: H / 2 };
+    const aim = { k: 1, x: W / 2, y: H / 2 };
+    const fit = () => {
+      let x0 = Infinity;
+      let y0 = Infinity;
+      let x1 = -Infinity;
+      let y1 = -Infinity;
+      for (const n of nodes) {
+        if (!n.target) continue;
+        x0 = Math.min(x0, n.x);
+        x1 = Math.max(x1, n.x);
+        y0 = Math.min(y0, n.y);
+        y1 = Math.max(y1, n.y);
+      }
+      if (x0 === Infinity) return;
+      const pad = 40;
+      const k = Math.max(1, Math.min(4, W / (x1 - x0 + pad * 2.4), H / (y1 - y0 + pad * 2)));
+      const hw = W / (2 * k);
+      const hh = H / (2 * k);
+      aim.k = k;
+      aim.x = Math.min(W - hw, Math.max(hw, (x0 + x1) / 2));
+      aim.y = Math.min(H - hh, Math.max(hh, (y0 + y1) / 2));
+    };
+
+    let scale = 1;
+    const size = () => {
+      const dpr = Math.min(2, devicePixelRatio || 1);
+      const w = canvas.clientWidth;
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round((w * H * dpr) / W);
+      scale = (w / W) * dpr;
+    };
+
+    const draw = () => {
+      const k = view.k;
+      const cssPx = (n: number) => (n * W) / canvas.clientWidth / k; // n CSS pixels in canvas units
+      const left = view.x - W / (2 * k);
+      const right = view.x + W / (2 * k);
+      const top = view.y - H / (2 * k);
+      const bottom = view.y + H / (2 * k);
+      const narrow = canvas.clientWidth < 600;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.fillStyle = colours.paper;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.setTransform(scale * k, 0, 0, scale * k, scale * (W / 2 - view.x * k), scale * (H / 2 - view.y * k));
+      const thin = 1 / Math.sqrt(k);
+
+      // Teams using systems, then systems feeding each other on top.
+      for (const wired of [false, true]) {
+        ctx.lineWidth = (wired ? 1.2 : 0.6) * thin;
+        ctx.strokeStyle = wired ? colours.accent : colours.muted;
+        for (const e of edges) {
+          if (e.wired !== wired) continue;
+          const v = Math.min(nodes[e.a].v, nodes[e.b].v);
+          if (v < 0.01) continue;
+          ctx.globalAlpha = (wired ? 0.75 : 0.35) * v;
+          ctx.beginPath();
+          ctx.moveTo(nodes[e.a].x, nodes[e.a].y);
+          ctx.lineTo(nodes[e.b].x, nodes[e.b].y);
+          ctx.stroke();
+        }
+      }
+
+      // Teams: circles sized by how many people are in them.
+      ctx.fillStyle = colours.ink;
+      for (const n of nodes) {
+        if (n.system || n.v < 0.01 || n.r < 0.05) continue;
+        ctx.globalAlpha = 0.9 * n.v;
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // Systems: squares.
+      nodes.forEach((n, i) => {
+        if (!n.system || n.v < 0.01) return;
+        const s = 4.6 * (0.4 + 0.6 * n.v);
+        ctx.globalAlpha = n.v;
+        ctx.fillStyle = i === hovered ? colours.strong : colours.paper;
+        ctx.fillRect(n.x - s, n.y - s, s * 2, s * 2);
+        ctx.strokeStyle = colours.strong;
+        ctx.lineWidth = 1.3 * thin;
+        ctx.strokeRect(n.x - s, n.y - s, s * 2, s * 2);
+      });
+
+      // Messages in flight; those between systems in the accent colour.
+      const dot = 1.25 * thin;
+      for (let mi = 0; mi < active; mi++) {
+        const m = messages[mi];
+        if (m.edge < 0) continue;
+        const e = edges[m.edge];
+        const t = m.dir > 0 ? m.t : 1 - m.t;
+        ctx.globalAlpha = 0.95 * Math.min(nodes[e.a].v, nodes[e.b].v);
+        ctx.fillStyle = e.wired ? colours.strong : colours.ink;
+        ctx.beginPath();
+        ctx.arc(nodes[e.a].x + (nodes[e.b].x - nodes[e.a].x) * t, nodes[e.a].y + (nodes[e.b].y - nodes[e.a].y) * t, dot, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Labels, kept inside the view with a paper halo so they read over the lines.
+      ctx.lineJoin = 'round';
+      const label = (text: string, x: number, y: number, colour: string, alpha: number, align: CanvasTextAlign = 'center') => {
+        if (alpha < 0.02) return;
+        const w = ctx.measureText(text).width;
+        const pad = cssPx(4);
+        // Keep the whole label inside the view, whichever way it runs from x.
+        const from = align === 'left' ? 0 : align === 'right' ? w : w / 2;
+        const cx = Math.min(right - pad - (w - from), Math.max(left + pad + from, x));
+        y = Math.min(bottom - cssPx(5), Math.max(top + cssPx(12), y));
+        ctx.textAlign = align;
+        ctx.globalAlpha = alpha;
+        ctx.lineWidth = cssPx(3);
+        ctx.strokeStyle = colours.paper;
+        ctx.strokeText(text, cx, y);
+        ctx.fillStyle = colour;
+        ctx.fillText(text, cx, y);
+      };
+      // System names while there are few enough to read; past that, hovering names them.
+      const systemsShown = nodes.filter((n) => n.system && n.target).length;
+      if ((!narrow || k > 1.8) && systemsShown <= 16) {
+        ctx.font = `${cssPx(9.5)}px ${colours.font}`;
+        for (const n of nodes) {
+          if (!n.system) continue;
+          // Out from the department's centre, so the names in a ring don't collide.
+          const t = teams[n.dept];
+          const d = Math.hypot(n.x - t.x, n.y - t.y);
+          const ux = d < 1 ? 0 : (n.x - t.x) / d;
+          const uy = d < 1 ? -1 : (n.y - t.y) / d;
+          const gap = 6 + cssPx(4);
+          const align: CanvasTextAlign = ux > 0.35 ? 'left' : ux < -0.35 ? 'right' : 'center';
+          const y = n.y + uy * gap + (align === 'center' ? (uy > 0 ? cssPx(8) : 0) : cssPx(3));
+          label(n.name!, n.x + ux * gap, y, colours.strong, n.v, align);
+        }
+      }
+      // Department names, under the lowest of what is shown of each.
+      ctx.font = `600 ${cssPx(narrow ? 8 : 10)}px ${colours.font}`;
+      teams.forEach((t, ti) => {
+        let low = -Infinity;
+        let seen = 0;
+        for (const n of nodes) {
+          if (n.dept !== ti || n.v < 0.01) continue;
+          seen = Math.max(seen, n.v);
+          low = Math.max(low, t.y + (n.y - t.y) * n.v);
+        }
+        label(t.name.toUpperCase(), t.x, low + cssPx(17), colours.muted, seen);
+      });
+      ctx.globalAlpha = 1;
+    };
+
+    let step = -1;
+    const tally = () => {
+      let people = 0;
+      let squads = 0;
+      let systems = 0;
+      for (const n of nodes) {
+        if (!n.target) continue;
+        if (n.system) systems++;
+        else {
+          squads++;
+          people += n.sizes[step];
+        }
+      }
+      const plural = (n: number, one: string, many: string) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
+      return `${plural(people, 'person', 'people')} in ${plural(squads, 'team', 'teams')}, ${plural(systems, 'system', 'systems')}, ${plural(liveList.length, 'dependency', 'dependencies')}.`;
+    };
+    const show = (s: number, instant = false) => {
+      step = s;
+      now = performance.now();
+      // Newcomers arrive over a second or so, systems first, then teams.
+      let order = 0;
+      for (const n of nodes) {
+        const target = n.from >= 0 && n.from <= s ? 1 : 0;
+        if (target !== n.target) {
+          n.target = target;
+          n.at = now + (n.system ? 0 : 250) + Math.min(1400, order++ * 25) + rand() * 200;
+        }
+        if (!n.system) n.rAim = radius(n.sizes[s]);
+        if (instant) {
+          n.v = n.target;
+          n.r = n.rAim;
+        }
+      }
+      liveList = [];
+      edges.forEach((e, ei) => {
+        live[ei] = nodes[e.a].target && nodes[e.b].target ? 1 : 0;
+        if (live[ei]) liveList.push(ei);
+      });
+      active = Math.min(messages.length, Math.max(1, Math.round(liveList.length * 0.12)));
+      for (const m of messages) if (m.edge < 0 || !live[m.edge]) respawn(m);
+      fit();
+      if (instant) Object.assign(view, aim);
+      const g = growth[s];
+      readout.innerHTML = `<strong>${g.title}.</strong> ${g.text} <span class="hitl-note">${tally()}</span>`;
+      progress.textContent = `Step ${s + 1} of ${growth.length}`;
+      prev.disabled = s === 0;
+    };
+
+    const STEP = 5200;
+    const HOLD = 9000;
+    // One scheduler. `playing` is whether it is running now; `paused` is whether
+    // the reader stopped it, which scrolling back on screen must not undo.
+    let timer: number | undefined;
+    let raf: number | undefined;
+    let playing = false;
+    let paused = false;
+    let last = performance.now();
+    const frame = () => {
+      now = performance.now();
+      const dt = Math.min(64, now - last);
+      last = now;
+      // Ease the view toward what is shown: zoom in log space, so it feels even.
+      const f = 1 - Math.exp(-dt / 500);
+      view.k = Math.exp(Math.log(view.k) + (Math.log(aim.k) - Math.log(view.k)) * f);
+      view.x += (aim.x - view.x) * f;
+      view.y += (aim.y - view.y) * f;
+      const g = 1 - Math.exp(-dt / 200);
+      for (const n of nodes) {
+        if (now < n.at) continue;
+        if (n.v !== n.target) {
+          n.v += (n.target - n.v) * g;
+          if (Math.abs(n.target - n.v) < 0.005) n.v = n.target;
+        }
+        if (n.r !== n.rAim) {
+          n.r += (n.rAim - n.r) * g;
+          if (Math.abs(n.rAim - n.r) < 0.01) n.r = n.rAim;
+        }
+      }
+      for (let mi = 0; mi < active; mi++) {
+        const m = messages[mi];
+        if (m.edge < 0) {
+          respawn(m);
+          continue;
+        }
+        m.t += m.speed;
+        if (m.t > 1) {
+          // Arrive, and leave again along another live line from the same node.
+          const e = edges[m.edge];
+          const at = m.dir > 0 ? e.b : e.a;
+          const onward = out[at].filter((ei) => live[ei] && ei !== m.edge);
+          if (!onward.length) {
+            m.dir = m.dir > 0 ? -1 : 1;
+            m.t = 0;
+            continue;
+          }
+          m.edge = onward[Math.floor(rand() * onward.length)];
+          m.dir = edges[m.edge].a === at ? 1 : -1;
+          m.t = 0;
+        }
+      }
+      draw();
+      raf = requestAnimationFrame(frame);
+    };
+    const advance = () => show(step >= growth.length - 1 ? 0 : step + 1);
+    const schedule = () => {
+      if (timer) clearTimeout(timer);
+      // The last step holds longer; then the company starts again from one person.
+      timer = window.setTimeout(() => {
+        advance();
+        schedule();
+      }, step >= growth.length - 1 ? HOLD : STEP);
+    };
+    // The traffic and the growing run whenever the figure is on screen; the
+    // timer that steps through the company is what play and pause control.
+    const animate = (on: boolean) => {
+      if (on && !raf) {
+        last = performance.now();
+        frame();
+      }
+      if (!on && raf) {
+        cancelAnimationFrame(raf);
+        raf = undefined;
+      }
+    };
+    const stop = () => {
+      playing = false;
+      if (timer) clearTimeout(timer);
+      timer = undefined;
+      play.textContent = '▶';
+      play.setAttribute('aria-label', 'Play');
+    };
+    const start = () => {
+      if (playing) return;
+      playing = true;
+      play.textContent = '❚❚';
+      play.setAttribute('aria-label', 'Pause');
+      schedule();
+    };
+    play.addEventListener('click', () => {
+      if (playing) {
+        paused = true;
+        stop();
+      } else {
+        paused = false;
+        start();
+      }
+    });
+    const jump = (s: number) => {
+      paused = true;
+      stop();
+      show(s, reduced);
+      if (reduced) draw();
+      else animate(true);
+    };
+    prev.addEventListener('click', () => jump(Math.max(0, step - 1)));
+    next.addEventListener('click', () => jump(step >= growth.length - 1 ? 0 : step + 1));
+
+    // Hovering a system names it and says what it does and who depends on it;
+    // hovering a team says which department it is in and how many it has.
+    let shownStep = '';
+    const restore = () => {
+      if (shownStep) readout.innerHTML = shownStep;
+      shownStep = '';
+    };
+    canvas.addEventListener('mousemove', (ev) => {
+      const rect = canvas.getBoundingClientRect();
+      const x = view.x + ((ev.clientX - rect.left) / rect.width - 0.5) * (W / view.k);
+      const y = view.y + ((ev.clientY - rect.top) / rect.height - 0.5) * (H / view.k);
+      let best: number | null = null;
+      let bd = (12 / view.k) ** 2 + 40;
+      nodes.forEach((n, i) => {
+        if (!n.target) return;
+        const d = (n.x - x) ** 2 + (n.y - y) ** 2;
+        if (d < bd) {
+          bd = d;
+          best = i;
+        }
+      });
+      hovered = best !== null && nodes[best].system ? best : null;
+      if (best === null) return restore();
+      if (!shownStep) shownStep = readout.innerHTML;
+      const n = nodes[best];
+      if (n.system) {
+        const users = out[best].filter((ei) => live[ei] && !edges[ei].wired).length;
+        const wires = out[best].filter((ei) => live[ei] && edges[ei].wired).length;
+        readout.textContent = `${n.name}: ${n.what} Used by ${users} ${users === 1 ? 'team' : 'teams'}, connected to ${wires} other ${wires === 1 ? 'system' : 'systems'}.`;
+      } else {
+        const t = teams[n.dept];
+        const people = n.sizes[step];
+        readout.textContent = `${t.name}: ${t.what} This team has ${people} ${people === 1 ? 'person' : 'people'}.`;
+      }
+      if (!raf) draw();
+    });
+    canvas.addEventListener('mouseleave', () => {
+      hovered = null;
+      restore();
+      if (!raf) draw();
+    });
+
+    readTheme();
+    size();
+    new ResizeObserver(() => {
+      size();
+      draw();
+    }).observe(canvas);
+    new MutationObserver(() => {
+      readTheme();
+      draw();
+    }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+      readTheme();
+      draw();
+    });
+
+    show(0, true);
+    draw();
+    if (reduced) {
+      // No motion: each step is drawn as it is, and the arrows move between them.
+      paused = true;
+      stop();
+    } else {
+      // Animate only while the figure is on screen; step through the company
+      // there too, unless the reader paused it.
+      new IntersectionObserver(
+        (entries) => {
+          for (const e of entries) {
+            animate(e.isIntersecting);
+            if (e.isIntersecting && !paused) start();
+            else if (!e.isIntersecting) stop();
+          }
+        },
+        { threshold: 0.3 },
+      ).observe(figure);
+    }
+  }
+</script>

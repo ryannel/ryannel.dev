@@ -1,0 +1,410 @@
+---
+import '../../styles/hitl.css';
+
+/**
+ * A rough prototype of lanes and threads: identical teams, each a lane with a
+ * pile of work, and work that needs several teams drawn as parts joined by a
+ * thread. The model is in lanes-model.ts; this draws it.
+ */
+---
+
+<figure class="hitl slow-lanes" data-slow-lanes>
+  <div class="hitl-stage">
+    <canvas class="lanes-canvas" aria-label="Teams drawn as lanes of waiting work, with threads joining pieces of work that need more than one team, and three charts below: work shipped per day, where the teams' time goes, and how long work takes."></canvas>
+    <noscript><p class="hitl-note">The figure is drawn with JavaScript.</p></noscript>
+  </div>
+  <div class="hitl-controls">
+    <button type="button" data-add>+ team</button>
+    <button type="button" data-remove>− team</button>
+    <span class="lanes-gap" aria-hidden="true"></span>
+    <button type="button" data-mode="align" aria-pressed="true">Align first</button>
+    <button type="button" data-mode="later" aria-pressed="false">Integrate later</button>
+    <span class="lanes-gap" aria-hidden="true"></span>
+    <button type="button" data-pause aria-pressed="false">Pause</button>
+  </div>
+  <p class="hitl-readout" aria-live="polite"></p>
+  <figcaption>
+    A sketch, with invented rates. Each lane is a team of one. Grey cards need only that team; coloured cards are one piece of work split across teams, joined by a thread, and ship only when every part is done.
+  </figcaption>
+</figure>
+
+<style>
+  .slow-lanes .hitl-stage {
+    padding: 0;
+    overflow: hidden;
+  }
+  .lanes-canvas {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1000 / 780;
+  }
+  .lanes-gap {
+    width: 0.75rem;
+  }
+</style>
+
+<script>
+  import { theme, fit, animate, label, reducedMotion, NARROW } from './canvas';
+  import { Lanes, coupledShare, type Chip, type Mode, type Use } from './lanes-model';
+
+  const DAY = 650; // ms of animation per simulated day
+  const MAX_TEAMS = 10;
+
+  for (const figure of document.querySelectorAll<HTMLElement>('[data-slow-lanes]')) {
+    const canvas = figure.querySelector<HTMLCanvasElement>('.lanes-canvas')!;
+    const readout = figure.querySelector<HTMLElement>('.hitl-readout')!;
+    const add = figure.querySelector<HTMLButtonElement>('[data-add]')!;
+    const remove = figure.querySelector<HTMLButtonElement>('[data-remove]')!;
+    const pause = figure.querySelector<HTMLButtonElement>('[data-pause]')!;
+    const modes = [...figure.querySelectorAll<HTMLButtonElement>('[data-mode]')];
+    const reduced = reducedMotion();
+
+    // The model, in days.
+    let mode: Mode = 'align';
+    let paused = false;
+    let sim = new Lanes(1, mode);
+    const reset = (teams: number) => {
+      sim = new Lanes(teams, mode);
+      sim.onArrive = (c) => Object.assign(c, { x: 40, y: laneY(c.team) });
+    };
+
+    // Drawing.
+    let narrow = false;
+    let W = 1000;
+    let H = 780;
+    const LANES = { top: 30, bottom: 430 };
+    const laneH = () => Math.min(64, (LANES.bottom - LANES.top) / Math.max(sim.teams, 1));
+    const laneY = (i: number) => LANES.top + laneH() * (i + 0.5);
+    const workerX = () => W * 0.5;
+    const layout = (width: number) => {
+      narrow = width < NARROW;
+      W = narrow ? 600 : 1000;
+      H = narrow ? 1080 : 780;
+      return { W, H };
+    };
+
+    const cardSize = () => {
+      const h = Math.max(7, Math.min(16, laneH() * 0.42));
+      return { w: h * 1.25, h };
+    };
+    const target = (c: Chip) => {
+      const { w } = cardSize();
+      const y = laneY(c.team);
+      const wx = workerX();
+      if (c.state === 'gone') return { x: W + 40, y };
+      if (c.state === 'queued') {
+        const j = sim.queues[c.team].indexOf(c);
+        return { x: wx - 40 - j * (w + 3), y };
+      }
+      if (c.state === 'aside') {
+        // Put aside to wait for the other teams: a small stack just above the pile.
+        const j = sim.aside[c.team].indexOf(c);
+        return { x: wx - 34 - j * (w * 0.6), y: y - laneH() * 0.3 };
+      }
+      if (c.state === 'parked') {
+        const j = sim.parked[c.team].indexOf(c);
+        return { x: wx + 44 + j * (w + 3), y };
+      }
+      return { x: wx, y };
+    };
+
+    const hueColour = (h: number, a = 1) => `hsla(${Math.round(20 + h * 300)}, 62%, 52%, ${a})`;
+
+    const draw = () => {
+      const px = view.px;
+      clear(c.paper);
+      const { w, h } = cardSize();
+      const wx = workerX();
+      const lh = laneH();
+
+      // Lanes.
+      ctx.font = `${11 * px}px ${c.font}`;
+      for (let i = 0; i < sim.teams; i++) {
+        const y = laneY(i);
+        ctx.strokeStyle = c.rule;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(14, y + lh / 2);
+        ctx.lineTo(W - 14, y + lh / 2);
+        ctx.stroke();
+        ctx.fillStyle = c.muted;
+        ctx.textAlign = 'left';
+        if (lh > 22) ctx.fillText(`Team ${i + 1}`, 16, y + 4 * px);
+        // The person: a box that shows what they're doing.
+        const s = sim.serving[i];
+        const bw = w + 14;
+        const bh = h + 10;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash(s?.state === 'holding' ? [3, 3] : []);
+        ctx.strokeStyle = s?.state === 'holding' ? c.muted : s?.state === 'aligning' ? c.strong : c.ink;
+        ctx.fillStyle = s?.state === 'aligning' ? c.strong : c.paper;
+        ctx.globalAlpha = s?.state === 'aligning' ? 0.25 : 1;
+        ctx.fillRect(wx - bw / 2, y - bh / 2, bw, bh);
+        ctx.globalAlpha = 1;
+        ctx.strokeRect(wx - bw / 2, y - bh / 2, bw, bh);
+        ctx.setLineDash([]);
+        // More waiting than fits.
+        const fits = Math.floor((wx - 40 - 90) / (w + 3));
+        if (sim.queues[i].length > fits) {
+          ctx.textAlign = 'left';
+          label(ctx, c, px, `+${sim.queues[i].length - fits}`, 70, y + 4 * px, c.muted, 'left');
+        }
+      }
+
+      const visible = (c0: Chip) => {
+        if (c0.state !== 'queued') return true;
+        const fits = Math.floor((wx - 40 - 90) / (w + 3));
+        return sim.queues[c0.team].indexOf(c0) < fits;
+      };
+
+      // Threads between the parts of each coupled item.
+      for (const item of sim.items) {
+        if (item.chips.length < 2) continue;
+        const pts = item.chips.filter(visible).sort((a, b) => a.y - b.y);
+        if (pts.length < 2) continue;
+        ctx.strokeStyle = hueColour(item.hue, 0.45 * Math.min(...pts.map((p) => p.alpha)));
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let k = 1; k < pts.length; k++) {
+          const a = pts[k - 1];
+          const b = pts[k];
+          const my = (a.y + b.y) / 2;
+          ctx.bezierCurveTo(a.x, my, b.x, my, b.x, b.y);
+        }
+        ctx.stroke();
+      }
+
+      // Cards: grey for one team, coloured for coupled; they fade as they wait.
+      const card = (ch: Chip) => {
+        if (!visible(ch)) return;
+        const coupled = ch.item.chips.length > 1;
+        const age = sim.t - ch.item.born;
+        const fade = ch.state === 'gone' ? 1 : Math.max(0.35, 1 - age / 40);
+        ctx.globalAlpha = ch.alpha * fade;
+        ctx.fillStyle = coupled ? hueColour(ch.item.hue) : c.muted;
+        ctx.fillRect(ch.x - w / 2, ch.y - h / 2, w, h);
+        if (ch.flash > 0.02) {
+          ctx.globalAlpha = ch.flash;
+          ctx.strokeStyle = c.strong;
+          ctx.lineWidth = 2.5;
+          ctx.strokeRect(ch.x - w / 2 - 3, ch.y - h / 2 - 3, w + 6, h + 6);
+        }
+        ctx.globalAlpha = 1;
+      };
+      for (const it of sim.items) for (const ch of it.chips) card(ch);
+      for (const ch of sim.leaving) card(ch);
+
+      // Readouts.
+      const chart = (x0: number, y0: number, cw: number, ch: number, title: string) => {
+        ctx.font = `600 ${12 * px}px ${c.font}`;
+        ctx.fillStyle = c.ink;
+        ctx.textAlign = 'left';
+        ctx.fillText(title, x0, y0 - 12);
+        ctx.strokeStyle = c.rule;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(x0, y0 + ch);
+        ctx.lineTo(x0 + cw, y0 + ch);
+        ctx.stroke();
+        ctx.font = `${11 * px}px ${c.font}`;
+        ctx.fillStyle = c.muted;
+      };
+      const boxes = narrow
+        ? [
+            { x: 50, y: 500, w: 510, h: 130 },
+            { x: 50, y: 700, w: 510, h: 130 },
+            { x: 50, y: 900, w: 510, h: 130 },
+          ]
+        : [
+            { x: 50, y: 510, w: 260, h: 190 },
+            { x: 370, y: 510, w: 260, h: 190 },
+            { x: 690, y: 510, w: 270, h: 190 },
+          ];
+
+      // 1. Shipped per day, against what arrives.
+      {
+        const b = boxes[0];
+        chart(b.x, b.y, b.w, b.h, 'Shipped per day');
+        const top = Math.max(2, ...sim.history.map((s) => Math.max(s.alone, s.shipped))) * 1.1;
+        const X = (i: number) => b.x + (i / 239) * b.w;
+        const Y = (v: number) => b.y + b.h - (v / top) * b.h;
+        ctx.textAlign = 'right';
+        for (const v of [0, Math.round(top / 2), Math.floor(top)]) ctx.fillText(`${v}`, b.x - 6, Y(v) + 4 * px);
+        ctx.setLineDash([3, 4]);
+        ctx.strokeStyle = c.muted;
+        ctx.beginPath();
+        sim.history.forEach((s, i) => (i ? ctx.lineTo(X(i), Y(s.alone)) : ctx.moveTo(X(i), Y(s.alone))));
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.strokeStyle = c.strong;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        sim.history.forEach((s, i) => (i ? ctx.lineTo(X(i), Y(s.shipped)) : ctx.moveTo(X(i), Y(s.shipped))));
+        ctx.stroke();
+        // Where teams were added or taken away.
+        ctx.font = `${10 * px}px ${c.font}`;
+        sim.history.forEach((s, i) => {
+          if (i && s.teams !== sim.history[i - 1].teams) {
+            ctx.strokeStyle = c.rule;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(X(i), b.y);
+            ctx.lineTo(X(i), b.y + b.h);
+            ctx.stroke();
+            ctx.fillStyle = c.muted;
+            ctx.textAlign = 'center';
+            ctx.fillText(`${s.teams}`, X(i), b.y + 10 * px);
+          }
+        });
+        ctx.font = `${11 * px}px ${c.font}`;
+        ctx.textAlign = 'left';
+        ctx.fillStyle = c.muted;
+        ctx.fillText('dashed: what they’d ship working alone', b.x + 6, b.y + b.h + 16 * px);
+      }
+
+      // 2. Where the time goes, all teams together.
+      {
+        const b = boxes[1];
+        chart(b.x, b.y, b.w, b.h, 'Where the teams’ time goes');
+        const sum = sim.time();
+        const rows: [Use, string, string, number][] = [
+          ['work', 'Working', c.ink, 1],
+          ['align', 'Aligning', c.strong, 0.6],
+          ['blocked', 'Waiting on another team', c.muted, 0.5],
+          ['rework', 'Redoing', c.strong, 1],
+          ['idle', 'Nothing to do', c.rule, 1],
+        ];
+        const rh = b.h / rows.length;
+        rows.forEach(([k, name, colour, a], i) => {
+          const share = sum[k];
+          const y = b.y + i * rh;
+          ctx.globalAlpha = a;
+          ctx.fillStyle = colour;
+          ctx.fillRect(b.x + 1, y + rh * 0.45, Math.max(1, share * (b.w - 50)), rh * 0.4);
+          ctx.globalAlpha = 1;
+          ctx.fillStyle = c.muted;
+          ctx.textAlign = 'left';
+          ctx.fillText(name, b.x + 6, y + rh * 0.38);
+          ctx.textAlign = 'right';
+          ctx.fillText(`${Math.round(share * 100)}%`, b.x + b.w, y + rh * 0.8);
+        });
+      }
+
+      // 3. How long work takes: a dot for each of the last items shipped.
+      {
+        const b = boxes[2];
+        chart(b.x, b.y, b.w, b.h, 'Days from starting to shipped');
+        const max = 40;
+        const X = (d: number) => b.x + (Math.min(d, max) / max) * b.w;
+        ctx.textAlign = 'center';
+        for (const d of [0, 10, 20, 30, 40]) ctx.fillText(d === 40 ? '40+' : `${d}`, X(d), b.y + b.h + 16 * px);
+        const recent = sim.shipped.slice(-120);
+        const lane = (coupled: boolean) => b.y + b.h * (coupled ? 0.68 : 0.3);
+        ctx.textAlign = 'left';
+        ctx.fillText('one team', b.x + 6, lane(false) - 18 * px);
+        ctx.fillText('several teams', b.x + 6, lane(true) - 18 * px);
+        recent.forEach((s, i) => {
+          const jitter = (((i * 37) % 17) / 17 - 0.5) * 22;
+          ctx.globalAlpha = 0.25 + 0.6 * (i / recent.length);
+          ctx.fillStyle = s.coupled ? c.strong : c.muted;
+          ctx.beginPath();
+          ctx.arc(X(s.days), lane(s.coupled) + jitter, 3, 0, Math.PI * 2);
+          ctx.fill();
+        });
+        ctx.globalAlpha = 1;
+        for (const coupled of [false, true]) {
+          const ds = recent.filter((s) => s.coupled === coupled).map((s) => s.days).sort((a, b2) => a - b2);
+          if (ds.length < 3) continue;
+          const m = ds[Math.floor(ds.length / 2)];
+          ctx.strokeStyle = c.ink;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(X(m), lane(coupled) - 14);
+          ctx.lineTo(X(m), lane(coupled) + 14);
+          ctx.stroke();
+        }
+      }
+    };
+
+    const c = theme(figure, () => draw());
+    const { ctx, view, clear } = fit(canvas, layout, () => draw());
+
+    const describe = () => {
+      const last = sim.history[sim.history.length - 1];
+      const recent = sim.shipped.slice(-120);
+      const ds = recent.map((s) => s.days).sort((a, b) => a - b);
+      const median = ds.length ? ds[Math.floor(ds.length / 2)] : 0;
+      const share = Math.round(coupledShare(sim.teams) * 100);
+      const waiting = sim.waiting();
+      readout.innerHTML =
+        `<strong>${sim.teams} team${sim.teams > 1 ? 's' : ''}.</strong> ` +
+        `${share}% of new work needs another team. ` +
+        `Everyone is busy, shipping ${last ? last.shipped.toFixed(1) : '0'} pieces a day; working alone they’d ship ${(sim.teams / sim.R.effort).toFixed(1)}. ` +
+        `Half of it takes over ${median.toFixed(0)} days. ` +
+        `<span class="hitl-note">${waiting} pieces in piles.</span>`;
+      add.disabled = sim.teams >= MAX_TEAMS;
+      remove.disabled = sim.teams <= 1;
+    };
+
+    add.addEventListener('click', () => {
+      if (sim.teams >= MAX_TEAMS) return;
+      sim.addTeam();
+      describe();
+      draw();
+    });
+    remove.addEventListener('click', () => {
+      if (sim.teams <= 1) return;
+      reset(sim.teams - 1);
+      describe();
+      draw();
+    });
+    for (const b of modes)
+      b.addEventListener('click', () => {
+        mode = b.dataset.mode as Mode;
+        for (const o of modes) o.setAttribute('aria-pressed', String(o === b));
+        reset(sim.teams);
+        describe();
+        draw();
+      });
+    pause.addEventListener('click', () => {
+      paused = !paused;
+      pause.setAttribute('aria-pressed', String(paused));
+      pause.textContent = paused ? 'Play' : 'Pause';
+    });
+
+    animate(figure, (dt) => {
+      if (!paused) {
+        const until = sim.t + dt / DAY;
+        while (sim.t < until) sim.step();
+      }
+      const g = 1 - Math.exp(-dt / 120);
+      for (const it of sim.items)
+        for (const ch of it.chips) {
+          const aim = target(ch);
+          ch.x += (aim.x - ch.x) * g;
+          ch.y += (aim.y - ch.y) * g;
+          ch.alpha += (1 - ch.alpha) * g;
+          ch.flash *= Math.exp(-dt / 600);
+        }
+      for (const ch of sim.leaving) {
+        ch.x += (W + 40 - ch.x) * g;
+        ch.alpha *= Math.exp(-dt / 250);
+      }
+      sim.leaving = sim.leaving.filter((ch) => ch.alpha > 0.03);
+      describe();
+      draw();
+    });
+
+    reset(1);
+    if (reduced) {
+      // No motion: run a while and show where it stands.
+      reset(4);
+      sim.run(120);
+      for (const it of sim.items) for (const ch of it.chips) Object.assign(ch, target(ch), { alpha: 1 });
+    }
+    describe();
+    draw();
+  }
+</script>

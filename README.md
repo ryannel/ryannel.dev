@@ -11,9 +11,10 @@ Hosted on GitHub Pages, so hosting costs nothing.
 ```
 src/
   content/projects/    one .mdx file per project, served at /projects/<slug>/
+  content/notes/       one .mdx file per note, served at /notes/<slug>/
   content.config.ts    frontmatter schemas — the only place fields are defined
   consts.ts            name, links, taglines, how many projects the home page shows
-  pages/               home, /projects, /projects/<slug>, /about, /rss.xml, 404
+  pages/               home, /projects, /projects/<slug>, /notes, /notes/<slug>, /about, /rss.xml, 404
   components/          head, header, footer, project list, callout, figure, date, theme toggle
   layouts/Base.astro   the page shell
   styles/global.css    the whole design — one file, tokens at the top
@@ -436,7 +437,9 @@ Recorded so these stay decisions rather than oversights, and so the site doesn't
   the canonical archive. Distribution is per-piece and manual: some projects are worth submitting
   somewhere, most are not, and the site does not depend on any of it. No platform is the default,
   and none should get an integration.
-- **No separate note, essay or article type.** Everything dated is a project.
+- **Two kinds of page, and no third.** A project is something built, with its write-up. A note
+  is writing on its own: how I'm thinking about a subject at the time, revised in place. Notes
+  have no status and no related list. The in-page editor only edits projects for now.
 - **No per-project generated social images.** One static `public/og.png` covers every page. Set
   `image:` in a project's frontmatter to override it with a committed file.
 - **No theme framework.** The toggle is three states and about fifteen lines — see below.
