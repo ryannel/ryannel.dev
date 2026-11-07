@@ -1,6 +1,19 @@
+---
+interface Props {
+  href?: string;
+  label?: string;
+  text?: string;
+}
+const {
+  href = '#trying-it-out',
+  label = 'Try the full atlas',
+  text = 'Follow a scent from the centre outwards, or zoom around on your own.',
+} = Astro.props;
+---
+
 <div class="atlas-invite">
-  <a href="#trying-it-out">Try the full atlas <span aria-hidden="true">↓</span></a>
-  <p>Follow a scent from the centre outwards, or zoom around on your own.</p>
+  <a href={href}>{label} <span aria-hidden="true">↓</span></a>
+  <p>{text}</p>
 </div>
 
 <style>
