@@ -37,7 +37,7 @@ repos worth pointing at, and `related` for other projects (filenames without the
    own phrasing.
 2. In the frontmatter, set `draft: false`, `published:` to today's date, and `status:` (usually
    `Completed`).
-3. Check for leftovers: no `TK`, no `{/* notes to Codex */}`, no unused imports, and alt text
+3. Check for leftovers: no `TK`, no `{/* notes */}` comments, no unused imports, and alt text
    on every figure.
 4. Run the whole CI sequence locally:
    ```bash
