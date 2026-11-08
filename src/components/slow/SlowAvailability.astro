@@ -6,14 +6,14 @@ import './loop.css';
   <div class="hitl-stage">
     <p class="scene-title">What a delivery date depends on</p>
     <button class="loop-pause" data-pause-loop type="button" aria-label="Pause animation" aria-pressed="false">Ⅱ</button>
-    <canvas role="img" aria-label="Five warehouses and three boats serve different orders. One customer stays fixed. When the local depot empties, stock is transferred from the South depot. Once that stock is used, a new order waits for an incoming shipment to clear customs. North depot stock is already reserved for other customers. Orange shows the route behind the current delivery estimate."></canvas>
+    <canvas role="img" aria-label="Five warehouses and three boats serve different orders. One customer stays fixed. When the local warehouse empties, stock is transferred from the South warehouse. Once that stock is used, a new order waits for an incoming shipment to clear customs. North warehouse stock is already reserved for other customers. Orange shows the route behind the current delivery estimate."></canvas>
     <div class="estimate">
       <div><span class="eyebrow">The estimate we want the website to give</span><strong data-estimate>Arrives in 3–5 days</strong></div>
       <p data-source>From the local warehouse.</p>
     </div>
-    <noscript><p>When local stock runs out, stock can be transferred from the South depot. If both are empty, new orders wait for the incoming shipment. Stock at the North depot is already reserved for other customers.</p></noscript>
+    <noscript><p>When local stock runs out, stock can be transferred from the South warehouse. If both are empty, new orders wait for the incoming shipment. Stock at the North warehouse is already reserved for other customers.</p></noscript>
   </div>
-  <figcaption>For the same customer ordering at different moments, the answer changes. Orange traces the stock behind each estimate; other shipments serve other orders. A fictional network, with invented stock and delivery times.</figcaption>
+  <figcaption>A fictional network, with invented stock and delivery times.</figcaption>
 </figure>
 <style>
   .logistics .hitl-stage { border-radius: 1rem; box-shadow: 0 12px 32px light-dark(#354c3510, #00000024); }
@@ -153,7 +153,7 @@ import './loop.css';
         const count=state.stock[id];
         text(id==='north'?`${count} reserved`:count?`${count} available`:'Empty',{x:at.x,y:at.y+43},id==='north'?(dark?grey:'#63718c'):count?(dark?teal:'#357e72'):c.muted,narrow?10:11);
       };
-      warehouse('origin','Export A'); warehouse('west','Export B'); warehouse('north','North depot'); warehouse('local','Local depot'); warehouse('south','South depot');
+      warehouse('origin','Export A'); warehouse('west','Export B'); warehouse('north','North'); warehouse('local','Local'); warehouse('south','South');
       const port=nodes.customs;
       ctx.save();ctx.translate(port.x,port.y);ctx.scale(scale,scale);art.customs(ease((time-13300)/350));ctx.restore();
       pile({x:port.x-6,y:port.y+6},state.stock.customs);text('Customs',{x:port.x,y:port.y+29});
@@ -185,8 +185,8 @@ import './loop.css';
       if(state.source!==lastSource) {
         lastSource=state.source;
         const words={
-          local:['Arrives in 3–5 days','From the local depot.'],
-          south:['Arrives in 6–8 days','Stock from the South depot, transferred via Local.'],
+          local:['Arrives in 3–5 days','From the local warehouse.'],
+          south:['Arrives in 6–8 days','Stock from the South warehouse, sent on via Local.'],
           main:['Arrives in about 2 weeks','The next available batch is on the incoming ship.'],
           customs:['Arrives in about 1 week','The incoming batch is clearing customs.'],
         }[state.source];
