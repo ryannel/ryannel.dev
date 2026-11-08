@@ -62,15 +62,11 @@ anything I’ve made before, and almost every part of it is worth zooming into.
   caption="The observatory at Asterfall. On the map it is smaller than a fingernail."
 />
 
-The tricky part is size. The model that does the painting can only make a picture 1,536 pixels
-wide, and I wanted one nearly eight times wider. Most of this page is about how the map gets
-around that, but first it needs a look.
-
 ## Finding the look
 
 Two models share the work. Astra plans the map, writes the prompts and checks the results. GPT
-Image 2 does the painting. The first job is to settle on a style. The agent paints the same
-small scene a few different ways and you pick one. Every tile after that follows your choice, so
+Image 2 does the painting. The first job is to settle on a style. The agent paints a few versions
+in different styles and you pick one. Every tile after that follows your choice, so
 it’s worth taking your time over it.
 
 I spent an afternoon on this, and the early attempts looked like satellite photographs.
@@ -108,7 +104,8 @@ road leads somewhere and each port has a reason to exist.
 
 Bring as much of this as you like. When you run out of ideas, the agent can fill the gaps. I
 asked it to take inspiration from Dungeons & Dragons and to make room for all the variety in
-that setting. It came back with twenty-eight realms.
+that setting. It came back with twenty-eight realms. The layout of the world had also changed since
+that first evening, and the realms are drawn on the later version.
 
 <Figure
   src={territorial}
@@ -121,8 +118,8 @@ that setting. It came back with twenty-eight realms.
 GPT Image 2 paints at most 1,536 by 1,024 pixels. The first Lantern Sea, the whole world, is one
 picture that size.
 
-The finished map is 12,276 by 8,184 pixels. That’s just over 100 million pixels, about 64 times
-as many as the model can paint at once.
+The finished map is 12,276 by 8,184 pixels, nearly eight times wider. That’s just over 100
+million pixels, about 64 times as many as the model can paint at once.
 
 *Couldn’t you paint it small and scale it up?*
 
@@ -143,13 +140,14 @@ Painting a single tile is straightforward. The trouble starts where two tiles me
 separately and a river can leave one tile at a different place, width and colour from where it
 enters the next.
 
-Two things fix most of that. Each tile overlaps its neighbours by a couple of hundred pixels, so
-every join is painted twice. And before the agent paints a new tile, it copies in the finished
-edges of the tiles already beside it, so the model can see what it has to match.
+Two things fix most of that. Each tile overlaps its neighbours, by about 190 pixels side to side
+and 130 top to bottom, so every join is painted twice. That overlap is why the map takes 81 tiles
+rather than 64. And before the agent paints a new tile, it copies in the finished edges of the
+tiles already beside it, so the model can see what it has to match.
 
 ## The first tile
 
-Before the loop starts, one tile is painted at full size. This is the tile that tells you whether
+Before the loop starts, one tile is painted on its own. This is the tile that tells you whether
 the whole approach will work, so re-roll it until you’re happy. It’s also where you decide how
 places are drawn: a handful of roofs, a marker, or something in between. Every later tile copies
 what you choose here.
@@ -161,7 +159,7 @@ can spot the castle from the whole-world view, then zoom in to find the town aro
 <Figure
   src={crownmere}
   alt="The capital Crownmere at full resolution: a castle with blue slate roofs on a rise above a river bend, a walled town below it, a bridge, quays with boats, and fields and hedgerows all around."
-  caption="Crownmere, the capital. The castle is drawn oversized so it works as a marker."
+  caption="Crownmere, the royal capital. The castle is drawn oversized so it works as a marker."
   wide
 />
 
@@ -181,21 +179,19 @@ Here is one tile going through that loop.
 />
 
 The guide is deliberately crude. It has shaded relief, a blue line for the river, a pale line for
-each road and a numbered marker where each settlement goes. The rock, the roofs and the folds in
-the land are left for the model to invent.
+each road and a numbered marker where each settlement goes, all taken from the world plan. The
+rock, the roofs and the folds in the land are left for the model to invent.
 
-Along the top and left edges of the guide are strips of real painting, copied from the tiles
-already finished. They show the model the river at its true width and the light it has to match.
-What came back has a bridge town, a walled fortress and forested hills along the river.
+The strips of painting along its top and left edges are the copied edges of finished tiles. They
+show the model the river at its true width and the light it has to match. What came back has a
+bridge town, a walled fortress and forested hills along the river.
 
-*Does it actually line up?*
-
-Mostly. Here’s a strip across one join, at full size.
+A few joins still don’t line up, but most look like this strip across one, shown at full size.
 
 <Figure
   src={tileJoin}
   alt="A native-resolution strip across the boundary between two tiles, with the shared band marked by two dashed lines. A walled town sits in the tile above, a road runs down through the band into the tile below, and a fortress with red banners stands at the bottom right."
-  caption="Shown at full size. The dashed lines mark the strip both tiles painted; the road and the fields carry straight through."
+  caption="The dashed lines mark the band both tiles painted."
   wide
 />
 
@@ -215,9 +211,8 @@ not one. Here are four together, as they sit in the finished map.
 
 Repeat that eighty times and the map is finished.
 
-The plan for the world changed after that first evening, so the reference painting underneath is
-a later version. Here is the finished map built up over it, one tile at a time, until all 81 are
-in place.
+Here it is laid over that later whole-world painting, one tile after another,
+until all 81 are in place.
 
 <MapAssembly />
 
@@ -241,9 +236,12 @@ huge original image.
 
 ## Make your own
 
-Everything on this page is in a kit in my
-[experiments repository](https://github.com/ryannel/experiments/tree/main/map_creation). To get
-just that folder:
+The process on this page is in a kit in my
+[experiments repository](https://github.com/ryannel/experiments/tree/main/map_creation): the
+skills the agent follows, the templates and a working example. Its own helper builds smaller
+maps, up to about 16 megapixels. A map this size needs its own renderer, and the kit’s
+[notes on scaling](https://github.com/ryannel/experiments/blob/main/map_creation/docs/scaling.md)
+explain what that involves. To get just that folder:
 
 ```sh
 git clone --filter=blob:none --sparse https://github.com/ryannel/experiments.git experiments
@@ -256,5 +254,5 @@ best results. Type `$map-director` and describe the world you have in mind. The 
 takes you through the same steps as this page: the look, the world, the first tile, the rest of
 the tiles, and the labels.
 
-It took me ten days. Now that the process is worked out, you could have one of your own by the
-weekend.
+It took me ten days. Most of that went on working out the process, and that part is now written
+down.
