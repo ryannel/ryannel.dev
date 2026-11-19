@@ -309,12 +309,13 @@ import './loop.css';
       if (!meeting && !pickedAt && t - lastMeet >= PERIOD) {
         meeting = t;
         picksMade = false;
-        room = rows[2].filter(near);
+        // The delivery proposal counts as in the room even if a new arrival has just nudged it.
+        room = rows[2].filter((b) => b.ours || near(b));
       }
       if (meeting && !picksMade && t - meeting >= PICK) {
         picksMade = true;
         const others = room.filter((b) => !b.ours);
-        const ourTurn = !!ours && room.includes(ours) && lost >= 2;
+        const ourTurn = !!ours && room.includes(ours) && (lost >= 2 || others.length === 0);
         picked = ourTurn ? [ours!, ...others.slice(0, PICKS - 1)] : others.slice(0, PICKS);
         for (const b of picked) b.flash = 1;
         if (ours && room.includes(ours) && !ourTurn) {
@@ -424,7 +425,7 @@ import './loop.css';
         directors: 'The directors meet monthly and can align any number of teams. This one cuts into all of their goals.',
         senior: 'Only senior leaders can weigh it against everything else. They meet quarterly.',
         lost: `Q${lost}: other work wins. Below them, leads and directors keep settling smaller calls.`,
-        picked: 'Chosen in Q3: the leaders make room for the delivery work in every team’s plan.',
+        picked: `Chosen in Q${lost + 1}: the leaders make room for the delivery work in every team’s plan.`,
         done: 'Delivery work moves into all four plans. The outlined jobs move back to make room; work ahead of it still comes first.',
       }[stage]!;
     };
