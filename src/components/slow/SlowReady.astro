@@ -23,13 +23,13 @@ import '../../styles/hitl.css';
   </div>
   <div class="hitl-controls">
     <label for="slow-teams" class="hitl-note">Teams</label>
-    <input id="slow-teams" type="range" min="1" max="20" step="1" value="10" />
-    <span class="slow-value" data-out="teams" aria-hidden="true">10</span>
+    <input id="slow-teams" type="range" min="1" max="20" step="1" value="4" />
+    <span class="slow-value" data-out="teams" aria-hidden="true">4</span>
   </div>
   <div class="hitl-controls">
     <label for="slow-p" class="hitl-note slow-p">Each ready</label>
-    <input id="slow-p" class="slow-p" type="range" min="80" max="99" step="1" value="95" />
-    <span class="slow-value slow-p" data-out="p" aria-hidden="true">95%</span>
+    <input id="slow-p" class="slow-p" type="range" min="80" max="99" step="1" value="90" />
+    <span class="slow-value slow-p" data-out="p" aria-hidden="true">90%</span>
   </div>
   <p class="hitl-readout" aria-live="polite"></p>
   <figcaption>
@@ -78,8 +78,8 @@ import '../../styles/hitl.css';
     const reduced = reducedMotion();
     const rand = mulberry(5);
 
-    let k = 10;
-    let p = 0.95;
+    let k = 4;
+    let p = 0.9;
     let mode: 'ready' | 'slowest' = 'ready';
     let fade = 1; // 1 shows the first view, 0 the second
     let narrow = false;

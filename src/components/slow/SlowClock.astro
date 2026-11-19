@@ -19,12 +19,12 @@ const { upto } = Astro.props;
 // What each stretch is, and roughly how many weeks it takes in this sketch.
 const STRETCHES: [string, number][] = [
   ['Working out what the question is', 8],
-  ['Waiting for a decision', 14],
-  ['Waiting for every team to have room', 18],
-  ['Building and testing', 10],
+  ['Waiting for a decision', 26],
+  ['Waiting for every team to have room', 10],
+  ['Building and testing', 8],
   ['Adding the line to the page', 0.1],
 ];
-const SCALE = 52; // weeks across the full width of a bar
+const SCALE = 54; // weeks across the full width of a bar, with room for the last sliver
 const AFTERNOON = 0.1;
 
 const shown = STRETCHES.slice(0, upto);
@@ -35,7 +35,7 @@ const sofar =
   upto === 0
     ? 'The big company’s clock hasn’t started yet.'
     : `Big company so far: ${weeks(total)}${upto === STRETCHES.length ? ', of which the line itself took an afternoon' : ''}.`;
-const aria = `Two bars on the same scale of about a year. The small shop's is an afternoon, too thin to see. ${sofar}`;
+const aria = `Two bars on the same scale of about a year. The small shop's is an afternoon, a hairline. ${sofar}`;
 ---
 
 <figure class="hitl slow-clock" data-slow-clock>
@@ -71,7 +71,7 @@ const aria = `Two bars on the same scale of about a year. The small shop's is an
       )
     }
   </div>
-  <figcaption>A sketch with invented timings, on a scale of about a year.</figcaption>
+  {(upto === 1 || upto === STRETCHES.length) && <figcaption>A sketch with invented timings, on a scale of about a year.</figcaption>}
 </figure>
 
 <style>
