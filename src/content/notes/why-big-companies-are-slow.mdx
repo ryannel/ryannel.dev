@@ -1,8 +1,8 @@
 ---
 title: "Why big companies are slow"
-description: "One line on a product page takes a small shop an afternoon. A clock on where the rest of a big company’s year goes."
+description: "One line on a product page takes a small shop an afternoon. Here’s where a big company’s year goes."
 published: 2026-11-02
-updated: 2026-11-19
+updated: 2026-11-21
 draft: false
 tags: ["ways of working"]
 links:
@@ -24,12 +24,16 @@ import SlowAvailability from '../../components/slow/SlowAvailability.astro';
 import SlowEscalate from '../../components/slow/SlowEscalate.astro';
 import SlowReady from '../../components/slow/SlowReady.astro';
 
-Under the price of a kettle on a shopping site there’s often a line like “Arrives in 3–5 days”.
-Adding that line to a page is about an afternoon of work. At a big company, it can take many months
-to appear.
+Under the price of a kettle on a shopping site there’s often a line like “Arrives in 3–5 days”. At a
+small shop, adding that line is about an afternoon of work. At a big company it can take many months.
 
-Say a small shop and a big company both decide to add the line on the same Monday, and we keep a
-clock on each of them.
+People who move from a startup to a big company notice this quickly, and they often say so: “we were
+much better at this at my last place.” Usually they have a point. Big companies do get messy. But the
+mess doesn’t explain all of it, and the easiest way to see why is to follow this one line all the
+way through.
+
+Say a small shop and a big company both decide to add the line on the same Monday, and we time each
+of them. The timings are made up, but the shape is real.
 
 <SlowProduct />
 
@@ -44,88 +48,104 @@ The shop’s clock stops on Monday afternoon. The big company’s has only just 
 
 ## Bigger than it looks
 
-A big company doesn’t have a shelf. It has warehouses in many countries, fed by factories and ships,
-and the stock in them moves all the time. Some of it is already promised to retailers, and when the
-nearest warehouse runs out, the order might come from another one or wait for a ship.
+The big company makes its own kettles and sells them online and through other shops, so it has no
+single shelf to look at. It has warehouses in many countries, fed by factories and ships, and the
+stock in them moves all the time. There might be plenty of kettles in one warehouse and none in the
+one near the customer. Some of the stock is already promised to the shops it supplies. If the
+nearest warehouse runs out, the order might come from another one, or wait for a ship.
 
 <SlowAvailability />
 
 So the date has to be worked out for each customer, from where the stock is right now, at the moment
-they look. A range wide enough to cover every case, like “Arrives in 1–4 weeks”, would rarely be
-wrong, but it tells the customer almost nothing, and they might buy the kettle from someone who
-promises Thursday.
+they look. The company could show a range wide enough to cover every case, like “Arrives in 1–4
+weeks”. That would rarely be wrong, but it tells the customer almost nothing, and they might buy the
+kettle from someone who promises Thursday.
 
 The date also has to be right nearly every time. If the shop’s date is wrong one time in fifty,
 that’s an apology now and then. At a million orders, the same rate means twenty thousand customers
-told the wrong date, and the phone calls that go with them.
+told the wrong date, and many of them will phone to ask where their kettle is.
 
-Checkout needs to hold the kettle, so that two customers aren’t promised the same one. The
-warehouses, the sales teams and customer care turn out to need the same answer, and each of them
-works it out today with spreadsheets and phone calls. What started as one line on a page is really a
-system that says which stock can be promised to whom, and when it will get there. The line is one
-small use of it.
+And once the website has promised a date, checkout has to hold the kettle, so that two customers
+aren’t promised the same one.
 
-In this sketch, working all that out takes about two months of conversations, and nothing has been
-built yet.
+The website isn’t the only part of the company that needs this answer, either. Sales teams need to
+know what they can offer the shops they supply. Warehouses need to know which orders have a claim on
+their stock. Customer care needs to know what to tell someone whose kettle is late. Today each of
+them works it out with spreadsheets, phone calls and best guesses. So what started as one line on a
+page is really a system that says which stock can be promised to whom, and when it will get there.
+The line is one small use of it.
+
+Just working out that this is what’s really being asked takes about two months of meetings. Nothing
+has been built yet.
 
 <SlowClock upto={1} />
 
 ## Lots of teams
 
 No single team knows the whole answer. The warehouse team knows what’s on its shelves. The order
-team keeps the record of what’s been sold, online and to retailers. Logistics knows how long delivery
-takes from each warehouse. The website team, who were asked for the line, know none of it.
+team keeps the record of what’s been sold, online and to other shops. Logistics knows how long
+delivery takes from each warehouse. The website team, who were asked for the line, know none of it.
 
 All four teams have their own systems, and all of them will have to change. They also have to agree
 on questions none of them has had to answer before. When does stock count as reserved? Can an online
-order use stock that’s held for a retailer? Which warehouses can serve which customers?
+order use stock that’s held for another shop? Which warehouses can serve which customers?
 
-A team lead can decide to make room for something in their own team, but no team lead can tell the
-other three what to put on hold. So the decision goes up. Directors, who meet every month, can
-settle a lot of these. This one changes every team’s plans, though, and pushes other important work
-back, so it goes up again, to the senior leaders who weigh the whole company’s plans against each
-other.
+Every team already has a full plan of work, so making room for this means putting something else on
+hold. A team lead can decide that for their own team, but no team lead can tell the other three what
+to put on hold. So the decision goes up.
+
+Directors meet every month and can settle a lot of decisions like this. But this one changes every
+team’s plans and pushes other important work back. So it goes up again, to the senior leaders who
+weigh the whole company’s plans against each other.
 
 <SlowEscalate />
 
-Those leaders are deciding for a lot of teams at once, and teams that change direction every week
-never finish anything. So the big decisions are saved up for a planning round, often once a quarter.
-The delivery system goes into that round alongside everything else every team would like to do. If
-other work wins, it waits for the next round. By the time it’s chosen, the clock is at nearly eight
-months.
+Senior leaders are deciding for a lot of teams at once, and teams that change direction too often
+struggle to finish anything. So the big decisions are saved up for a planning round, often once a
+quarter. The delivery system goes into that round alongside everything else every team would like to
+do. Say other work wins the first two rounds, and it’s chosen at the third. That’s two quarters of
+waiting, and the clock is now at nearly eight months.
 
 <SlowClock upto={2} />
 
 ## Everyone is busy
 
-Say the delivery system is finally chosen. You might expect the teams to start on it the next
-morning, but none of them was sitting idle, waiting for it to arrive. Every team already has a plan
-full of work, and all of that work was chosen because it mattered. Some of it is half done, and some
-is promised to other people.
+Once the delivery system is chosen, it still can’t start the next morning. None of the teams has been
+sitting idle, waiting for it. The work already in their plans was chosen because it matters, and
+often it really does. Some of it is half done, and some is promised to other people.
 
-The line can only go live once every team has done its part. Suppose each team has room for new
-work in nine weeks out of ten. Our four teams all have room in the same week only about two weeks in
-three. Ten teams would all have room only about one week in three. Each team is nearly always ready,
-and together they often aren’t.
+The line can only go live once every team has done its part. Suppose each team has room for new work
+in nine weeks out of ten. That sounds like plenty. But for all four of our teams to have room in the
+same week, each of them has to be free at once, and that happens only about two weeks in three. With
+ten teams, it would be about one week in three. The more teams the work needs, the rarer those weeks
+get.
 
 <SlowReady />
 
-Real teams don’t wait for a week when they’re all free at once. Each starts its part when it gets to
-it, and the line goes live when the last one finishes. That softens the arithmetic but keeps its
-shape: the more teams the work needs, the longer it waits for the last of them. In this sketch,
-that’s another couple of months.
+Real teams don’t wait for a week when they’re all free at once. One team can start now. Another has a
+release to finish first, and another has work that still comes ahead of this. The website team can
+build the page with sample data while they wait. But the line can’t go live until the last team has
+finished, and the more teams there are, the longer that tends to be. Here, it adds another couple of
+months.
 
 <SlowClock upto={3} />
 
 ## The same line
 
-Then comes the building. Each team changes its own systems, and the pieces are connected and tested
-together. It’s real work, and it takes a couple of months of its own.
+Meanwhile, each team changes its own systems, and then the pieces are connected and tested together.
+The page might be ready long before it can show a real date, one backed by stock that checkout can
+actually hold. It’s real work, and it takes a couple of months of its own.
 
 When the day comes, adding the line to the page takes an afternoon, just as it did for the shop
 owner.
 
 <SlowClock upto={5} />
 
-The customer sees the same “Arrives in 3–5 days” that the shop owner typed on a Monday afternoon,
-a year earlier.
+Most of that year wasn’t building. It went on working out what was being asked, waiting for a
+planning round, and waiting for every team to have room. Nobody was idle in that time. Every team was
+busy with work that had been judged more important, and often it was. The newcomer who says things
+were better at their last place usually has a point, but even a tidy big company would take a while
+to ship this.
+
+The customer sees the same “Arrives in 3–5 days” that the shop owner typed on a Monday afternoon, a
+year earlier.
