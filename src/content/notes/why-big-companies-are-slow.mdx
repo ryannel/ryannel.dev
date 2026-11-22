@@ -1,8 +1,8 @@
 ---
 title: "Why big companies are slow"
-description: "One line on a product page takes a small shop an afternoon. Here’s where a big company’s year goes."
+description: "The forces that slow a big company down, why each one is reasonable, and how they add up."
 published: 2026-11-02
-updated: 2026-11-21
+updated: 2026-11-22
 draft: false
 tags: ["ways of working"]
 links:
@@ -18,134 +18,138 @@ links:
     href: "https://www.melconway.com/Home/Committees_Paper.html"
 ---
 
-import SlowProduct from '../../components/slow/SlowProduct.astro';
-import SlowClock from '../../components/slow/SlowClock.astro';
-import SlowAvailability from '../../components/slow/SlowAvailability.astro';
+import SlowWeb from '../../components/slow/SlowWeb.astro';
+import SlowRipple from '../../components/slow/SlowRipple.astro';
+import SlowQueue from '../../components/slow/SlowQueue.astro';
 import SlowEscalate from '../../components/slow/SlowEscalate.astro';
-import SlowReady from '../../components/slow/SlowReady.astro';
 
-Under the price of a kettle on a shopping site there’s often a line like “Arrives in 3–5 days”. At a
-small shop, adding that line is about an afternoon of work. At a big company it can take many months.
+In a small company, a change can happen in an afternoon. In a big one it can take months.
 
 People who move from a startup to a big company notice this quickly, and they often say so: “we were
-much better at this at my last place.” Usually they have a point. Big companies do get messy. But the
-mess doesn’t explain all of it, and the easiest way to see why is to follow this one line all the
-way through.
+much better at this at my last place.” Usually they have a point. Big companies do get messy,
+especially ones that have been around a while. Years of growth leave old systems behind, along with
+processes that made sense once and decisions nobody quite remembers making.
 
-Say a small shop and a big company both decide to add the line on the same Monday, and we time each
-of them. The timings are made up, but the shape is real.
+But the mess doesn’t explain all of it. Even a tidy big company would be slower than a small one,
+because size brings some forces with it that no amount of tidying removes. None of them is anyone
+being lazy or foolish. Each one is a sensible response to being big. The trouble is that they add up.
 
-<SlowProduct />
+## There’s more to know
 
-## The afternoon
+A big company simply has more going on. It sells more products, in more countries, to more kinds of
+customer. Each country has its own taxes, languages, payment methods and rules. Each product has its
+own suppliers and its own odd cases that someone once had to handle.
 
-The owner of a small shop already knows everything the line needs. They know what’s on the shelf,
-what’s been put aside for someone, and how long the local post usually takes. They pick a range
-that’s nearly always right, type it in, and get on with the day. If a kettle turns up a day late,
-they apologise to one customer.
+Suppose the company wants to change how it charges for delivery. In one country that’s a setting. In
+thirty, it’s thirty sets of rules, some of which nobody in the room knows.
 
-The shop’s clock stops on Monday afternoon. The big company’s has only just started.
+That complexity is real. It’s what the company’s customers are paying for, and it can’t be tidied
+away.
 
-## Bigger than it looks
+## It’s spread over many teams
 
-The big company makes its own kettles and sells them online and through other shops, so it has no
-single shelf to look at. It has warehouses in many countries, fed by factories and ships, and the
-stock in them moves all the time. There might be plenty of kettles in one warehouse and none in the
-one near the customer. Some of the stock is already promised to the shops it supplies. If the
-nearest warehouse runs out, the order might come from another one, or wait for a ship.
+No one person can hold all of that, so the company splits it up. Each team owns a part, such as
+checkout, stock, payments or loyalty, and each part runs on its own systems. Over time the systems
+come to lean on each other. Checkout needs stock to know what can be sold. Payments needs checkout to
+know what to charge.
 
-<SlowAvailability />
+Splitting the work makes each part manageable, but it costs something. Every pair of teams whose
+systems lean on each other is a conversation that might need to happen, and the number of pairs grows
+much faster than the number of teams. Ten teams make 45 possible pairs. Twenty make 190.
 
-So the date has to be worked out for each customer, from where the stock is right now, at the moment
-they look. The company could show a range wide enough to cover every case, like “Arrives in 1–4
-weeks”. That would rarely be wrong, but it tells the customer almost nothing, and they might buy the
-kettle from someone who promises Thursday.
+<SlowWeb />
 
-The date also has to be right nearly every time. If the shop’s date is wrong one time in fifty,
-that’s an apology now and then. At a million orders, the same rate means twenty thousand customers
-told the wrong date, and many of them will phone to ask where their kettle is.
+## So changes cut across teams
 
-And once the website has promised a date, checkout has to hold the kettle, so that two customers
-aren’t promised the same one.
+Because the systems lean on each other, a change to one often reaches others. Suppose the company
+wants a new kind of discount. That sounds like a checkout change. But payments has to charge it
+correctly, the loyalty programme has to decide whether it counts, and reporting has to show it to the
+people who track sales. Some changes reach further still, into other business areas with their own
+leaders and their own goals.
 
-The website isn’t the only part of the company that needs this answer, either. Sales teams need to
-know what they can offer the shops they supply. Warehouses need to know which orders have a claim on
-their stock. Customer care needs to know what to tell someone whose kettle is late. Today each of
-them works it out with spreadsheets, phone calls and best guesses. So what started as one line on a
-page is really a system that says which stock can be promised to whom, and when it will get there.
-The line is one small use of it.
+Before anyone builds anything, someone has to work out what has to change and which teams are
+affected. That means reading other teams’ systems, finding the people who know them, and asking
+questions they haven’t been asked before. It’s real work, and it can take weeks.
 
-Just working out that this is what’s really being asked takes about two months of meetings. Nothing
-has been built yet.
+<SlowRipple />
 
-<SlowClock upto={1} />
+## Mistakes cost more
 
-## Lots of teams
+Every team a change reaches is one more place it can go wrong, and at this size mistakes are
+expensive. When a small shop gets something wrong, it apologises to a few customers. When a company
+with millions of customers gets something wrong, it can mean thousands of complaints, a letter from a
+regulator, or a headline.
 
-No single team knows the whole answer. The warehouse team knows what’s on its shelves. The order
-team keeps the record of what’s been sold, online and to other shops. Logistics knows how long
-delivery takes from each warehouse. The website team, who were asked for the line, know none of it.
+So big companies, sensibly, check more. A change might need sign-off from legal, from security, or
+from each country it touches. Decisions that would be hard to undo get passed up to people who can see
+more of the picture. Each check is there because something once went wrong without it, and each one
+adds a little time.
 
-All four teams have their own systems, and all of them will have to change. They also have to agree
-on questions none of them has had to answer before. When does stock count as reserved? Can an online
-order use stock that’s held for another shop? Which warehouses can serve which customers?
+## Everyone is already busy
 
-Every team already has a full plan of work, so making room for this means putting something else on
-hold. A team lead can decide that for their own team, but no team lead can tell the other three what
-to put on hold. So the decision goes up.
+All of that has to happen around work that’s already under way. Every team has a plan full of it,
+and that work was chosen because it was important. If you want your change done, it has to take its
+place in that order. It can’t simply jump ahead, because whatever it pushed back was also important
+to someone.
 
-Directors meet every month and can settle a lot of decisions like this. But this one changes every
-team’s plans and pushes other important work back. So it goes up again, to the senior leaders who
-weigh the whole company’s plans against each other.
+Being busy costs more time than it seems to. When a team is busy most of the time, new work usually
+arrives to find it in the middle of something else, so it waits. The busier the team, the longer the
+wait. Suppose a piece of work needs a day from each of five teams, and the work arrives at random. If
+each team is busy 80% of the time, the day of work takes about five days to get through each team on
+average, so all five take about 25. At 90% busy it’s about ten days a team, or 50 in all. A team
+running flat out looks efficient, but everything that passes through it waits.
+
+<SlowQueue />
+
+## Cross-team work belongs to nobody
+
+The order of each team’s plan is set by its own goals. That’s fair, because it’s how a team knows
+whether it’s doing well. But it means work that helps several teams a little, and none of them a lot,
+has no natural home.
+
+Take the discount again. Reporting it properly would help finance a little and checkout a little, but
+neither has it in their plan. Every team can see the value in it, and every team has something more
+pressing of its own. So work that cuts across teams tends to wait for someone with a wider view to
+pick it up.
+
+## Someone higher up has to choose
+
+Within one team, a team lead can decide to make room for something. A change that needs time from
+several teams is different. No team lead can tell the other teams what to put on hold, so the
+decision goes up to someone who can weigh those teams’ plans against each other. For a change that
+reaches across business areas, that can be quite senior.
+
+Those people are deciding for a lot of teams at once. And teams that change direction too often
+struggle to finish anything, because every switch leaves half-done work behind. So leaders can’t
+change their minds often. They save the big decisions up and make them on a slow cadence, perhaps
+once a quarter. If other work wins this round, the change waits for the next one.
 
 <SlowEscalate />
 
-Senior leaders are deciding for a lot of teams at once, and teams that change direction too often
-struggle to finish anything. So the big decisions are saved up for a planning round, often once a
-quarter. The delivery system goes into that round alongside everything else every team would like to
-do. Say other work wins the first two rounds, and it’s chosen at the third. That’s two quarters of
-waiting, and the clock is now at nearly eight months.
+## They add up
 
-<SlowClock upto={2} />
+Each of these forces on its own would slow things a little. Together they do more than that, because
+each one feeds the next. The complexity is why the work is spread across teams. The spread is why
+changes cut across them, and why working out what to change takes weeks. Every team a change reaches
+adds a check, and a full queue to wait in. No single team owns the change, so it goes up for a
+decision, and that decision comes a quarter at a time.
 
-## Everyone is busy
+That’s how a change that someone could describe in a sentence can take months, sometimes most of a
+year. Nobody was idle in that time. Every team was busy with work that had been judged more
+important, and often it was.
 
-Once the delivery system is chosen, it still can’t start the next morning. None of the teams has been
-sitting idle, waiting for it. The work already in their plans was chosen because it matters, and
-often it really does. Some of it is half done, and some is promised to other people.
+## What helps
 
-The line can only go live once every team has done its part. Suppose each team has room for new work
-in nine weeks out of ten. That sounds like plenty. But for all four of our teams to have room in the
-same week, each of them has to be free at once, and that happens only about two weeks in three. With
-ten teams, it would be about one week in three. The more teams the work needs, the rarer those weeks
-get.
+None of this makes a big company small, and I don’t think there’s one fix for it. But a few things
+seem to help.
 
-<SlowReady />
+When a team owns something from end to end, it needs other teams less, so more changes stay inside
+it. Teams with a little slack keep their queues short, so new work waits less. Decisions that are easy
+to undo can be made lower down and sooner, which leaves the slow cadence for the few that really need
+it.
 
-Real teams don’t wait for a week when they’re all free at once. One team can start now. Another has a
-release to finish first, and another has work that still comes ahead of this. The website team can
-build the page with sample data while they wait. But the line can’t go live until the last team has
-finished, and the more teams there are, the longer that tends to be. Here, it adds another couple of
-months.
+And it helps just to know the forces are there. A change that touches six teams will be slow, and
+it’s kinder to plan for that than to be surprised by it.
 
-<SlowClock upto={3} />
-
-## The same line
-
-Meanwhile, each team changes its own systems, and then the pieces are connected and tested together.
-The page might be ready long before it can show a real date, one backed by stock that checkout can
-actually hold. It’s real work, and it takes a couple of months of its own.
-
-When the day comes, adding the line to the page takes an afternoon, just as it did for the shop
-owner.
-
-<SlowClock upto={5} />
-
-Most of that year wasn’t building. It went on working out what was being asked, waiting for a
-planning round, and waiting for every team to have room. Nobody was idle in that time. Every team was
-busy with work that had been judged more important, and often it was. The newcomer who says things
-were better at their last place usually has a point, but even a tidy big company would take a while
-to ship this.
-
-The customer sees the same “Arrives in 3–5 days” that the shop owner typed on a Monday afternoon, a
-year earlier.
+The newcomer who says things were better at their last place usually has a point. But some of what
+they’re noticing is the cost of being big, and that cost is mostly people doing their jobs well.

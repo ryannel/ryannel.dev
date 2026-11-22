@@ -10,7 +10,7 @@ import '../../styles/hitl.css';
  * work takes 25 days at 80% and 50 at 90%. The chart plots that line, with a
  * dot for each change as it finishes. A model with invented teams, not data.
  */
-const stages = ['Checkout', 'Delivery', 'Payments', 'App', 'Release'];
+const stages = ['Checkout', 'Stock', 'Payments', 'Loyalty', 'Reporting'];
 ---
 
 <figure class="hitl slow-queue" data-slow-queue data-stages={JSON.stringify(stages)}>
@@ -322,8 +322,8 @@ const stages = ['Checkout', 'Delivery', 'Payments', 'App', 'Release'];
       let note = '';
       if (tracked) {
         const work = tracked.work + (tracked.stage < K && queues[tracked.stage][0] === tracked ? t - tracked.since : 0);
-        note = `The marked piece has been going ${Math.floor(t - tracked.born)} days; ${work.toFixed(1)} of them were work.`;
-      } else if (lastTracked) note = `The last marked piece took ${Math.round(lastTracked.days)} days, for ${lastTracked.work.toFixed(1)} days of work.`;
+        note = `The marked piece has been on its way for ${Math.floor(t - tracked.born)} days. It has been worked on for ${work.toFixed(1)} of them.`;
+      } else if (lastTracked) note = `The last marked piece took ${Math.round(lastTracked.days)} days, and was worked on for ${lastTracked.work.toFixed(1)} of them.`;
       readout.innerHTML = `<strong>Each team busy ${pct}% of the time.</strong> Five days of work takes about ${days} days. <span class="hitl-note">${note}</span>`;
     };
 
