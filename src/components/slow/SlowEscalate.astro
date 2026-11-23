@@ -24,14 +24,14 @@ import './loop.css';
     <canvas
       class="slow-canvas"
       role="img"
-      aria-label="Four teams work through their own queues. New work arrives above the teams it touches. The leads of those teams settle most of it straight away. Some goes up to the directors, who meet monthly, and a little goes on to senior leaders, who meet quarterly. The orange delivery proposal touches all four teams. Neither the leads nor the directors can settle it, so it waits for senior leaders, loses two quarterly rounds, and is chosen at the third, when it enters all four teams' plans."
+      aria-label="Four teams work through their own queues. New work arrives above the teams it touches. The leads of those teams settle most of it straight away. Some goes up to the directors, who meet monthly, and a little goes on to senior leaders, who meet quarterly. The orange change touches all four teams. Neither the leads nor the directors can settle it, so it waits for senior leaders, loses two quarterly rounds, and is chosen at the third, when it enters all four teams' plans."
     ></canvas>
     <button class="loop-pause" data-pause-loop type="button" aria-label="Pause animation" aria-pressed="false">Ⅱ</button>
-    <noscript><p class="hitl-note">New work goes to the lowest group that can agree on it: the team leads, the directors monthly, or senior leaders quarterly. The delivery proposal goes all the way up and waits through two quarterly rounds while the teams continue other work.</p></noscript>
+    <noscript><p class="hitl-note">New work goes to the lowest group that can agree on it: the team leads, the directors monthly, or senior leaders quarterly. The orange change goes all the way up and waits through two quarterly rounds while the teams continue other work.</p></noscript>
   </div>
   <p class="hitl-readout"></p>
   <figcaption>
-    Orange is the delivery proposal. A sketch with invented timings and reporting lines.
+    Orange is a change that needs all four teams. A sketch with invented timings and reporting lines.
   </figcaption>
 </figure>
 
@@ -81,7 +81,7 @@ import './loop.css';
     ['#8e9cb0', '#a9b5c6'],
   ];
   const PACES = [2300, 3400, 2600, 2900];
-  const NAMES = ['Warehouse', 'Orders', 'Logistics', 'Website'];
+  const NAMES = ['Checkout', 'Payments', 'Loyalty', 'Reporting'];
   const OURS: Hue = ['#ec8a3c', '#f4a35e'];
 
   // The work that turns up, in order. Escalation follows whether the group can
@@ -421,12 +421,12 @@ import './loop.css';
     const describe = () => {
       readout.textContent = {
         start: 'New work arrives above the teams it touches. If their leads can agree, it goes straight into their plans.',
-        arrived: 'Delivery dates touch all four teams. Their leads meet, but each would have to drop committed work.',
+        arrived: 'This change touches all four teams. Their leads meet, but each would have to drop work they’ve already committed to.',
         directors: 'The directors meet monthly and can align any number of teams. This one cuts into all of their goals.',
         senior: 'Only senior leaders can weigh it against everything else. They meet quarterly.',
         lost: `Quarter ${lost}: other work wins. Below them, leads and directors keep settling smaller calls.`,
-        picked: `Chosen in quarter ${lost + 1}: the leaders make room for the delivery work in every team’s plan.`,
-        done: 'Delivery work moves into all four plans. Other jobs move back to make room, and work already ahead of it still comes first.',
+        picked: `Chosen in quarter ${lost + 1}: the leaders make room for the change in every team’s plan.`,
+        done: 'The change moves into all four plans. Some other jobs are pushed back to make room. Work that was already ahead of it still comes first.',
       }[stage]!;
     };
 
@@ -602,7 +602,7 @@ import './loop.css';
         label(ctx, c, view.px, NAMES[i], x, g.floor + px(16), c.muted);
       });
       ctx.font = `${px(11)}px ${c.font}`;
-      label(ctx, c, view.px, 'Next job at the bottom · outlined jobs move back', g.box.x + g.box.w / 2, g.floor + px(40), c.muted);
+      label(ctx, c, view.px, 'Next job at the bottom · dashed jobs get pushed back', g.box.x + g.box.w / 2, g.floor + px(40), c.muted);
 
       // Calls waiting on a decision, with the teams each one touches. In the
       // senior leaders' room every call is weighed across all of it.
@@ -615,7 +615,7 @@ import './loop.css';
           ctx.font = `600 ${px(12)}px ${c.font}`;
           ctx.save();
           ctx.globalAlpha = ours.grow < 1 ? ours.grow : 1;
-          label(ctx, c, view.px, 'Delivery dates', ours.x, ours.y - R() - px(11), OURS[dk]);
+          label(ctx, c, view.px, 'Our change', ours.x, ours.y - R() - px(11), OURS[dk]);
           ctx.restore();
         }
       }
