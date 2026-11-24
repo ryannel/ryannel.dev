@@ -1,0 +1,128 @@
+---
+import '../../styles/hitl.css';
+import './cash.css';
+---
+<figure class="hitl cash" data-cash-growth>
+  <div class="hitl-stage">
+    <canvas role="img" aria-label="Two lines over three years: Norrvik's profit so far, and the cash in its bank. A slider sets how fast it grows. The profit line always climbs. The faster Norrvik grows, the further the cash line falls, and above about 35% a year it drops below zero."></canvas>
+  </div>
+  <div class="cash-controls">
+    <label for="cash-growth-rate">Growth per year: <output data-growth-value>25%</output></label>
+    <input id="cash-growth-rate" type="range" min="0" max="60" step="5" value="25" data-growth />
+  </div>
+  <p class="hitl-readout" data-growth-readout aria-live="polite"></p>
+  <figcaption>Every car is still sold at a profit. Norrvik starts with 5 billion kr in the bank. A sketch with invented numbers.</figcaption>
+</figure>
+<script>
+  import { theme, fit, ball, NARROW } from '../slow/canvas';
+  import { text, orange, grey, bn, tween } from './draw';
+
+  const MONTHS = 36;
+  const START_CASH = 5;
+  const MARGIN = 0.0625; // 25,000 kr of each 400,000 kr car
+  const REVENUE = 100; // billion kr a year, today
+  const TIED = 90 / 365; // three months of costs waiting in cars
+  const COST = REVENUE * (1 - MARGIN);
+  const Y_MIN = -35;
+  const Y_MAX = 45;
+
+  /** Cumulative profit and cash, month by month, for growth g a year. */
+  const model = (g: number) => {
+    const profit: number[] = [0];
+    const cash: number[] = [START_CASH];
+    let made = 0;
+    for (let m = 1; m <= MONTHS; m++) {
+      const scale = Math.pow(1 + g, m / 12);
+      made += (REVENUE * scale * MARGIN) / 12;
+      const extra = COST * TIED * (scale - 1);
+      profit.push(made);
+      cash.push(START_CASH + made - extra);
+    }
+    return { profit, cash };
+  };
+
+  for (const figure of document.querySelectorAll<HTMLElement>('[data-cash-growth]')) {
+    const input = figure.querySelector<HTMLInputElement>('[data-growth]')!;
+    const value = figure.querySelector<HTMLOutputElement>('[data-growth-value]')!;
+    const readout = figure.querySelector<HTMLElement>('[data-growth-readout]')!;
+    let shown: number[] = [];
+    let draw = () => {};
+    const c = theme(figure, () => draw());
+    const { ctx, view, clear } = fit(figure.querySelector('canvas')!, (w) => ({ W: w, H: w < NARROW ? 280 : 300 }), () => draw());
+
+    draw = () => {
+      clear(c.paper);
+      if (!shown.length) return;
+      const w = view.W;
+      const narrow = w < NARROW;
+      const o = orange(c);
+      const g = grey(c);
+      const left = narrow ? 44 : 64;
+      const right = w - (narrow ? 14 : 28);
+      const top = 50;
+      const bottom = view.H - 34;
+      const x = (m: number) => left + (m / MONTHS) * (right - left);
+      const y = (v: number) => bottom - ((v - Y_MIN) / (Y_MAX - Y_MIN)) * (bottom - top);
+
+      ball(ctx, left + 6, 22, 5, g);
+      text(ctx, c, 'Profit so far', left + 16, 22, { colour: c.muted });
+      ball(ctx, left + 116, 22, 5, o);
+      text(ctx, c, 'Cash in the bank', left + 126, 22, { colour: c.muted });
+
+      for (const v of [-20, 0, 20, 40]) {
+        ctx.strokeStyle = c.rule;
+        ctx.lineWidth = v === 0 ? 1.5 : 1;
+        ctx.globalAlpha = v === 0 ? 1 : 0.6;
+        ctx.beginPath();
+        ctx.moveTo(left, y(v));
+        ctx.lineTo(right, y(v));
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        text(ctx, c, v === 0 ? '0' : `${v} bn`, left - 8, y(v), { colour: c.muted, align: 'right', size: 11 });
+      }
+      for (let year = 1; year <= 3; year++) {
+        text(ctx, c, `Year ${year}`, x(year * 12 - 6), bottom + 18, { colour: c.muted, align: 'center', size: 11 });
+      }
+
+      const line = (values: number[], colour: string) => {
+        ctx.strokeStyle = colour;
+        ctx.lineWidth = 2.5;
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        values.forEach((v, m) => (m ? ctx.lineTo(x(m), y(v)) : ctx.moveTo(x(m), y(v))));
+        ctx.stroke();
+      };
+      const profit = shown.slice(0, MONTHS + 1);
+      const cash = shown.slice(MONTHS + 1);
+      line(profit, g);
+      line(cash, o);
+      const end = cash[MONTHS];
+      ctx.fillStyle = o;
+      ctx.beginPath();
+      ctx.arc(x(MONTHS), y(end), 4, 0, Math.PI * 2);
+      ctx.fill();
+    };
+
+    const target = () => {
+      const { profit, cash } = model(Number(input.value) / 100);
+      return [...profit, ...cash];
+    };
+    const update = tween(target, (v) => (shown = v), () => draw());
+
+    const describe = () => {
+      const rate = Number(input.value);
+      value.textContent = `${rate}%`;
+      const { profit, cash } = model(rate / 100);
+      const below = cash.findIndex((v) => v < 0);
+      let s = rate === 0
+        ? `Not growing, Norrvik makes ${bn(profit[MONTHS])} of profit over three years, and all of it ends up in the bank.`
+        : `Growing ${rate}% a year, Norrvik makes ${bn(profit[MONTHS])} of profit over three years. Its bank balance goes from 5 billion to ${bn(cash[MONTHS])}.`;
+      if (below > 0) s += ` It runs out of cash in year ${Math.ceil(below / 12)}.`;
+      readout.textContent = s;
+    };
+
+    input.addEventListener('input', () => { describe(); update(); });
+    describe();
+    update();
+  }
+</script>

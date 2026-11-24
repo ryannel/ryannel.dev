@@ -1,0 +1,96 @@
+---
+import '../../styles/hitl.css';
+import '../slow/loop.css';
+import './cash.css';
+---
+<figure class="hitl slow-loop cash" data-cash-split>
+  <div class="hitl-stage">
+    <canvas role="img" aria-label="A bar for the 400,000 kronor a dealer pays for one car. Pieces drop out of it one at a time: 280,000 kronor for parts and materials, 40,000 for the factory and its people, 10,000 for shipping, 35,000 for design, marketing and running the company, and 10,000 for warranty repairs. A thin 25,000 kronor slice is left at the end: the profit."></canvas>
+    <button class="loop-pause" data-pause-loop type="button" aria-label="Pause animation" aria-pressed="false">Ⅱ</button>
+    <noscript><p>Of 400,000 kr: parts 280,000, factory 40,000, shipping 10,000, design, marketing and running costs 35,000, warranty 10,000. Profit: 25,000.</p></noscript>
+  </div>
+  <figcaption>Where the 400,000 kr for one car goes. A sketch with invented numbers.</figcaption>
+</figure>
+<script>
+  import { theme, fit, HUES, isDark, NARROW } from '../slow/canvas';
+  import { loop, ease, clamp } from '../slow/loop';
+  import { text, orange, kr } from './draw';
+
+  const PARTS = [
+    { name: 'Parts and materials', short: 'Parts', amount: 280000, hue: 'purchasing' },
+    { name: 'The factory and its people', short: 'Factory', amount: 40000, hue: 'factory' },
+    { name: 'Shipping', short: 'Shipping', amount: 10000, hue: 'logistics' },
+    { name: 'Design, marketing and running the company', short: 'Design and overheads', amount: 35000, hue: 'warehouses' },
+    { name: 'Warranty repairs', short: 'Warranty', amount: 10000, hue: 'website' },
+  ] as const;
+  const PRICE = 400000;
+  const START = 1200;
+  const STEP = 1100;
+  const END = START + PARTS.length * STEP + 600;
+  const DURATION = END + 3600;
+
+  for (const figure of document.querySelectorAll<HTMLElement>('[data-cash-split]')) {
+    let time = DURATION - 1;
+    let draw = () => {};
+    const c = theme(figure, () => draw());
+    const { ctx, view, clear } = fit(figure.querySelector('canvas')!, (w) => ({ W: w, H: w < NARROW ? 320 : 280 }), () => draw());
+    draw = () => {
+      clear(c.paper);
+      const w = view.W;
+      const narrow = w < NARROW;
+      const dark = isDark(c);
+      const left = narrow ? 14 : 24;
+      const right = w - (narrow ? 14 : 24);
+      const span = right - left;
+      const barY = 58;
+      const barH = 34;
+      const rowY = (i: number) => (narrow ? 146 : 122) + i * (narrow ? 30 : 28);
+      const fade = time > DURATION - 500 ? 1 - clamp((time - (DURATION - 500)) / 500) : 1;
+      ctx.globalAlpha = fade;
+
+      text(ctx, c, `${kr(PRICE)} from the dealer`, left, 26, { size: narrow ? 13 : 14, weight: 500 });
+      ctx.strokeStyle = c.rule;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(left + 0.5, barY + 0.5, span - 1, barH - 1);
+
+      let at = 0;
+      PARTS.forEach((part, i) => {
+        const x = left + (at / PRICE) * span;
+        const width = (part.amount / PRICE) * span;
+        at += part.amount;
+        const p = ease((time - START - i * STEP) / 700);
+        const y = barY + (rowY(i) - 10 - barY) * p;
+        const h = barH + (20 - barH) * p;
+        ctx.fillStyle = HUES[part.hue][dark ? 1 : 0];
+        ctx.beginPath();
+        ctx.roundRect(x, y, Math.max(2, width), h, 2);
+        ctx.fill();
+        if (p > 0.6) {
+          ctx.globalAlpha = fade * clamp((p - 0.6) / 0.4);
+          const label = `${narrow ? part.short : part.name}  ${kr(part.amount)}`;
+          ctx.font = `12px ${c.font}`;
+          const room = right - (x + width + 8);
+          const size = ctx.measureText(label).width;
+          if (size < room) text(ctx, c, label, x + width + 8, rowY(i), { colour: c.ink });
+          else if (size < x - left - 8) text(ctx, c, label, x - 8, rowY(i), { colour: c.ink, align: 'right' });
+          else text(ctx, c, label, x + 8, rowY(i), { colour: c.paper, weight: 500 });
+          ctx.globalAlpha = fade;
+        }
+      });
+
+      const profitX = left + (at / PRICE) * span;
+      const profitW = right - profitX;
+      const glow = ease((time - END) / 600);
+      ctx.fillStyle = orange(c);
+      ctx.beginPath();
+      ctx.roundRect(profitX, barY, profitW, barH, 2);
+      ctx.fill();
+      if (glow > 0) {
+        ctx.globalAlpha = fade * glow;
+        text(ctx, c, `${kr(PRICE - at)} left: the profit`, narrow ? right : right - 30, narrow ? barY + barH + 18 : 26, { colour: orange(c), weight: 500, align: 'right' });
+      }
+      ctx.globalAlpha = 1;
+    };
+    loop(figure, DURATION, DURATION - 600, (t) => { time = t; draw(); });
+  }
+</script>

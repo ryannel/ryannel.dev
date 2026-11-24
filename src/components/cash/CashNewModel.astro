@@ -1,0 +1,143 @@
+---
+import '../../styles/hitl.css';
+import './cash.css';
+---
+<figure class="hitl cash" data-cash-model>
+  <div class="hitl-stage">
+    <canvas role="img" aria-label="Six years of a carmaker building a new electric model. Bars show each year's profit, which stays positive throughout. A line shows the cash in the bank, which falls for three years while the factory is built and climbs once the new car sells. Buttons switch between the plan, older models selling less, and the new car arriving a year late; in both of those the cash line drops below zero while profit stays positive."></canvas>
+  </div>
+  <div class="cash-buttons" role="group" aria-label="Scenario">
+    <button type="button" data-scenario="plan" aria-pressed="true">As planned</button>
+    <button type="button" data-scenario="slow" aria-pressed="false">Old models sell less</button>
+    <button type="button" data-scenario="late" aria-pressed="false">New car a year late</button>
+  </div>
+  <p class="hitl-readout" data-model-readout aria-live="polite"></p>
+  <figcaption>Norrvik starts with 15 billion kr and spends 10 billion a year on the new factory. A sketch with invented numbers.</figcaption>
+</figure>
+<script>
+  import { theme, fit, ball, NARROW } from '../slow/canvas';
+  import { text, orange, grey, tween } from './draw';
+
+  const START = 15;
+  /** Profit, and cash spent on the factory, for years 1 to 6, in billion kr. */
+  const SCENARIOS = {
+    plan: {
+      profit: [6, 6, 6, 7, 7, 7],
+      build: [10, 10, 10, 0, 0, 0],
+      text: 'Profit never drops below 6 billion a year, but the bank balance falls from 15 billion to 3 while the factory is built. Once the new car sells, cash climbs faster than profit, because the factory’s cost is spread over its life in the accounts but was already paid for.',
+    },
+    slow: {
+      profit: [2, 2, 2, 5, 5, 5],
+      build: [10, 10, 10, 0, 0, 0],
+      text: 'With fewer cars to share the factory’s fixed costs, profit falls to 2 billion a year. It is still a profit, but Norrvik runs out of cash in year 2 and is 9 billion short by year 3.',
+    },
+    late: {
+      profit: [6, 6, 6, 6, 7, 7],
+      build: [10, 10, 10, 10, 0, 0],
+      text: 'A year of delay means a fourth year of building with nothing new to sell. Profit is the same as the plan for that year, and the cash runs out.',
+    },
+  } as const;
+  type Name = keyof typeof SCENARIOS;
+  const DEPRECIATION = 3; // the factory's cost, spread over ten years once it runs
+  const Y_MIN = -12;
+  const Y_MAX = 36;
+
+  const cashLine = (name: Name) => {
+    const s = SCENARIOS[name];
+    const out = [START];
+    s.profit.forEach((p, i) => {
+      const running = s.build[i] === 0 ? DEPRECIATION : 0;
+      out.push(out[i] + p + running - s.build[i]);
+    });
+    return out;
+  };
+
+  for (const figure of document.querySelectorAll<HTMLElement>('[data-cash-model]')) {
+    const buttons = [...figure.querySelectorAll<HTMLButtonElement>('[data-scenario]')];
+    const readout = figure.querySelector<HTMLElement>('[data-model-readout]')!;
+    let scenario: Name = 'plan';
+    let shown: number[] = [];
+    let draw = () => {};
+    const c = theme(figure, () => draw());
+    const { ctx, view, clear } = fit(figure.querySelector('canvas')!, (w) => ({ W: w, H: w < NARROW ? 280 : 300 }), () => draw());
+
+    draw = () => {
+      clear(c.paper);
+      if (!shown.length) return;
+      const w = view.W;
+      const narrow = w < NARROW;
+      const o = orange(c);
+      const g = grey(c);
+      const left = narrow ? 44 : 64;
+      const right = w - (narrow ? 14 : 28);
+      const top = 50;
+      const bottom = view.H - 34;
+      const step = (right - left) / 6;
+      const x = (year: number) => left + year * step;
+      const y = (v: number) => bottom - ((v - Y_MIN) / (Y_MAX - Y_MIN)) * (bottom - top);
+      const profit = shown.slice(0, 6);
+      const cash = shown.slice(6);
+      const building = SCENARIOS[scenario].build.filter((b) => b > 0).length;
+
+      ball(ctx, left + 6, 22, 5, g);
+      text(ctx, c, 'Profit that year', left + 16, 22, { colour: c.muted });
+      ball(ctx, left + 136, 22, 5, o);
+      text(ctx, c, 'Cash in the bank', left + 146, 22, { colour: c.muted });
+
+      ctx.fillStyle = c.ink;
+      ctx.globalAlpha = 0.05;
+      ctx.fillRect(x(0), top - 6, x(building) - x(0), bottom - top + 6);
+      ctx.globalAlpha = 1;
+      text(ctx, c, 'Building the factory', (x(0) + x(building)) / 2, top + 4, { colour: c.muted, align: 'center', size: 11 });
+
+      for (const v of [-10, 0, 10, 20, 30]) {
+        ctx.strokeStyle = c.rule;
+        ctx.lineWidth = v === 0 ? 1.5 : 1;
+        ctx.globalAlpha = v === 0 ? 1 : 0.6;
+        ctx.beginPath();
+        ctx.moveTo(left, y(v));
+        ctx.lineTo(right, y(v));
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        text(ctx, c, v === 0 ? '0' : `${v} bn`, left - 8, y(v), { colour: c.muted, align: 'right', size: 11 });
+      }
+
+      profit.forEach((p, i) => {
+        const bw = Math.min(28, step * 0.4);
+        const cx = x(i + 0.5);
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.roundRect(cx - bw / 2, y(p), bw, y(0) - y(p), 2);
+        ctx.fill();
+        text(ctx, c, `Year ${i + 1}`, cx, bottom + 18, { colour: c.muted, align: 'center', size: 11 });
+      });
+
+      ctx.strokeStyle = o;
+      ctx.lineWidth = 2.5;
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      cash.forEach((v, i) => (i ? ctx.lineTo(x(i), y(v)) : ctx.moveTo(x(i), y(v))));
+      ctx.stroke();
+      cash.forEach((v, i) => {
+        ctx.fillStyle = v < 0 ? c.paper : o;
+        ctx.strokeStyle = o;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(x(i), y(v), 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      });
+    };
+
+    const target = () => [...SCENARIOS[scenario].profit, ...cashLine(scenario)];
+    const update = tween(target, (v) => (shown = v), () => draw());
+    const select = (name: Name) => {
+      scenario = name;
+      for (const b of buttons) b.setAttribute('aria-pressed', String(b.dataset.scenario === name));
+      readout.textContent = SCENARIOS[name].text;
+      update();
+    };
+    for (const b of buttons) b.addEventListener('click', () => select(b.dataset.scenario as Name));
+    select('plan');
+  }
+</script>

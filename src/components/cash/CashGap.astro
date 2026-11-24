@@ -1,0 +1,106 @@
+---
+import '../../styles/hitl.css';
+import '../slow/loop.css';
+import './cash.css';
+---
+<figure class="hitl slow-loop cash" data-cash-gap>
+  <div class="hitl-stage">
+    <canvas role="img" aria-label="A stream of cars moves along a 120-day line. Parts wait on a shelf, go through the factory, spend a month at sea and a month in a yard. At day 90 a dealer takes the car, which becomes an unpaid invoice. Norrvik pays its suppliers on day 30 and the dealer pays Norrvik on day 120. The three months between are shaded: money spent and not yet back, about 23 billion kronor across all the cars on the way."></canvas>
+    <button class="loop-pause" data-pause-loop type="button" aria-label="Pause animation" aria-pressed="false">Ⅱ</button>
+    <noscript><p>Norrvik pays for a car’s parts on day 30 and is paid by the dealer on day 120. Across all the cars on the way, about 23 billion kronor is spent and not yet back.</p></noscript>
+  </div>
+  <figcaption>One car’s journey from parts to payment, repeated about 700 times a day. A sketch with invented timings.</figcaption>
+</figure>
+<script>
+  import { theme, fit, NARROW } from '../slow/canvas';
+  import { loop } from '../slow/loop';
+  import { text, orange, grey, car, invoice, coin } from './draw';
+
+  const DAYS = 120;
+  const PAY_OUT = 30;
+  const SOLD = 90;
+  const STAGES = [
+    { from: 0, to: 20, name: 'On a shelf', short: 'Shelf' },
+    { from: 20, to: 30, name: 'Factory', short: 'Build' },
+    { from: 30, to: 60, name: 'At sea', short: 'Sea' },
+    { from: 60, to: 90, name: 'In the yard', short: 'Yard' },
+    { from: 90, to: 120, name: 'Invoice unpaid', short: 'Unpaid' },
+  ];
+  const MS_PER_DAY = 100;
+  const DURATION = DAYS * MS_PER_DAY;
+
+  for (const figure of document.querySelectorAll<HTMLElement>('[data-cash-gap]')) {
+    let time = 0;
+    let draw = () => {};
+    const c = theme(figure, () => draw());
+    const { ctx, view, clear } = fit(figure.querySelector('canvas')!, (w) => ({ W: w, H: w < NARROW ? 250 : 240 }), () => draw());
+    draw = () => {
+      clear(c.paper);
+      const w = view.W;
+      const narrow = w < NARROW;
+      const o = orange(c);
+      const g = grey(c);
+      const left = narrow ? 22 : 40;
+      const right = w - (narrow ? 48 : 60);
+      const x = (d: number) => left + (d / DAYS) * (right - left);
+      const trackY = 150;
+
+      // The gap: money out, not yet back.
+      ctx.fillStyle = o;
+      ctx.globalAlpha = 0.1;
+      ctx.fillRect(x(PAY_OUT), 70, x(DAYS) - x(PAY_OUT), trackY - 70 + 24);
+      ctx.globalAlpha = 1;
+      text(ctx, c, narrow ? 'Spent, not yet back' : 'Money spent, not yet back: about 3 months', (x(PAY_OUT) + x(DAYS)) / 2, 84, { colour: o, weight: 500, align: 'center', size: narrow ? 12 : 13 });
+
+      // The two payments.
+      ctx.strokeStyle = c.rule;
+      ctx.lineWidth = 1;
+      for (const d of [PAY_OUT, DAYS]) {
+        ctx.beginPath();
+        ctx.moveTo(x(d), 44);
+        ctx.lineTo(x(d), trackY + 24);
+        ctx.stroke();
+      }
+      text(ctx, c, narrow ? 'Pays suppliers' : 'Norrvik pays suppliers', x(PAY_OUT), 34, { colour: c.muted, align: 'center', size: narrow ? 11 : 12 });
+      text(ctx, c, 'Dealer pays', x(DAYS), 34, { colour: c.muted, align: 'right', size: narrow ? 11 : 12 });
+      text(ctx, c, 'Day 30', x(PAY_OUT), 18, { colour: c.muted, align: 'center', size: 11 });
+      text(ctx, c, 'Day 120', x(DAYS), 18, { colour: c.muted, align: 'right', size: 11 });
+
+      // Track and stages.
+      ctx.strokeStyle = c.rule;
+      ctx.beginPath();
+      ctx.moveTo(x(0), trackY + 8);
+      ctx.lineTo(x(DAYS), trackY + 8);
+      ctx.stroke();
+      STAGES.forEach((s) => {
+        ctx.beginPath();
+        ctx.moveTo(x(s.from), trackY + 4);
+        ctx.lineTo(x(s.from), trackY + 12);
+        ctx.stroke();
+        text(ctx, c, narrow ? s.short : s.name, (x(s.from) + x(s.to)) / 2, trackY + 26, { colour: c.muted, align: 'center', size: narrow ? 10 : 12 });
+      });
+
+      // One car every ten days, so the stream loops seamlessly.
+      const offset = time / MS_PER_DAY;
+      for (let k = 0; k < DAYS / 10; k++) {
+        const d = (offset + k * 10) % DAYS;
+        const px = x(d);
+        if (d < SOLD) {
+          // Parts until the factory, then a car.
+          if (d < 20) {
+            ctx.fillStyle = g;
+            for (let j = 0; j < 3; j++) ctx.fillRect(px - 7 + j * 5, trackY - 3, 4, 4);
+          } else car(ctx, px, trackY, d < PAY_OUT ? g : o, narrow ? 0.8 : 1);
+        } else invoice(ctx, c, px, trackY - 2, o);
+        // Money leaves on day 30 and comes back on day 120.
+        const out = d - PAY_OUT;
+        if (out >= 0 && out < 8) coin(ctx, x(PAY_OUT), 44 + 22 - out * 3, g, 1 - out / 8);
+        const back = DAYS - d;
+        if (back < 8) coin(ctx, x(DAYS) - 10, 44 + 22 - (8 - back) * 3, o, back / 8);
+      }
+
+      text(ctx, c, narrow ? '63,000 cars on the way: 23 billion kr' : 'About 63,000 cars on the way at once: about 23 billion kr tied up', w / 2, trackY + 62, { colour: c.ink, align: 'center', weight: 500, size: narrow ? 12 : 14 });
+    };
+    loop(figure, DURATION, 4500, (t) => { time = t; draw(); });
+  }
+</script>

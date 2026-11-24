@@ -1,10 +1,16 @@
 ---
 title: "Why a profitable company runs short of cash"
 description: "Following a made-up carmaker’s money to see how record sales can leave it scrambling."
-published: 2026-11-19
-draft: true
+published: 2026-11-24
+draft: false
 tags: ["business"]
 ---
+
+import CashSplit from '../../components/cash/CashSplit.astro';
+import CashGap from '../../components/cash/CashGap.astro';
+import CashGrowth from '../../components/cash/CashGrowth.astro';
+import CashLevers from '../../components/cash/CashLevers.astro';
+import CashNewModel from '../../components/cash/CashNewModel.astro';
 
 Every so often a big company announces record sales and, in the same week, a plan to save money.
 It sounds contradictory. If you’re selling more than ever, why would you be short of anything?
@@ -22,10 +28,6 @@ but that part isn’t Norrvik’s money.
 This year Norrvik sells 250,000 cars, so it takes in 100 billion kronor. That number is its
 **revenue**: everything customers paid, or agreed to pay, before anything is taken off. It’s the
 number in the headlines, and it’s a record.
-
-<Callout label="Figure to build">
-  A counter ticking up as cars roll off a line, settling at 100 billion kronor.
-</Callout>
 
 ## Profit
 
@@ -45,10 +47,7 @@ Six percent is a thin slice. If parts get 5% more expensive, that’s 14,000 kr 
 than half the profit is gone. This is why carmakers fight so hard over the price of steel and
 batteries.
 
-<Callout label="Figure to build">
-  One 400,000 kr bar that splits into coloured bands, each sliding off towards who it pays, leaving
-  the thin profit band behind.
-</Callout>
+<CashSplit />
 
 ## Cash
 
@@ -66,7 +65,7 @@ money has gone out but hasn’t come back, so it isn’t sitting in a bank. It�
 half-built cars and finished cars in a car park.
 
 That doesn’t sound like much for one car. But Norrvik sells about 700 cars a day. Three months of
-cars at different stages comes to around 60,000 cars, and Norrvik has already spent about 375,000
+cars at different stages comes to around 63,000 cars, and Norrvik has already spent about 375,000
 kr on each. That is about 23 billion kronor tied up at any one time, or nearly four years of
 profit.
 
@@ -74,11 +73,7 @@ Accountants call this **working capital**: the money a company needs to keep its
 paying for things and being paid for them. It’s still Norrvik’s money. Norrvik just can’t spend it,
 because it’s a car.
 
-<Callout label="Figure to build">
-  A timeline for one car. Money flows out to suppliers on the left, the car moves along through
-  factory, ship and yard, and the payment from the dealer arrives on the right. The gap between them
-  is shaded. Behind it, a car park fills with cars and a counter shows the kronor tied up in them.
-</Callout>
+<CashGap />
 
 ## Growing
 
@@ -93,10 +88,7 @@ This is the part that surprises people. A company growing quickly can be profita
 and still find its bank balance falling, because each sale needs cash before it brings cash back.
 The faster it grows, the more of its profit is waiting in a car park.
 
-<Callout label="Figure to build">
-  A slider for how fast Norrvik grows. The profit line stays positive while the cash line sags
-  further the faster it grows, until it dips below zero.
-</Callout>
+<CashGrowth />
 
 ## Getting the cash back
 
@@ -127,18 +119,14 @@ Sometimes the choice is made for it. When chips were scarce in 2021, carmakers a
 cars that were finished apart from a handful of chips. All the money for the steel, the battery and
 the seats had been spent, and the cars couldn’t be sold until the last parts arrived.
 
-<Callout label="Figure to build">
-  Three sliders: days cars spend in stock, days until the dealer pays, and days until Norrvik pays
-  its suppliers. As each one moves, the tied-up cash grows or shrinks, and a note shows what the
-  change costs elsewhere.
-</Callout>
+<CashLevers />
 
 ## The new model
 
 There is one more way profit and cash come apart, and it’s the biggest.
 
 Suppose Norrvik decides its next car should be electric. It needs a new platform, new tooling and
-perhaps a battery plant. Call it 15 billion kronor, spent over three years before the first car is
+perhaps a battery plant. Call it 30 billion kronor, spent over three years before the first car is
 sold.
 
 Profit doesn’t see that cost all at once. Because the factory will be used for years, the accounts
@@ -149,10 +137,7 @@ So for three years Norrvik is paying for a factory that earns nothing yet, out o
 current cars make, while those cars also need more cash to grow. If the old models sell slower than
 planned, or the new one is late, the cash runs out long before the profit does.
 
-<Callout label="Figure to build">
-  Two lines over six years. Profit stays steady. Cash falls for three years while the new factory is
-  built, then climbs back once the new car starts selling.
-</Callout>
+<CashNewModel />
 
 ## Record sales
 

@@ -1,0 +1,19 @@
+/* Shared by the figures in notes/where-the-cash-goes. */
+.cash .hitl-stage { padding: 0; overflow: hidden; }
+.cash canvas { display: block; width: 100%; }
+.cash .cash-controls {
+  display: grid;
+  grid-template-columns: minmax(9rem, auto) 1fr;
+  gap: 0.25rem 0.75rem;
+  align-items: center;
+  margin-top: 0.75rem;
+  font-size: 0.8125rem;
+  color: var(--ink);
+}
+.cash .cash-controls output { font-variant-numeric: tabular-nums; }
+.cash input[type='range'] { width: 100%; accent-color: var(--ink); }
+.cash .cash-buttons { display: flex; flex-wrap: wrap; gap: 0.375rem; margin-top: 0.75rem; font-size: 0.8125rem; }
+@media (max-width: 30rem) {
+  .cash .cash-controls { grid-template-columns: 1fr; }
+  .cash .cash-controls input { margin-bottom: 0.4rem; }
+}
