@@ -1,0 +1,204 @@
+---
+import '../../styles/hitl.css';
+
+/**
+ * The running clock for notes/why-big-companies-are-slow. Two bars on the same
+ * scale, about a year wide: the small shop's, which is only ever an afternoon,
+ * and the big company's, which gains a stretch each time the note shows the
+ * clock again. `upto` says how many stretches are on it so far; the newest one
+ * is orange and grows in when the figure scrolls into view, and the older ones
+ * are grey.
+ *
+ * The lengths are invented. It's a sketch of the shape, and the caption says so.
+ */
+interface Props {
+  upto: 0 | 1 | 2 | 3 | 4 | 5;
+}
+const { upto } = Astro.props;
+
+// What each stretch is, and roughly how many weeks it takes in this sketch.
+const STRETCHES: [string, number][] = [
+  ['Working out what is really being asked', 8],
+  ['Waiting for a decision', 26],
+  ['Waiting for every team to have room', 10],
+  ['Building and testing', 8],
+  ['Adding the line to the page', 0.1],
+];
+const SCALE = 54; // weeks across the full width of a bar, with room for the last sliver
+const AFTERNOON = 0.1;
+
+const shown = STRETCHES.slice(0, upto);
+const total = shown.reduce((a, [, w]) => a + w, 0);
+const pct = (w: number) => `${Math.max((w / SCALE) * 100, 0.4)}%`;
+const weeks = (w: number) => {
+  if (w < 1) return 'an afternoon';
+  if (w >= 50) return 'about a year';
+  const m = Math.round(w / 4.35);
+  return m === 1 ? 'about a month' : `about ${m} months`;
+};
+const sofar =
+  upto === 0
+    ? 'The big company’s clock hasn’t started yet.'
+    : `Big company so far: ${weeks(total)}${upto === STRETCHES.length ? ', of which the line itself took an afternoon' : ''}.`;
+const said = `The small shop took an afternoon. ${sofar}`;
+---
+
+<figure class="hitl slow-clock" data-slow-clock>
+  <div class="hitl-stage">
+    <p class="clock-said">{said}</p>
+    <div class="clock-row" aria-hidden="true">
+      <span class="clock-name">Small shop</span>
+      <div class="clock-track">
+        <span class="clock-bar is-past" style={`width:${pct(AFTERNOON)}`}></span>
+      </div>
+      <span class="clock-total">an afternoon</span>
+    </div>
+    <div class="clock-row" aria-hidden="true">
+      <span class="clock-name">Big company</span>
+      <div class="clock-track">
+        {
+          shown.map(([, w], i) => (
+            <span class:list={['clock-bar', i === upto - 1 ? 'is-new' : 'is-past']} style={`width:${pct(w)}`} />
+          ))
+        }
+      </div>
+      <span class="clock-total">{upto === 0 ? '?' : weeks(total)}</span>
+    </div>
+    {
+      upto > 0 && (
+        <ol class="clock-legend">
+          {shown.map(([name, w], i) => (
+            <li class:list={[i === upto - 1 ? 'is-new' : 'is-past']}>
+              <span class="hitl-swatch" aria-hidden="true" />
+              {name}: {weeks(w)}
+              {i === upto - 1 && <span class="clock-new">(new)</span>}
+            </li>
+          ))}
+        </ol>
+      )
+    }
+  </div>
+  {(upto === 1 || upto === STRETCHES.length) && <figcaption>A sketch with invented timings, on a scale of about a year.</figcaption>}
+</figure>
+
+<style>
+  .slow-clock {
+    --orange: light-dark(#ec8a3c, #f4a35e);
+    --past: light-dark(#8a867e, #6e6b66);
+  }
+  .clock-row {
+    display: grid;
+    grid-template-columns: 6.5rem 1fr 7.5rem;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.8125rem;
+  }
+  .clock-row + .clock-row {
+    margin-top: 0.6rem;
+  }
+  .clock-name {
+    color: var(--ink-muted);
+  }
+  .clock-total {
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+  .clock-said {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .clock-new {
+    margin-left: 0.35em;
+    font-weight: 600;
+  }
+  .clock-track {
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--ink-muted) 60%, transparent);
+    display: flex;
+    height: 1.1rem;
+    border-radius: 3px;
+    background: var(--surface);
+    overflow: hidden;
+  }
+  .clock-bar {
+    display: block;
+    height: 100%;
+    min-width: 4px;
+    flex-shrink: 0;
+    transform-origin: left;
+  }
+  .clock-bar + .clock-bar {
+    border-left: 2px solid var(--paper);
+  }
+  .clock-bar.is-past {
+    background: var(--past);
+  }
+  .clock-bar.is-new {
+    background: var(--orange);
+    box-shadow: inset 0 0 0 2px var(--ink);
+    transition: transform 1.6s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  .slow-clock[data-waiting] .clock-bar.is-new {
+    transform: scaleX(0);
+  }
+  .clock-legend {
+    margin: 0.9rem 0 0;
+    padding: 0;
+    list-style: none;
+    font-size: 0.8125rem;
+    line-height: 1.6;
+    color: var(--ink-muted);
+  }
+  .clock-legend .hitl-swatch {
+    display: inline-block;
+    width: 0.7em;
+    height: 0.7em;
+    margin-right: 0.45em;
+    border-radius: 2px;
+    vertical-align: -0.05em;
+  }
+  .clock-legend .is-past .hitl-swatch {
+    background: var(--past);
+  }
+  .clock-legend .is-new {
+    color: var(--ink);
+  }
+  .clock-legend .is-new .hitl-swatch {
+    background: var(--orange);
+  }
+  @media (max-width: 34rem) {
+    .clock-row {
+      grid-template-columns: 1fr auto;
+      gap: 0.3rem 0.75rem;
+    }
+    .clock-track {
+      grid-column: 1 / -1;
+      grid-row: 2;
+    }
+  }
+</style>
+
+<script>
+  // Hold the newest stretch at zero until the figure is on screen, then let it grow in.
+  const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!still && 'IntersectionObserver' in window) {
+    const seen = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (!e.isIntersecting) continue;
+          (e.target as HTMLElement).removeAttribute('data-waiting');
+          seen.unobserve(e.target);
+        }
+      },
+      { threshold: 0.6 },
+    );
+    for (const figure of document.querySelectorAll<HTMLElement>('[data-slow-clock]')) {
+      if (!figure.querySelector('.clock-bar.is-new')) continue;
+      figure.setAttribute('data-waiting', '');
+      seen.observe(figure);
+    }
+  }
+</script>
