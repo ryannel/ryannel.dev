@@ -1,0 +1,137 @@
+---
+import '../../styles/hitl.css';
+import './cash.css';
+---
+<figure class="hitl cash" data-cash-levers>
+  <div class="hitl-stage">
+    <canvas role="img" aria-label="Two timelines. The top one is a car: the days it spends from parts arriving to the dealer taking it, then the days until the dealer pays. The bottom one is Norrvik's bill for the parts, paid after a number of days. The gap between paying the bill and being paid is shaded, with the cash it ties up. Three sliders change the three lengths."></canvas>
+  </div>
+  <div class="cash-controls">
+    <label for="cash-stock">Days from parts to dealer: <output data-out="stock">90</output></label>
+    <input id="cash-stock" type="range" min="20" max="150" step="5" value="90" data-lever="stock" />
+    <label for="cash-dealer">Days until the dealer pays: <output data-out="dealer">30</output></label>
+    <input id="cash-dealer" type="range" min="0" max="90" step="5" value="30" data-lever="dealer" />
+    <label for="cash-supplier">Days until Norrvik pays suppliers: <output data-out="supplier">30</output></label>
+    <input id="cash-supplier" type="range" min="0" max="150" step="5" value="30" data-lever="supplier" />
+  </div>
+  <p class="hitl-readout" data-levers-readout aria-live="polite"></p>
+  <figcaption>The cash tied up is the gap in days times what Norrvik spends a day, about 257 million kr. A sketch with invented numbers.</figcaption>
+</figure>
+<script>
+  import { theme, fit, NARROW } from '../slow/canvas';
+  import { text, orange, grey, tween } from './draw';
+
+  const PER_DAY = 93.75 / 365; // billion kr of costs a day
+  const DEFAULT = { stock: 90, dealer: 30, supplier: 30 };
+  const SCALE = 240; // days across the figure
+  type Key = keyof typeof DEFAULT;
+
+  const COSTS: Record<Key, [string, string]> = {
+    stock: [
+      'With fewer cars waiting, customers wait longer instead, and some buy another brand.',
+      'With more cars waiting, customers drive away sooner, but there are more to discount when the model changes.',
+    ],
+    dealer: [
+      'Dealers who pay sooner can afford to hold fewer cars, so they order fewer.',
+      'Giving dealers longer to pay helps them carry more cars, with Norrvik’s money.',
+    ],
+    supplier: [
+      'Paying suppliers sooner keeps them healthy, and costs Norrvik cash.',
+      'Paying suppliers later leaves them short instead, and a supplier that fails stops the line.',
+    ],
+  };
+
+  for (const figure of document.querySelectorAll<HTMLElement>('[data-cash-levers]')) {
+    const inputs = [...figure.querySelectorAll<HTMLInputElement>('[data-lever]')];
+    const readout = figure.querySelector<HTMLElement>('[data-levers-readout]')!;
+    const days = () => Object.fromEntries(inputs.map((i) => [i.dataset.lever, Number(i.value)])) as Record<Key, number>;
+    let shown: number[] = [];
+    let draw = () => {};
+    const c = theme(figure, () => draw());
+    const { ctx, view, clear } = fit(figure.querySelector('canvas')!, (w) => ({ W: w, H: 200 }), () => draw());
+
+    draw = () => {
+      clear(c.paper);
+      if (!shown.length) return;
+      const [stock, dealer, supplier] = shown;
+      const w = view.W;
+      const narrow = w < NARROW;
+      const o = orange(c);
+      const g = grey(c);
+      const left = narrow ? 14 : 24;
+      const right = w - (narrow ? 14 : 24);
+      const x = (d: number) => left + (d / SCALE) * (right - left);
+      const size = narrow ? 11 : 12;
+      const carY = 52;
+      const billY = 112;
+
+      const paid = stock + dealer;
+      const gap = paid - supplier;
+      ctx.fillStyle = gap >= 0 ? o : g;
+      ctx.globalAlpha = 0.14;
+      ctx.fillRect(Math.min(x(supplier), x(paid)), carY - 14, Math.abs(x(paid) - x(supplier)), billY - carY + 28);
+      ctx.globalAlpha = 1;
+
+      text(ctx, c, 'The car', left, carY - 24, { colour: c.muted, size });
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.roundRect(x(0), carY - 8, x(stock) - x(0), 16, 3);
+      ctx.fill();
+      ctx.fillStyle = o;
+      ctx.globalAlpha = 0.55;
+      ctx.beginPath();
+      ctx.roundRect(x(stock), carY - 8, Math.max(0, x(paid) - x(stock)), 16, 3);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      if (x(stock) - x(0) > 70) text(ctx, c, narrow ? 'To dealer' : 'Parts to dealer', x(0) + 6, carY, { colour: c.paper, size });
+      if (x(paid) - x(stock) > 70) text(ctx, c, narrow ? 'Unpaid' : 'Dealer owes', x(stock) + 6, carY, { colour: c.ink, size });
+
+      text(ctx, c, 'Norrvik’s bill for the parts', left, billY - 24, { colour: c.muted, size });
+      ctx.strokeStyle = g;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([3, 4]);
+      ctx.beginPath();
+      ctx.moveTo(x(0), billY);
+      ctx.lineTo(x(supplier), billY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(x(supplier), billY, 5, 0, Math.PI * 2);
+      ctx.fill();
+      text(ctx, c, 'Paid', x(supplier) + 9, billY, { colour: c.muted, size });
+
+      const tied = Math.round(gap * PER_DAY);
+      const label = gap >= 0
+        ? `${Math.round(gap)} days: about ${tied} billion kr tied up`
+        : `Paid ${Math.round(-gap)} days early: Norrvik holds about ${-tied} billion kr of suppliers’ money`;
+      text(ctx, c, label, w / 2, 172, { colour: gap >= 0 ? o : c.ink, weight: 500, align: 'center', size: narrow ? 12 : 14 });
+    };
+
+    const target = () => { const d = days(); return [d.stock, d.dealer, d.supplier]; };
+    const update = tween(target, (v) => (shown = v), () => draw());
+
+    const describe = () => {
+      const d = days();
+      for (const i of inputs) figure.querySelector(`[data-out="${i.dataset.lever}"]`)!.textContent = i.value;
+      const before = (DEFAULT.stock + DEFAULT.dealer - DEFAULT.supplier) * PER_DAY;
+      const now = (d.stock + d.dealer - d.supplier) * PER_DAY;
+      const moved = (Object.keys(DEFAULT) as Key[]).filter((k) => d[k] !== DEFAULT[k]);
+      if (!moved.length) {
+        readout.textContent = 'Move a slider to see how much cash it frees, and what that costs.';
+        return;
+      }
+      const change = Math.round(now - before);
+      const head = change < 0 ? `That frees about ${-change} billion kr.` : change > 0 ? `That ties up about ${change} billion kr more.` : 'That leaves the cash where it was.';
+      const costs = moved.map((k) => {
+        const freesCash = k === 'supplier' ? d[k] > DEFAULT[k] : d[k] < DEFAULT[k];
+        return COSTS[k][k === 'supplier' ? Number(freesCash) : Number(!freesCash)];
+      });
+      readout.textContent = `${head} ${costs.join(' ')}`;
+    };
+
+    for (const i of inputs) i.addEventListener('input', () => { describe(); update(); });
+    describe();
+    update();
+  }
+</script>
