@@ -1,0 +1,3 @@
+Three.js 0.170.0
+https://registry.npmjs.org/three/-/three-0.170.0.tgz
+sha512-FQK+LEpYc0fBD+J8g6oSEyyNzjp+Q7Ks1C568WWaoMRLW+TkNNWmenWeGgJjV105Gd+p/2ql1ZcjYvNiPZBhuQ==

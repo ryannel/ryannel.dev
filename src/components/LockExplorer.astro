@@ -1,0 +1,55 @@
+<figure class="lock-explorer" id="explore-the-locks">
+  <lock-explorer data-article-explorer label="Explore six lock mechanisms in 3D"></lock-explorer>
+  <figcaption><a href="/lock-explorer/explorer.html">Open the full explorer ↗</a></figcaption>
+</figure>
+
+<script is:inline type="module" src="/lock-explorer/embed.mjs"></script>
+
+<script>
+  import articleStyles from '../styles/lock-explorer.css?inline';
+
+  // The reader owns its iframe and handles navigation and resizing. The article
+  // supplies its own type and colour tokens as it does for the map explorer.
+  customElements.whenDefined('lock-explorer').then(() => {
+    for (const host of document.querySelectorAll('lock-explorer[data-article-explorer]')) {
+      const frame = host.shadowRoot?.querySelector('iframe');
+      if (!frame) continue;
+      const root = document.documentElement;
+      const syncTheme = () => {
+        const page = frame.contentDocument;
+        if (!page?.querySelector('#explorer-page')) return;
+        if (!page.querySelector('style[data-article-style]')) {
+          const style = page.createElement('style');
+          style.dataset.articleStyle = '';
+          style.textContent = articleStyles;
+          page.head.append(style);
+        }
+        const theme = getComputedStyle(root);
+        const viewer = page.documentElement.style;
+        viewer.colorScheme = theme.colorScheme;
+        for (const [key, token] of Object.entries({
+          '--ink': '--ink', '--paper': '--paper', '--box': '--surface', '--muted': '--ink-muted',
+          '--line': '--rule', '--accent': '--accent', '--teal': '--accent', '--tint': '--selection',
+          '--sans': '--font-ui', '--serif': '--font-prose', '--mono': '--font-mono',
+        })) viewer.setProperty(key, theme.getPropertyValue(token));
+      };
+      frame.addEventListener('load', syncTheme);
+      new MutationObserver(syncTheme).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+      syncTheme();
+    }
+  });
+</script>
+
+<style>
+  :global(.prose #explore-the-locks),
+  figure.lock-explorer {
+    width: min(60rem, calc(100vw - var(--gutter) * 2));
+    max-width: none;
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+  figure.lock-explorer { margin-top: .75rem; scroll-margin-top: 1.25rem; }
+  lock-explorer::part(frame) { background: transparent; border: 0; border-radius: 0; }
+  figcaption { text-align: right; }
+</style>
