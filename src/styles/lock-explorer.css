@@ -7,10 +7,8 @@
   font-display: swap;
 }
 
-.explorer-mast, .collection-heading h1 { display: none; }
-/* Keep the reader's short introduction above the lock grid. */
-.collection-heading { margin: 0 0 1.4rem; }
-.collection-heading p { font: 400 1.08rem/1.5 var(--serif); color: var(--ink); max-width: 62ch; }
+/* The article introduces the grid itself, so the reader's own heading stays hidden. */
+.explorer-mast, .collection-heading { display: none; }
 body main { max-width: none; margin: 0; padding: .4rem 3px; }
 body { -webkit-font-smoothing: antialiased; }
 .shelf { gap: 1.5rem 1rem; }
