@@ -1,6 +1,6 @@
 ---
 title: "Modelling locks in Blender"
-description: "I found lock picking manuals tucked among the hacking guides I downloaded as a teenager. Years later I used Astra and Blender to animate six locks from the inside."
+description: "I've been fascinated by locks since I found lock picking manuals among the hacking guides I downloaded as a teenager. Now that AI can build 3D models, I had to try making some."
 status: "Completed"
 published: 2026-11-24
 draft: false
@@ -16,29 +16,28 @@ import LockExplorer from '../../components/LockExplorer.astro';
   text="Choose a lock and follow its moving parts in a cutaway."
 />
 
-The early 2000s were a good time to be a curious kid on the internet. A time of dial up modems,
-secret forums, peer to peer networks and pirated software. Getting online still felt like and
+The early 2000s were a good time to be a curious kid on the internet. A time of dial-up modems,
+secret forums, peer-to-peer networks and pirated software. Getting online still felt like an
 occasion and the internet was young and messy.
 
 I got hooked on software security, on hacking. I used to trawl the forums downloading
 compressed bundles of guides, software and pirated books, reading everything I could get my
-hands on. Those bundles were a mess of unorganised files, and mixed in alongside The Hacker
-Manifesto, guides on port scanning and security were other topics like stories of phreaking
-(hacking telephone networks) from the 70s, the Anarchists Cookbook, and strangely enough lock
-picking.
+hands on. Those bundles were a mess of disorganised files. Mixed in with *The Hacker Manifesto*
+and guides on port scanning were stories of phreaking (hacking telephone networks) from the
+'70s, *The Anarchist Cookbook* and, strangely enough, guides to lock picking.
 
-Those early days started off a quiet and life long interest in locks.
+Those early days started a lifelong interest in locks.
 
-I find them facinating and as AI models became better and better at Blender and 3D modeling,
-one of the first things I wanted to try and make were some 3D models of locks.
+I still find them fascinating. So when AI models started getting good at Blender, locks were
+one of the first things I wanted to try.
 
-Here they are:
+Here are the six I've made so far. Pick one to watch it open from the inside.
 
 <LockExplorer />
 
 ## Get the models
 
-The [lock project on GitHub](https://github.com/ryannel/experiments/tree/main/lock_mechanisms) has the editable Blender models, the scripts that build them and the finished animations. I’ve included two skills in `.agents/skills/` you can use to build a lock of your own and check how its parts fit and move. To download just this experiment, run
+The [lock project on GitHub](https://github.com/ryannel/experiments/tree/main/lock_mechanisms) has the editable Blender models, the scripts that build them and the finished animations. I’ve included two skills in `.agents/skills/` you can use to build a lock of your own and check how its parts fit and move. To download just this experiment, run:
 
 ```sh
 git clone --filter=blob:none --sparse https://github.com/ryannel/experiments.git

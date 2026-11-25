@@ -38,19 +38,17 @@ export function cameraChoices(c){
 }
 
 export function wireCameras(figure,c){
-  const movie=figure.querySelector('video'), labels=figure.querySelector('.label-switch');
+  const movie=figure.querySelector('video');
   const files=cameraFiles(c.asset);
-  const labelView=files.assembly?(c.asset.split('/').at(-1).startsWith('wafer-')?'context':'whole'):'paired';
   const urls={context:files.context,whole:files.whole,guided:files.guided,detail:files.detail,paired:c.clip||c.asset+'.mp4'};
   const controller=new AbortController(), options={signal:controller.signal};
-  let current=movie.dataset.camera,pending=null,labelReturn=null;
+  let current=movie.dataset.camera,pending=null;
 
   function choose(view){
     if(view===current)return;
     // A second selection can arrive before the first source has loaded.
     pending=pending||{time:movie.currentTime,play:!movie.paused&&!movie.ended,rate:movie.playbackRate,
       captions:Array.from(movie.textTracks).some(track=>track.mode==='showing')};
-    if(view!==labelView&&labels.getAttribute('aria-expanded')==='true'){labelReturn=null;labels.click();}
     current=view;
     for(const button of figure.querySelectorAll('button[data-camera]')){
       button.setAttribute('aria-pressed',String(button.dataset.camera===view));
@@ -78,15 +76,5 @@ export function wireCameras(figure,c){
     const button=event.target.closest('[data-camera]');
     if(button)choose(button.dataset.camera);
   },options);
-  // Use the camera for which the part positions were measured.
-  labels.addEventListener('click',()=>{
-    if(labels.getAttribute('aria-expanded')==='false'){
-      if(current!==labelView)labelReturn=current;
-      movie.preload='auto';movie.pause();if(pending)pending.play=false;choose(labelView);
-    }else if(labelReturn){
-      const target=labelReturn;labelReturn=null;
-      setTimeout(()=>{if(figure.isConnected&&labels.getAttribute('aria-expanded')==='false')choose(target);},0);
-    }
-  },{...options,capture:true});
   return ()=>controller.abort();
 }

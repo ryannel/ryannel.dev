@@ -113,7 +113,9 @@ export function wireLabels(root,family,c={}){
   const paint=frame?makeOverlay(frame.querySelector('svg')):null;
   const name=c.asset?.split('/').pop(),source=(c.bindingSource||c.asset)?.split('/').pop();
   const assembled=assemblyLabels[name],coords=assembled||familyData[c.inspect]?.points||{};
-  const locations=new Map(),paths=new Map();
+  const locations=new Map(),paths=new Map(),closePaths=new Map();
+  // How the active camera's picture is made from the wide and close-up cameras.
+  let views=null,closeSize=null;
   for(const [term,[frame,x,y]] of Object.entries(coords))locations.set(term,{frame,x,y});
   if(family==='pin'&&movie&&!assembled){
     for(const point of pinExamples(c.asset,c.mixed,c.securityStudies==='mixed'))locations.set(point.key,point);
@@ -126,7 +128,6 @@ export function wireLabels(root,family,c={}){
   for(const [key,point] of locations)if(point.frame>c.lastFrame)locations.delete(key);
 
   const entries=new Map(glossaryEntries(family)),rows=new Map();
-  const detailTerms=new Set();
   const controller=new AbortController(),options={signal:controller.signal};
   let active=false,selected='',pending=null,videoCallback=0,ready=false;
   index.querySelector('summary').textContent=familyNames[family]+' glossary';
@@ -138,13 +139,21 @@ export function wireLabels(root,family,c={}){
 
   async function prepare(){
     if(ready||!movie)return;
+    const [cuts,close]=await Promise.all([loadTracks('./camera-cuts.json?v=view-labels-1'),loadTracks('./close-tracks.json?v=view-labels-1')]);
+    if(controller.signal.aborted)return;
+    views=cuts[name]?.views||null;
+    const closeup=close[source];
+    if(closeup){
+      closeSize=closeup.size;
+      for(const [key,segments] of Object.entries(closeup.tracks))if(entries.has(key))closePaths.set(key,segments);
+    }
     if(assembled||!c.inspect){
       const dataset=await loadTracks(assembled?'./part-tracks.json':'./label-tracks.json');
       if(controller.signal.aborted)return;
       for(const [id,path] of Object.entries(dataset[source]||{})){
-        const detail=id.startsWith('detail/');
-        const key=assembled?id.replace(/^detail\//,''):filmKeys[family]?.[id];
-        if(detail)detailTerms.add(key);
+        // Close-up positions now come from close-tracks.json.
+        if(id.startsWith('detail/'))continue;
+        const key=assembled?id:filmKeys[family]?.[id];
         if(entries.has(key))paths.set(key,path);
       }
     }
@@ -153,8 +162,9 @@ export function wireLabels(root,family,c={}){
     const parts=document.createElement('optgroup'),moments=document.createElement('optgroup');
     parts.label='Parts';moments.label='Pause at a film moment';
     for(const [key,[title]] of entries){
-      if(!paths.has(key)&&!locations.has(key))continue;
-      const target=!paths.has(key)&&locations.get(key)?.frame!==undefined?moments:parts;
+      const moving=paths.has(key)||closePaths.has(key);
+      if(!moving&&!locations.has(key))continue;
+      const target=!moving&&locations.get(key)?.frame!==undefined?moments:parts;
       target.append(new Option(title,key));
       const button=document.createElement('button');button.type='button';button.dataset.term=key;button.textContent=title;
       rows.get(key).firstChild.replaceWith(button);
@@ -162,20 +172,34 @@ export function wireLabels(root,family,c={}){
     for(const group of [parts,moments])if(group.children.length)choice.append(group);
   }
   const currentFrame=()=>Math.max(0,Math.floor(movie.currentTime*24+.005));
-  function anchor(key,at){
-    let x,y;
+  // A point in the wide camera's normalised picture.
+  function widePoint(key,at){
     if(paths.has(key)){
       const [u,v]=pointAt(paths.get(key),at);
-      x=u/(detailTerms.has(key)?400:assembled?960:1600);y=v/(detailTerms.has(key)?460:assembled?720:900);
-    }else{
-      const p=locations.get(key);
-      if(!p||(p.frame!==undefined&&p.frame!==at))return null;
-      ({x,y}=p);
+      return [u/(assembled?960:1600),v/(assembled?720:900)];
     }
-    if(!(x>=0&&x<=1&&y>=0&&y<=1))return null;
-    if(detailTerms.has(key)){x=(904+x*368)/1280;y=(148+y*424)/720;}
-    else if(assembled&&movie.dataset.camera==='context'){x=x*896/1280;y=(24+y*672)/720;}
-    return {key,name:entries.get(key)[0].replace(/ \(.+\)$/,''),x,y};
+    const p=locations.get(key);
+    if(!p||(p.frame!==undefined&&p.frame!==at))return null;
+    return [p.x,p.y];
+  }
+  // A point in the close-up camera, or null while that part is hidden from it.
+  function closePoint(key,at){
+    const segment=closePaths.get(key)?.find(path=>path[0][0]<=at&&at<=path.at(-1)[0]);
+    if(!segment)return null;
+    const [u,v]=pointAt(segment,at);
+    return [u/closeSize[0],v/closeSize[1]];
+  }
+  function anchor(key,at){
+    const span=views?.[movie.dataset.camera]?.find(part=>part.from<=at&&at<part.to);
+    for(const {layer,t,clip} of span?.layers||[]){
+      const point=layer==='close'?closePoint(key,at):widePoint(key,at);
+      if(!point)continue;
+      const [u,v]=point;
+      if(!(u>=clip[0]&&u<=clip[2]&&v>=clip[1]&&v<=clip[3]))continue;
+      const x=t[0]*u+t[1],y=t[2]*v+t[3];
+      if(x>=0&&x<=1&&y>=0&&y<=1)return {key,name:entries.get(key)[0].replace(/ \(.+\)$/,''),x,y};
+    }
+    return null;
   }
   function draw(at){
     if(!movie)return;
@@ -184,7 +208,7 @@ export function wireLabels(root,family,c={}){
     const picture=pictureRect(movie);
     const limit=picture.width<430?2:3;
     const anchors=keys.map(key=>anchor(key,at)).filter(Boolean).slice(0,limit);
-    locate.hidden=!selected||anchors.length>0||!paths.has(selected);
+    locate.hidden=!selected||anchors.length>0||!(paths.has(selected)||closePaths.has(selected));
     paint(anchors,picture);
   }
   function drawNow(){if(movie)draw(currentFrame());}
@@ -202,10 +226,12 @@ export function wireLabels(root,family,c={}){
     selected=key;pending=null;
     if(key&&!paths.has(key)&&locations.get(key)?.frame!==undefined){
       movie.pause();pending=locations.get(key).frame;seek();
-    }else if(paths.has(key)&&!anchor(key,currentFrame())){
-      // Some inset cameras crop a moving part during the final turn.
+    }else if((paths.has(key)||closePaths.has(key))&&!anchor(key,currentFrame())){
+      // The active camera can crop a moving part or cut to a close-up that hides it.
       const at=currentFrame();
-      const visible=paths.get(key).map(([frame])=>frame).filter(frame=>frame<movie.duration*24&&anchor(key,frame));
+      const frames=new Set([...(paths.get(key)||[]),...(closePaths.get(key)||[]).flat()].map(([frame])=>frame));
+      for(const span of views?.[movie.dataset.camera]||[])frames.add(span.from);
+      const visible=[...frames].filter(frame=>frame<movie.duration*24&&anchor(key,frame));
       if(visible.length){
         movie.pause();pending=visible.reduce((a,b)=>Math.abs(a-at)<Math.abs(b-at)?a:b);seek();
       }

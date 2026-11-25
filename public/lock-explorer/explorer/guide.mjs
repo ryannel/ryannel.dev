@@ -1,9 +1,9 @@
-import {cameraChoices,cameraFiles,wireCameras} from './camera-views.mjs?v=named-labels-1';
+import {cameraChoices,cameraFiles,wireCameras} from './camera-views.mjs?v=view-labels-1';
 import {featureNotes} from './feature-notes.mjs';
 import {familyData} from './family-data.mjs?v=wheel-views-1';
 import {hasTouchCues,touchCues,wireTouchCues} from './feedback.mjs?v=quiet-1';
 import {guides} from './walkthroughs.mjs?v=lock-views-2';
-import {labelControls,labelFrame,wireLabels} from './part-labels.mjs?v=named-labels-1';
+import {labelControls,labelFrame,wireLabels} from './part-labels.mjs?v=view-labels-1';
 
 const main=document.querySelector('main');
 const names=Object.keys(guides);
